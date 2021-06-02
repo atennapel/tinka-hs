@@ -1,0 +1,57 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
+--
+-- see: https://github.com/sol/hpack
+
+name:           tinka-hs
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/atennapel/tinka-hs#readme>
+homepage:       https://github.com/atennapel/tinka-hs#readme
+bug-reports:    https://github.com/atennapel/tinka-hs/issues
+author:         Albert ten Napel
+maintainer:     aptennap@gmail.com
+copyright:      2021 Albert ten Napel
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+
+source-repository head
+  type: git
+  location: https://github.com/atennapel/tinka-hs
+
+executable tinka-hs
+  main-is: Main.hs
+  other-modules:
+      Common
+      Core
+      Ctx
+      Elaboration
+      Surface
+      Val
+      Verification
+      Paths_tinka_hs
+  hs-source-dirs:
+      src
+  default-extensions:
+      DerivingVia
+      DeriveAnyClass
+      DeriveFunctor
+      DeriveFoldable
+      DeriveTraversable
+      FlexibleContexts
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      OverloadedStrings
+      PatternSynonyms
+      StandaloneDeriving
+      Strict
+      TupleSections
+      ViewPatterns
+  ghc-options: -Wall -Wno-name-shadowing -Wno-missing-signatures -Wno-unused-do-bind -Wno-unused-matches -Wno-missing-pattern-synonym-signatures -threaded -rtsopts -with-rtsopts=-N -O
+  build-depends:
+      base >=4.7 && <5
+    , megaparsec
+  default-language: Haskell2010
