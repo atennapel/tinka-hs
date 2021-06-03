@@ -29,6 +29,7 @@ executable tinka-hs
       Core
       Ctx
       Elaboration
+      Parser
       Surface
       Val
       Verification

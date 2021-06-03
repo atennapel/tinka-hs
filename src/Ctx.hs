@@ -1,5 +1,7 @@
 module Ctx where
 
+import Text.Megaparsec (SourcePos)
+
 import Common
 import Core
 import Surface
@@ -22,17 +24,21 @@ data Ctx = Ctx {
   lvl :: Lvl,
   ns :: [Name],
   ts :: [Val],
-  vs :: Env
+  vs :: Env,
+  pos :: Maybe SourcePos
 }
 
 empty :: Ctx
-empty = Ctx 0 [] [] []
+empty = Ctx 0 [] [] [] Nothing
 
 define :: Name -> Val -> Val -> Ctx -> Ctx
-define x t v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (v : vs ctx)
+define x t v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (v : vs ctx) (pos ctx)
 
 bind :: Name -> Val -> Ctx -> Ctx
-bind x t ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx)
+bind x t ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (pos ctx)
+
+enter :: SourcePos -> Ctx -> Ctx
+enter p ctx = ctx { pos = Just p }
 
 closeVal :: Ctx -> Val -> Clos
 closeVal ctx v = Clos (vs ctx) (quote (lvl ctx + 1) v)

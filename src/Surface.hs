@@ -2,10 +2,10 @@ module Surface (Surface(..), fromCore) where
 
 import GHC.Exts( IsString(..) )
 import Data.List (intercalate)
+import Text.Megaparsec (SourcePos)
 
 import Common
 import Core
-
 
 data Surface
   = SVar Name
@@ -14,10 +14,12 @@ data Surface
   | SPi Name Surface Surface
   | SU
   | SLet Name (Maybe Surface) Surface Surface
+  | SPos SourcePos Surface
 
 isSimple :: Surface -> Bool
 isSimple (SVar _) = True
 isSimple SU = True
+isSimple (SPos _ s) = isSimple s
 isSimple _ = False
 
 showS :: Surface -> String
@@ -27,14 +29,17 @@ flattenApp :: Surface -> (Surface, [Surface])
 flattenApp s = go s []
   where
     go (SApp f a) as = go f (a : as)
+    go (SPos _ s) as = go s as
     go s as = (s, as)
 
 flattenAbs :: Surface -> ([(Name, Maybe Surface)], Surface)
 flattenAbs (SAbs x t b) = let (as, s') = flattenAbs b in ((x, t) : as, s')
+flattenAbs (SPos _ s) = flattenAbs s
 flattenAbs s = ([], s)
 
 flattenPi :: Surface -> ([(Name, Surface)], Surface)
 flattenPi (SPi x t b) = let (as, s') = flattenPi b in ((x, t) : as, s')
+flattenPi (SPos _ s) = flattenPi s
 flattenPi s = ([], s)
 
 showAbsBinder :: (Name, Maybe Surface) -> String
@@ -43,6 +48,7 @@ showAbsBinder (x, Just t) = "(" ++ x ++ " : " ++ show t ++ ")"
 
 showPiBinder :: (Name, Surface) -> String
 showPiBinder ("_", s@(SApp _ _)) = show s
+showPiBinder ("_", SPos _ s@(SApp _ _)) = show s
 showPiBinder ("_", s) = showS s
 showPiBinder (x, s) = "(" ++ x ++ " : " ++ show s ++ ")"
 
@@ -60,6 +66,7 @@ instance Show Surface where
     intercalate " -> " (map showPiBinder as) ++ " -> " ++ show s'
   show (SLet x Nothing v b) = "let " ++ x ++ " = " ++ show v ++ "; " ++ show b
   show (SLet x (Just t) v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
+  show (SPos _ s) = show s
 
 instance IsString Surface where
   fromString = SVar

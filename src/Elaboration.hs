@@ -16,6 +16,7 @@ checkOrInfer ctx v (Just t) = do
   return (cv, ct, ty)
 
 check :: Ctx -> Surface -> Val -> TC Core
+check ctx (SPos p s) ty = check (enter p ctx) s ty
 check ctx (SAbs x Nothing b) (VPi x' ty b') = do
   cb <- check (bind x ty ctx) b (vinst b' $ vvar (lvl ctx))
   return $ Abs x (quote (lvl ctx) ty) cb
@@ -29,6 +30,7 @@ check ctx s ty = do
   return c
 
 infer :: Ctx -> Surface -> TC (Core, Val)
+infer ctx (SPos p s) = infer (enter p ctx) s
 infer ctx SU = return (U, VU) -- type-in-type
 infer ctx (SVar x) = do
   (i, ty) <- lookupVar ctx x
@@ -56,7 +58,7 @@ infer ctx (SLet x t v b) = do
   return (Let x ct cv cb, rty)
 infer ctx s = err $ "unable to infer " ++ show s
 
-elaborate :: Surface -> TC (Core, Core)
-elaborate s = do
-  (c, ty) <- infer empty s
+elaborate :: Ctx -> Surface -> TC (Core, Core)
+elaborate ctx s = do
+  (c, ty) <- infer ctx s
   return (c, quote 0 ty)
