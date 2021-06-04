@@ -28,8 +28,13 @@ parens p   = char '(' *> p <* char ')'
 pArrow     = symbol "→" <|> symbol "->"
 pBind      = pIdent <|> symbol "_"
 
+isUniv :: String -> Bool
+isUniv "U" = True
+isUniv ('U' : tl) = all isDigit tl
+isUniv _ = False
+
 keyword :: String -> Bool
-keyword x = x == "let" || x == "λ" || x == "U"
+keyword x = x == "let" || x == "λ" || isUniv x
 
 pIdent :: Parser Name
 pIdent = try $ do
@@ -42,10 +47,20 @@ pKeyword kw = do
   C.string kw
   (takeWhile1P Nothing isAlphaNum *> empty) <|> ws
 
+readInt :: String -> Int
+readInt = read
+
+pU :: Parser Surface
+pU = do
+  C.char 'U'
+  i <- takeWhileP Nothing isDigit
+  (takeWhile1P Nothing isAlphaNum *> empty) <|> ws
+  return $ SU (if null i then 0 else readInt i)
+
 pAtom :: Parser Surface
 pAtom  =
       withPos (    (SVar <$> pIdent)
-               <|> (SU <$ char 'U')
+               <|> pU
                <|> (SHole <$ char '_'))
   <|> parens pTm
 

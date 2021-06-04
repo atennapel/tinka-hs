@@ -15,7 +15,7 @@ data Val
   = VNe Head Spine
   | VAbs Name Val Clos
   | VPi Name Val Clos
-  | VU
+  | VU Ix
 
 vvar :: Lvl -> Val
 vvar k = VNe k []
@@ -33,7 +33,7 @@ eval e (Var i) = e !! i
 eval e (App f a) = vapp (eval e f) (eval e a)
 eval e (Abs x t b) = VAbs x (eval e t) (Clos e b)
 eval e (Pi x t b) = VPi x (eval e t) (Clos e b)
-eval e U = VU
+eval e (U i) = VU i
 eval e (Let x t v b) = eval (eval e v : e) b
 
 quoteHead :: Lvl -> Head -> Core
@@ -46,7 +46,7 @@ quoteClos :: Lvl -> Clos -> Core
 quoteClos k c = quote (k + 1) $ vinst c (vvar k)
 
 quote :: Lvl -> Val -> Core
-quote k VU = U
+quote k (VU i) = U i
 quote k (VNe h sp) = foldr (quoteElim k) (quoteHead k h) sp
 quote k (VAbs x t b) = Abs x (quote k t) (quoteClos k b)
 quote k (VPi x t b) = Pi x (quote k t) (quoteClos k b)
@@ -61,7 +61,7 @@ convElim :: Lvl -> Elim -> Elim -> Bool
 convElim k (EApp v) (EApp v') = conv k v v'
 
 conv :: Lvl -> Val -> Val -> Bool
-conv k VU VU = True
+conv k (VU i) (VU j) = i == j
 conv k (VPi _ t b) (VPi _ t' b') = conv k t t' && convLift k b b'
 conv k (VAbs _ _ b) (VAbs _ _ b') = convLift k b b'
 conv k (VAbs _ _ b) x = let v = vvar k in conv (k + 1) (vinst b v) (vapp x v)

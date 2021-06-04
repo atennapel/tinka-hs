@@ -1,5 +1,6 @@
 module Elaboration (elaborate) where
 
+import Common
 import Ctx
 import Surface
 import Core
@@ -10,7 +11,7 @@ checkOrInfer ctx v Nothing = do
   (cv, ty) <- infer ctx v
   return (cv, quote (lvl ctx) ty, ty)
 checkOrInfer ctx v (Just t) = do
-  ct <- check ctx t VU
+  (ct, i) <- inferU ctx t
   let ty = eval (vs ctx) ct
   cv <- check ctx v ty
   return (cv, ct, ty)
@@ -30,9 +31,16 @@ check ctx s ty = do
   test (conv (lvl ctx) ty' ty) $ "check failed " ++ show s ++ " : " ++ showV ctx ty ++ ", got " ++ showV ctx ty'
   return c
 
+inferU :: Ctx -> Surface -> TC (Core, Ix)
+inferU ctx c = do
+  (e, ty) <- infer ctx c
+  case ty of
+    VU i -> return (e, i)
+    _ -> err $ "failed to infer universe in " ++ show c ++ ": " ++ show (quote (lvl ctx) ty)
+
 infer :: Ctx -> Surface -> TC (Core, Val)
 infer ctx (SPos p s) = infer (enter p ctx) s
-infer ctx SU = return (U, VU) -- type-in-type
+infer ctx (SU i) = return (U i, VU (i + 1))
 infer ctx (SVar x) = do
   (i, ty) <- lookupVar ctx x
   return (Var i, ty)
@@ -44,15 +52,15 @@ infer ctx c@(SApp f a) = do
       return (App cf ca, vinst b (eval (vs ctx) ca))
     _ -> err $ "not a pi type in " ++ show c ++ ", got " ++ showV ctx fty
 infer ctx (SAbs x (Just t) b) = do
-  ct <- check ctx t VU
+  (ct, i) <- inferU ctx t
   let ty = eval (vs ctx) ct
   (cb, rty) <- infer (bind x ty ctx) b
   return (Abs x ct cb, VPi x ty $ closeVal ctx rty)
 infer ctx (SPi x t b) = do
-  ct <- check ctx t VU
+  (ct, i) <- inferU ctx t
   let ty = eval (vs ctx) ct
-  cb <- check (bind x ty ctx) b VU
-  return (Pi x ct cb, VU)
+  (cb, j) <- inferU (bind x ty ctx) b
+  return (Pi x ct cb, VU (max i j))
 infer ctx (SLet x t v b) = do
   (cv, ct, ty) <- checkOrInfer ctx v t
   (cb, rty) <- infer (define x ty (eval (vs ctx) cv) ctx) b
