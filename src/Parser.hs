@@ -19,92 +19,89 @@ ws :: Parser ()
 ws = L.space C.space1 (L.skipLineComment "--") (L.skipBlockComment "{-" "-}")
 
 withPos :: Parser Surface -> Parser Surface
-withPos p = do
-  pos <- getSourcePos
-  p >>= \case
-    t@SPos{} -> pure t
-    t -> pure (SPos pos t)
+withPos p = SPos <$> getSourcePos <*> p
 
-lexeme = L.lexeme ws
-symbol s = lexeme (C.string s)
-char c = lexeme (C.char c)
-parens p = char '(' *> p <* char ')'
-pBind = pIdent <|> symbol "_"
-pArrow = symbol "->"
+lexeme     = L.lexeme ws
+symbol s   = lexeme (C.string s)
+char c     = lexeme (C.char c)
+parens p   = char '(' *> p <* char ')'
+pArrow     = symbol "→" <|> symbol "->"
+pBind      = pIdent <|> symbol "_"
 
 keyword :: String -> Bool
-keyword x = x == "let" || x == "\\" || x == "U"
+keyword x = x == "let" || x == "λ" || x == "U"
 
 pIdent :: Parser Name
 pIdent = try $ do
-  x <- C.letterChar
-  xs <- takeWhile1P Nothing (\c -> isAlphaNum c || c == '\'')
-  guard (not (keyword (x : xs)))
-  (x : xs) <$ ws
+  x <- takeWhile1P Nothing isAlphaNum
+  guard (not (keyword x))
+  x <$ ws
 
 pKeyword :: String -> Parser ()
-pKeyword w = do
-  C.string w
-  (takeWhileP Nothing (\c -> isAlphaNum c || c == '\'') *> empty) <|> ws
+pKeyword kw = do
+  C.string kw
+  (takeWhile1P Nothing isAlphaNum *> empty) <|> ws
 
 pAtom :: Parser Surface
-pAtom = withPos ((SVar <$> pIdent) <|> (SU <$ symbol "U")) <|> parens pSurface
+pAtom  =
+      withPos (    (SVar <$> pIdent)
+               <|> (SU <$ char 'U')
+               <|> (SHole <$ char '_'))
+  <|> parens pTm
 
-pApp :: Parser Surface
-pApp = do
+pArg :: Parser Surface
+pArg = pAtom
+
+pSpine :: Parser Surface
+pSpine = do
   h <- pAtom
-  as <- many pAtom
-  pure $ foldl SApp h as
+  args <- many pArg
+  pure $ foldl SApp h args
 
-pAbsBind :: Parser (Name, Maybe Surface)
-pAbsBind =
-  parens ((,) <$> pBind <*> optional (char ':' *> pSurface))
-  <|> ((,Nothing) <$> pBind)
+pLamBinder :: Parser ([Name], Maybe Surface)
+pLamBinder = parens ((,) <$> some pBind <*> optional (char ':' *> pTm))
+  <|> ((\x -> ([x], Nothing)) <$> pBind)
 
-pAbs = do
-  char '\\'
-  xs <- some pAbsBind
+pLam :: Parser Surface
+pLam = do
+  char 'λ' <|> char '\\'
+  xs <- some pLamBinder
   char '.'
-  t <- pAbsLet
-  pure $ foldr (\(x, t) u -> SAbs x t u) t xs
+  t <- pTm
+  pure $ foldr (\(xs, ty) b -> foldr (`SAbs` ty) b xs) t xs
 
-pPiBind :: Parser ([Name], Surface)
-pPiBind = parens ((,) <$> some pBind <*> (char ':' *> pSurface))
+pPiBinder :: Parser ([Name], Surface)
+pPiBinder = parens ((,) <$> some pBind <*> (char ':' *> pTm))
 
 pPi :: Parser Surface
 pPi = do
-  optional (try (some pPiBind)) >>= \case
-    Nothing -> do
-      t <- pApp
-      (pArrow *> (SPi "_" t <$> pPi)) <|> pure t
-    Just bs -> do
-      bs <- some pPiBind
-      case bs of
-        [([x], a)] -> SPi x a <$> (pArrow *> pPi)
-        dom -> do
-          pArrow
-          b <- pPi
-          pure $ foldr (\(xs, a) t -> foldr (`SPi` a) t xs) b dom
+  dom <- some pPiBinder
+  pArrow
+  cod <- pTm
+  pure $ foldr (\(xs, a) t -> foldr (`SPi` a) t xs) cod dom
+
+pFunOrSpine :: Parser Surface
+pFunOrSpine = do
+  sp <- pSpine
+  optional pArrow >>= \case
+    Nothing -> pure sp
+    Just _  -> SPi "_" sp <$> pTm
 
 pLet :: Parser Surface
 pLet = do
   pKeyword "let"
-  x <- pBind
-  ann <- optional (char ':' *> pSurface)
+  x <- pIdent
+  ann <- optional (char ':' *> pTm)
   char '='
-  t <- pSurface
+  t <- pTm
   symbol ";"
-  u <- pAbsLet
-  SLet x ann t <$> pAbsLet
+  SLet x ann t <$> pTm
 
-pAbsLet :: Parser Surface
-pAbsLet = withPos (pAbs <|> pLet <|> pPi)
-
-pSurface :: Parser Surface
-pSurface = withPos pAbsLet
+pTm :: Parser Surface
+pTm = withPos (pLam <|> pLet <|> try pPi <|> pFunOrSpine)
 
 pSrc :: Parser Surface
-pSrc = ws *> pSurface <* eof
+pSrc = ws *> pTm <* eof
 
 parseStr :: String -> IO Surface
 parseStr src =
@@ -117,6 +114,6 @@ parseStr src =
 
 parseStdin :: IO (Surface, String)
 parseStdin = do
-  file <- getContents
-  tm <- parseStr file
-  pure (tm, file)
+  src <- getContents
+  t <- parseStr src
+  pure (t, src)

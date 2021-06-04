@@ -15,10 +15,12 @@ data Surface
   | SU
   | SLet Name (Maybe Surface) Surface Surface
   | SPos SourcePos Surface
+  | SHole
 
 isSimple :: Surface -> Bool
 isSimple (SVar _) = True
 isSimple SU = True
+isSimple SHole = True
 isSimple (SPos _ s) = isSimple s
 isSimple _ = False
 
@@ -55,6 +57,7 @@ showPiBinder (x, s) = "(" ++ x ++ " : " ++ show s ++ ")"
 instance Show Surface where
   show (SVar x) = x
   show SU = "U"
+  show SHole = "_"
   show s@(SApp f a) =
     let (f', as) = flattenApp s in
     showS f' ++ " " ++ unwords (map showS as)

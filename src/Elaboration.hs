@@ -17,6 +17,7 @@ checkOrInfer ctx v (Just t) = do
 
 check :: Ctx -> Surface -> Val -> TC Core
 check ctx (SPos p s) ty = check (enter p ctx) s ty
+check ctx SHole ty = err $ "hole encountered: " ++ showV ctx ty
 check ctx (SAbs x Nothing b) (VPi x' ty b') = do
   cb <- check (bind x ty ctx) b (vinst b' $ vvar (lvl ctx))
   return $ Abs x (quote (lvl ctx) ty) cb
