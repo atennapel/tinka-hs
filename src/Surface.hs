@@ -12,14 +12,14 @@ data Surface
   | SApp Surface Surface
   | SAbs Name (Maybe Surface) Surface
   | SPi Name Surface Surface
-  | SU Ix
+  | SU
   | SLet Name (Maybe Surface) Surface Surface
   | SPos SourcePos Surface
   | SHole
 
 isSimple :: Surface -> Bool
 isSimple (SVar _) = True
-isSimple (SU _) = True
+isSimple SU = True
 isSimple SHole = True
 isSimple (SPos _ s) = isSimple s
 isSimple _ = False
@@ -56,8 +56,7 @@ showPiBinder (x, s) = "(" ++ x ++ " : " ++ show s ++ ")"
 
 instance Show Surface where
   show (SVar x) = x
-  show (SU 0) = "U"
-  show (SU i) = "U" ++ show i
+  show SU = "U"
   show SHole = "_"
   show s@(SApp f a) =
     let (f', as) = flattenApp s in
@@ -80,5 +79,5 @@ fromCore ns (Var i) = SVar (ns !! i)
 fromCore ns (App f a) = SApp (fromCore ns f) (fromCore ns a)
 fromCore ns (Abs x t b) = SAbs x (Just $ fromCore ns t) (fromCore (x : ns) b)
 fromCore ns (Pi x t b) = SPi x (fromCore ns t) (fromCore (x : ns) b)
-fromCore ns (U i) = SU i
+fromCore ns U = SU
 fromCore ns (Let x t v b) = SLet x (Just $ fromCore ns t) (fromCore ns v) (fromCore (x : ns) b)
