@@ -8,6 +8,7 @@ import Surface
 import Ctx
 import Val
 import Elaboration
+import Verification
 import Parser
 import Core
 
@@ -17,6 +18,9 @@ main = mainWith getArgs parseStdin
 mainWith :: IO [String] -> IO (Surface, String) -> IO ()
 mainWith getOpt getSurface = do
   getOpt >>= \case
+    ["parse"] -> do
+      (t, file) <- getSurface
+      print t
     ["nf"] -> do
       (c, ty) <- elab getSurface
       putStrLn $ showC empty $ nf c
@@ -37,4 +41,7 @@ elab getSurface = do
   (t, file) <- getSurface
   case elaborate (enter (initialPos file) empty) t of
     Left msg -> putStrLn msg >> exitSuccess
-    Right res -> return res
+    Right res@(tm, ty) -> do
+      case verify tm of
+        Left msg -> putStrLn msg >> exitSuccess
+        Right _ -> return res

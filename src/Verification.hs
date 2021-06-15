@@ -3,6 +3,7 @@ module Verification (verify) where
 import Core
 import Ctx
 import Val
+import Common
 
 check :: Ctx -> Core -> Val -> TC ()
 check ctx c ty = do
@@ -21,6 +22,10 @@ infer ctx (Pi x t b) = do
   check ctx t VU
   check (bind x (eval (vs ctx) t) ctx) b VU
   return VU
+infer ctx (Sigma x t b) = do
+  check ctx t VU
+  check (bind x (eval (vs ctx) t) ctx) b VU
+  return VU
 infer ctx (Abs x t b) = do
   check ctx t VU
   let ty = eval (vs ctx) t
@@ -33,6 +38,21 @@ infer ctx c@(App f a) = do
       check ctx a t
       return $ vinst b (eval (vs ctx) a)
     _ -> err $ "not a pi type in " ++ show c ++ ", got " ++ show (quote (lvl ctx) fty)
+infer ctx c@(Pair a b t) = do
+  check ctx t VU
+  let vt = eval (vs ctx) t
+  case vt of
+    VSigma x ty c -> do
+      check ctx a ty
+      check ctx b (vinst c $ eval (vs ctx) a)
+      return vt
+    _ -> err $ "not a sigma type in " ++ show c
+infer ctx c@(Proj t p) = do
+  vt <- infer ctx t
+  case (vt, p) of
+    (VSigma x ty c, Fst) -> return ty
+    (VSigma x ty c, Snd) -> return $ vinst c (vproj (eval (vs ctx) t) Fst)
+    _ -> err $ "not a sigma type in " ++ show c ++ ", got " ++ show (quote (lvl ctx) vt)
 infer ctx (Let x t v b) = do
   check ctx t VU
   let ty = eval (vs ctx) t

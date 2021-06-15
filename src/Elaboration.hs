@@ -4,6 +4,7 @@ import Ctx
 import Surface
 import Core
 import Val
+import Common
 
 checkOrInfer :: Ctx -> Surface -> Maybe Surface -> TC (Core, Core, Val)
 checkOrInfer ctx v Nothing = do
@@ -21,6 +22,10 @@ check ctx SHole ty = err $ "hole encountered: " ++ showV ctx ty
 check ctx (SAbs x Nothing b) (VPi x' ty b') = do
   cb <- check (bind x ty ctx) b (vinst b' $ vvar (lvl ctx))
   return $ Abs x (quote (lvl ctx) ty) cb
+check ctx (SPair a b) tt@(VSigma x ty b') = do
+  ta <- check ctx a ty
+  tb <- check ctx b (vinst b' $ eval (vs ctx) ta)
+  return $ Pair ta tb (quote (lvl ctx) tt)
 check ctx (SLet x t v b) rty = do
   (cv, ct, ty) <- checkOrInfer ctx v t
   cb <- check (define x ty (eval (vs ctx) cv) ctx) b rty
@@ -53,6 +58,22 @@ infer ctx (SPi x t b) = do
   let ty = eval (vs ctx) ct
   cb <- check (bind x ty ctx) b VU
   return (Pi x ct cb, VU)
+infer ctx (SSigma x t b) = do
+  ct <- check ctx t VU
+  let ty = eval (vs ctx) ct
+  cb <- check (bind x ty ctx) b VU
+  return (Sigma x ct cb, VU)
+infer ctx (SPair a b) = do
+  (ta, va) <- infer ctx a
+  (tb, vb) <- infer ctx b
+  let vt = VSigma "_" va (Fun $ const vb)
+  return (Pair ta tb (quote (lvl ctx) vt), vt)
+infer ctx c@(SProj t p) = do
+  (tm, vt) <- infer ctx t
+  case (vt, p) of
+    (VSigma x ty c, Fst) -> return (Proj tm p, ty)
+    (VSigma x ty c, Snd) -> return (Proj tm p, vinst c $ vproj (eval (vs ctx) tm) Fst)
+    _ -> err $ "not a sigma type in " ++ show c ++ ", got " ++ show (quote (lvl ctx) vt)
 infer ctx (SLet x t v b) = do
   (cv, ct, ty) <- checkOrInfer ctx v t
   (cb, rty) <- infer (define x ty (eval (vs ctx) cv) ctx) b
