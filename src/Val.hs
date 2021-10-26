@@ -41,6 +41,12 @@ vproj (VPair a b _) Snd = b
 vproj (VNe h sp) p = VNe h (EProj p : sp)
 vproj _ _ = undefined
 
+vfst :: Val -> Val
+vfst v = vproj v Fst
+
+vsnd :: Val -> Val
+vsnd v = vproj v Snd
+
 eval :: Env -> Core -> Val
 eval e (Var i) = e !! i
 eval e (App f a) = vapp (eval e f) (eval e a)
@@ -89,5 +95,7 @@ conv k (VAbs _ _ b) (VAbs _ _ b') = convLift k b b'
 conv k (VAbs _ _ b) x = let v = vvar k in conv (k + 1) (vinst b v) (vapp x v)
 conv k x (VAbs _ _ b) = let v = vvar k in conv (k + 1) (vapp x v) (vinst b v)
 conv k (VPair a b _) (VPair c d _) = conv k a c && conv k b d
+conv k (VPair a b _) x = conv k a (vfst x) && conv k b (vsnd x)
+conv k x (VPair a b _) = conv k (vfst x) a && conv k (vsnd x) b
 conv k (VNe h sp) (VNe h' sp') | h == h' = and $ zipWith (convElim k) sp sp'
 conv k _ _ = False
