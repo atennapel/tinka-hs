@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5c98536b86ad0b354d38bb9cc781083e0ce18e5f48d4b95195b4db60c1106a2d
+-- hash: e357cdc0567b20f40e0f4acf11d4aa3b3cdba4d26608c02a9b6ce736f1eaa5a2
 
 name:           tinka-hs
 version:        0.1.0.0
@@ -43,4 +43,5 @@ executable tinka-hs
   build-depends:
       base >=4.7 && <5
     , megaparsec
+    , transformers
   default-language: Haskell2010

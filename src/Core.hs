@@ -4,6 +4,7 @@ import Common
 
 data Core
   = Var Ix
+  | Global Name
   | App Core Core
   | Abs Name Core Core
   | Pi Name Core Core
@@ -19,6 +20,7 @@ showProjType Snd = ".2"
 
 instance Show Core where
   show (Var x) = show x
+  show (Global x) = show x
   show (App f a) = "(" ++ show f ++ " " ++ show a ++ ")"
   show (Abs x t b) = "(\\(" ++ x ++ " : " ++ show t ++ "). " ++ show b ++ ")"
   show (Pi x t b) = "((" ++ x ++ " : " ++ show t ++ ") -> " ++ show b ++ ")"

@@ -1,24 +1,24 @@
 module Ctx where
 
 import Text.Megaparsec (SourcePos)
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.Class
+import Data.Functor.Identity (Identity)
 
 import Common
 import Core
 import Surface
 import Val
 
-type TC t = Either String t
+type TC t = ReaderT GlobalCtx (ExceptT String Identity) t
 
 err :: String -> TC t
-err = Left
+err = lift . throwE
 
 test :: Bool -> String -> TC ()
 test True _ = return ()
 test False msg = err msg
-
-showTC :: Show t => TC t -> String
-showTC (Left msg) = msg
-showTC (Right x) = show x
 
 data Ctx = Ctx {
   lvl :: Lvl,
@@ -40,20 +40,41 @@ bind x t ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs 
 enter :: SourcePos -> Ctx -> Ctx
 enter p ctx = ctx { pos = Just p }
 
-closeVal :: Ctx -> Val -> Clos
-closeVal ctx v = Clos (vs ctx) (quote (lvl ctx + 1) v)
+closeVal :: GlobalCtx -> Ctx -> Val -> Clos
+closeVal gs ctx v = Clos (vs ctx) (quote gs (lvl ctx + 1) v)
 
 showC :: Ctx -> Core -> String
 showC ctx c = show $ fromCore (ns ctx) c
 
-showV :: Ctx -> Val -> String
-showV ctx v = show $ fromCore (ns ctx) (quote (lvl ctx) v)
+showV :: GlobalCtx -> Ctx -> Val -> String
+showV gs ctx v = show $ fromCore (ns ctx) (quote gs (lvl ctx) v)
 
-lookupVar :: Ctx -> Name -> TC (Ix, Val)
-lookupVar ctx x = go (ns ctx) (ts ctx) 0
+lookupVarMaybe :: Ctx -> Name -> TC (Maybe (Ix, Val))
+lookupVarMaybe ctx x = go (ns ctx) (ts ctx) 0
   where
-    go :: [Name] -> [Val] -> Ix -> TC (Ix, Val)
-    go [] [] _ = err $ "undefined variable " ++ x
-    go (y : _) (ty : _) i | x == y = return (i, ty)
+    go :: [Name] -> [Val] -> Ix -> TC (Maybe (Ix, Val))
+    go [] [] _ = return Nothing
+    go (y : _) (ty : _) i | x == y = return $ Just (i, ty)
     go (_ : ns) (_ : ts) i = go ns ts (i + 1)
     go _ _ _ = undefined
+
+lookupVar :: Ctx -> Name -> TC (Ix, Val)
+lookupVar ctx x = do
+  res <- lookupVarMaybe ctx x
+  case res of
+    Just e -> return e
+    Nothing -> err $ "undefined variable " ++ x
+
+indexCtx :: Ctx -> Ix -> TC Val
+indexCtx ctx = go (ts ctx)
+  where
+    go [] i = err $ "undefined var " ++ show i
+    go (ty : _) 0 = return ty
+    go (_ : tl) n = go tl (n - 1)
+
+lookupGlobal :: Name -> TC GlobalEntry
+lookupGlobal x = do
+  gs <- ask
+  case getGlobal gs x of
+    Just e -> return e
+    Nothing -> err $ "undefined global " ++ x
