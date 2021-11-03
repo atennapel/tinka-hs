@@ -1,8 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.4.
+-- This file has been generated from package.yaml by hpack version 0.31.1.
 --
 -- see: https://github.com/sol/hpack
+--
+-- hash: 5c98536b86ad0b354d38bb9cc781083e0ce18e5f48d4b95195b4db60c1106a2d
 
 name:           tinka-hs
 version:        0.1.0.0
@@ -36,21 +38,7 @@ executable tinka-hs
       Paths_tinka_hs
   hs-source-dirs:
       src
-  default-extensions:
-      DerivingVia
-      DeriveAnyClass
-      DeriveFunctor
-      DeriveFoldable
-      DeriveTraversable
-      FlexibleContexts
-      GeneralizedNewtypeDeriving
-      LambdaCase
-      OverloadedStrings
-      PatternSynonyms
-      StandaloneDeriving
-      Strict
-      TupleSections
-      ViewPatterns
+  default-extensions: DerivingVia DeriveAnyClass DeriveFunctor DeriveFoldable DeriveTraversable FlexibleContexts GeneralizedNewtypeDeriving LambdaCase OverloadedStrings PatternSynonyms StandaloneDeriving Strict TupleSections ViewPatterns
   ghc-options: -Wall -Wno-name-shadowing -Wno-missing-signatures -Wno-unused-do-bind -Wno-unused-matches -Wno-missing-pattern-synonym-signatures -threaded -rtsopts -with-rtsopts=-N -O
   build-depends:
       base >=4.7 && <5

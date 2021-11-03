@@ -15,14 +15,14 @@ data Surface
   | SSigma Name Surface Surface
   | SPair Surface Surface
   | SProj Surface ProjType
-  | SU
+  | SU ULvl
   | SLet Name (Maybe Surface) Surface Surface
   | SPos SourcePos Surface
   | SHole
 
 isSimple :: Surface -> Bool
 isSimple (SVar _) = True
-isSimple SU = True
+isSimple (SU _) = True
 isSimple SHole = True
 isSimple (SPair _ _) = True
 isSimple (SPos _ s) = isSimple s
@@ -81,7 +81,7 @@ showProjType Snd = ".2"
 
 instance Show Surface where
   show (SVar x) = x
-  show SU = "U"
+  show (SU l) = if l <= 0 then "Type" else "Type" ++ show l
   show SHole = "_"
   show s@(SApp f a) =
     let (f', as) = flattenApp s in
@@ -112,5 +112,5 @@ fromCore ns (Pi x t b) = SPi x (fromCore ns t) (fromCore (x : ns) b)
 fromCore ns (Sigma x t b) = SSigma x (fromCore ns t) (fromCore (x : ns) b)
 fromCore ns (Pair a b _) = SPair (fromCore ns a) (fromCore ns b) -- TODO: use type or not?
 fromCore ns (Proj s p) = SProj (fromCore ns s) p 
-fromCore ns U = SU
+fromCore ns (U l) = SU l
 fromCore ns (Let x t v b) = SLet x (Just $ fromCore ns t) (fromCore ns v) (fromCore (x : ns) b)

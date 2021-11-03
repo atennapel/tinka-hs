@@ -11,7 +11,7 @@ checkOrInfer ctx v Nothing = do
   (cv, ty) <- infer ctx v
   return (cv, quote (lvl ctx) ty, ty)
 checkOrInfer ctx v (Just t) = do
-  ct <- check ctx t VU
+  (ct, _) <- inferUniv ctx t
   let ty = eval (vs ctx) ct
   cv <- check ctx v ty
   return (cv, ct, ty)
@@ -35,9 +35,16 @@ check ctx s ty = do
   test (conv (lvl ctx) ty' ty) $ "check failed " ++ show s ++ " : " ++ showV ctx ty ++ ", got " ++ showV ctx ty'
   return c
 
+inferUniv :: Ctx -> Surface -> TC (Core, ULvl)
+inferUniv ctx tm = do
+  (c, ty) <- infer ctx tm
+  case ty of
+    VU l -> return (c, l)
+    _ -> err $ "expected a universe but got " ++ show (quote (lvl ctx) ty) ++ ", while checking " ++ show tm 
+
 infer :: Ctx -> Surface -> TC (Core, Val)
 infer ctx (SPos p s) = infer (enter p ctx) s
-infer ctx SU = return (U, VU)
+infer ctx (SU l) = return (U l, VU (l + 1))
 infer ctx (SVar x) = do
   (i, ty) <- lookupVar ctx x
   return (Var i, ty)
@@ -49,20 +56,20 @@ infer ctx c@(SApp f a) = do
       return (App cf ca, vinst b (eval (vs ctx) ca))
     _ -> err $ "not a pi type in " ++ show c ++ ", got " ++ showV ctx fty
 infer ctx (SAbs x (Just t) b) = do
-  ct <- check ctx t VU
+  (ct, _) <- inferUniv ctx t
   let ty = eval (vs ctx) ct
   (cb, rty) <- infer (bind x ty ctx) b
   return (Abs x ct cb, VPi x ty $ closeVal ctx rty)
 infer ctx (SPi x t b) = do
-  ct <- check ctx t VU
+  (ct, l1) <- inferUniv ctx t
   let ty = eval (vs ctx) ct
-  cb <- check (bind x ty ctx) b VU
-  return (Pi x ct cb, VU)
+  (cb, l2) <- inferUniv (bind x ty ctx) b
+  return (Pi x ct cb, VU (max l1 l2))
 infer ctx (SSigma x t b) = do
-  ct <- check ctx t VU
+  (ct, l1) <- inferUniv ctx t
   let ty = eval (vs ctx) ct
-  cb <- check (bind x ty ctx) b VU
-  return (Sigma x ct cb, VU)
+  (cb, l2) <- inferUniv (bind x ty ctx) b
+  return (Sigma x ct cb, VU (max l1 l2))
 infer ctx (SPair a b) = do
   (ta, va) <- infer ctx a
   (tb, vb) <- infer ctx b

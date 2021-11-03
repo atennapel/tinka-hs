@@ -21,7 +21,7 @@ data Val
   | VPi Name Val Clos
   | VSigma Name Val Clos
   | VPair Val Val Val
-  | VU
+  | VU ULvl
 
 vvar :: Lvl -> Val
 vvar k = VNe k []
@@ -55,7 +55,7 @@ eval e (Pi x t b) = VPi x (eval e t) (Clos e b)
 eval e (Sigma x t b) = VSigma x (eval e t) (Clos e b)
 eval e (Pair a b t) = VPair (eval e a) (eval e b) (eval e t)
 eval e (Proj t p) = vproj (eval e t) p
-eval e U = VU
+eval e (U l) = VU l
 eval e (Let x t v b) = eval (eval e v : e) b
 
 quoteHead :: Lvl -> Head -> Core
@@ -69,7 +69,7 @@ quoteClos :: Lvl -> Clos -> Core
 quoteClos k c = quote (k + 1) $ vinst c (vvar k)
 
 quote :: Lvl -> Val -> Core
-quote k VU = U
+quote k (VU l) = U l
 quote k (VNe h sp) = foldr (quoteElim k) (quoteHead k h) sp
 quote k (VAbs x t b) = Abs x (quote k t) (quoteClos k b)
 quote k (VPi x t b) = Pi x (quote k t) (quoteClos k b)
@@ -88,7 +88,7 @@ convElim k (EProj p) (EProj p') = p == p'
 convElim k _ _ = False
 
 conv :: Lvl -> Val -> Val -> Bool
-conv k VU VU = True
+conv k (VU l1) (VU l2) | l1 == l2 = True
 conv k (VPi _ t b) (VPi _ t' b') = conv k t t' && convLift k b b'
 conv k (VSigma _ t b) (VSigma _ t' b') = conv k t t' && convLift k b b'
 conv k (VAbs _ _ b) (VAbs _ _ b') = convLift k b b'

@@ -10,7 +10,7 @@ data Core
   | Sigma Name Core Core
   | Pair Core Core Core
   | Proj Core ProjType
-  | U
+  | U ULvl
   | Let Name Core Core Core
 
 showProjType :: ProjType -> String
@@ -25,5 +25,5 @@ instance Show Core where
   show (Sigma x t b) = "((" ++ x ++ " : " ++ show t ++ ") ** " ++ show b ++ ")"
   show (Pair a b t) = "(" ++ show a ++ ", " ++ show b ++ ") : " ++ show t
   show (Proj s p) = show s ++ showProjType p
-  show U = "U"
+  show (U l) = "Type" ++ show l
   show (Let x t v b) = "(let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b ++ ")"
