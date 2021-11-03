@@ -36,7 +36,7 @@ data Elim
 
 data Val
   = VNe Head Spine
-  | VGlobal Name Spine Val
+  | VGlobal Name ULvl Spine Val
   | VAbs Name Val Clos
   | VPi Name Val Clos
   | VSigma Name Val Clos
@@ -53,14 +53,14 @@ vinst _ (Fun f) v = f v
 vapp :: GlobalCtx -> Val -> Val -> Val
 vapp gs (VAbs _ _ b) v = vinst gs b v
 vapp gs (VNe h sp) v = VNe h (EApp v : sp)
-vapp gs (VGlobal x sp w) v = VGlobal x (EApp v : sp) (vapp gs w v)
+vapp gs (VGlobal x l sp w) v = VGlobal x l (EApp v : sp) (vapp gs w v)
 vapp _ _ _ = undefined
 
 vproj :: Val -> ProjType -> Val
 vproj (VPair a b _) Fst = a
 vproj (VPair a b _) Snd = b
 vproj (VNe h sp) p = VNe h (EProj p : sp)
-vproj (VGlobal x sp v) p = VGlobal x (EProj p : sp) (vproj v p)
+vproj (VGlobal x l sp v) p = VGlobal x l (EProj p : sp) (vproj v p)
 vproj _ _ = undefined
 
 vfst :: Val -> Val
@@ -71,7 +71,11 @@ vsnd v = vproj v Snd
 
 eval :: GlobalCtx -> Env -> Core -> Val
 eval gs e (Var i) = e !! i
-eval gs e (Global x) = maybe undefined gval (getGlobal gs x)
+eval gs e (Global x l) =
+  case getGlobal gs x of
+    Just e | l == 0 -> gval e
+    Just e -> eval gs [] (liftUniv l (gcore e))
+    Nothing -> undefined
 eval gs e (App f a) = vapp gs (eval gs e f) (eval gs e a)
 eval gs e (Abs x t b) = VAbs x (eval gs e t) (Clos e b)
 eval gs e (Pi x t b) = VPi x (eval gs e t) (Clos e b)
@@ -94,7 +98,7 @@ quoteClos gs k c = quote gs (k + 1) $ vinst gs c (vvar k)
 quote :: GlobalCtx -> Lvl -> Val -> Core
 quote gs k (VU l) = U l
 quote gs k (VNe h sp) = foldr (quoteElim gs k) (quoteHead k h) sp
-quote gs k (VGlobal x sp _) = foldr (quoteElim gs k) (Global x) sp -- TODO: unfold parameter
+quote gs k (VGlobal x l sp _) = foldr (quoteElim gs k) (Global x l) sp -- TODO: unfold parameter
 quote gs k (VAbs x t b) = Abs x (quote gs k t) (quoteClos gs k b)
 quote gs k (VPi x t b) = Pi x (quote gs k t) (quoteClos gs k b)
 quote gs k (VSigma x t b) = Sigma x (quote gs k t) (quoteClos gs k b)
@@ -122,9 +126,9 @@ conv gs k (VPair a b _) (VPair c d _) = conv gs k a c && conv gs k b d
 conv gs k (VPair a b _) x = conv gs k a (vfst x) && conv gs k b (vsnd x)
 conv gs k x (VPair a b _) = conv gs k (vfst x) a && conv gs k (vsnd x) b
 conv gs k (VNe h sp) (VNe h' sp') | h == h' = and $ zipWith (convElim gs k) sp sp'
-conv gs k (VGlobal x sp v) (VGlobal x' sp' v') | x == x' =
+conv gs k (VGlobal x l sp v) (VGlobal x' l' sp' v') | x == x' && l == l' =
   and (zipWith (convElim gs k) sp sp') || conv gs k v v'
-conv gs k (VGlobal _ _ v) (VGlobal _ _ v') = conv gs k v v'
-conv gs k (VGlobal _ _ v) v' = conv gs k v v'
-conv gs k v (VGlobal _ _ v') = conv gs k v v'
+conv gs k (VGlobal _ _ _ v) (VGlobal _ _ _ v') = conv gs k v v'
+conv gs k (VGlobal _ _ _ v) v' = conv gs k v v'
+conv gs k v (VGlobal _ _ _ v') = conv gs k v v'
 conv gs k _ _ = False

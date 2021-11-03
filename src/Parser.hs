@@ -40,11 +40,21 @@ pArrow   = symbol "→" <|> symbol "->"
 keyword :: String -> Bool
 keyword x = x == "let" || x == "λ" || x == "Type"
 
-pIdent :: Parser Name
+pLifting :: Parser ULvl
+pLifting = do
+  lift <- optional (do
+    char '^'
+    l <- optional L.decimal
+    return $ fromMaybe 1 l)
+  return $ fromMaybe 0 lift
+
+pIdent :: Parser (Name, ULvl)
 pIdent = try $ do
   x <- takeWhile1P Nothing isAlphaNum
   guard (not (keyword x))
-  x <$ ws
+  lift <- pLifting
+  ws
+  return (x, lift)
 
 pKeyword :: String -> Parser ()
 pKeyword kw = do
@@ -63,11 +73,11 @@ pAtom =
   withPos (
     (SU <$> pType) <|>
     (SHole <$ symbol "_") <|>
-    (SVar <$> pIdent))
+    (uncurry SVar <$> pIdent))
   <|> parens pSurface
 
 pBinder :: Parser Name
-pBinder = pIdent <|> symbol "_"
+pBinder = (fst <$> pIdent) <|> symbol "_"
 
 pSpine :: Parser Surface
 pSpine = foldl1 SApp <$> some pAtom

@@ -8,7 +8,7 @@ import Common
 import Core
 
 data Surface
-  = SVar Name
+  = SVar Name ULvl
   | SApp Surface Surface
   | SAbs Name (Maybe Surface) Surface
   | SPi Name Surface Surface
@@ -21,7 +21,7 @@ data Surface
   | SHole
 
 isSimple :: Surface -> Bool
-isSimple (SVar _) = True
+isSimple (SVar _ _) = True
 isSimple (SU _) = True
 isSimple SHole = True
 isSimple (SPair _ _) = True
@@ -80,8 +80,11 @@ showProjType Fst = ".1"
 showProjType Snd = ".2"
 
 instance Show Surface where
-  show (SVar x) = x
-  show (SU l) = if l <= 0 then "Type" else "Type" ++ show l
+  show (SVar x 0) = x
+  show (SVar x 1) = x ++ "^"
+  show (SVar x l) = x ++ "^" ++ show l
+  show (SU 0) = "Type"
+  show (SU l) = "Type" ++ show l
   show SHole = "_"
   show s@(SApp f a) =
     let (f', as) = flattenApp s in
@@ -102,11 +105,11 @@ instance Show Surface where
   show (SPos _ s) = show s
 
 instance IsString Surface where
-  fromString = SVar
+  fromString x = SVar x 0
 
 fromCore :: [Name] -> Core -> Surface
-fromCore ns (Var i) = SVar (ns !! i)
-fromCore ns (Global x) = SVar x
+fromCore ns (Var i) = SVar (ns !! i) 0
+fromCore ns (Global x l) = SVar x l
 fromCore ns (App f a) = SApp (fromCore ns f) (fromCore ns a)
 fromCore ns (Abs x t b) = SAbs x (Just $ fromCore ns t) (fromCore (x : ns) b)
 fromCore ns (Pi x t b) = SPi x (fromCore ns t) (fromCore (x : ns) b)

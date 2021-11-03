@@ -24,7 +24,11 @@ inferUniv ctx tm = do
 infer :: Ctx -> Core -> TC Val
 infer ctx (U l) = return $ VU (l + 1)
 infer ctx c@(Var i) = indexCtx ctx i
-infer ctx (Global x) = gvtype <$> lookupGlobal x
+infer ctx (Global x l) = do
+  e <- lookupGlobal x
+  gs <- ask
+  let vt = if l == 0 then gvtype e else eval gs [] (liftUniv l (gtype e))
+  return vt
 infer ctx (Pi x t b) = do
   l1 <- inferUniv ctx t
   gs <- ask
