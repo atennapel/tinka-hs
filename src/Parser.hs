@@ -1,4 +1,4 @@
-module Parser (parseStr, parseStdin) where
+module Parser (parseStr, parseStdin, parseStrDefs, parseStdinDefs) where
 
 import Control.Applicative hiding (many, some)
 import Control.Monad
@@ -108,12 +108,13 @@ pLet :: Parser Surface
 pLet = do
   pKeyword "let"
   x <- pBinder
-  symbol ":"
-  a <- pSurface
+  a <- optional (do
+    symbol ":"
+    pSurface)
   symbol "="
   t <- pSurface
   symbol ";"
-  SLet x (Just a) t <$> pSurface
+  SLet x a t <$> pSurface
 
 pSurface :: Parser Surface
 pSurface = withPos (pLam <|> pLet <|> try pPi <|> funOrSpine)
@@ -134,4 +135,38 @@ parseStdin :: IO (Surface, String)
 parseStdin = do
   src <- getContents
   t <- parseStr src
+  pure (t, src)
+
+pDef :: Parser Def
+pDef = do
+  x <- pBinder
+  a <- optional (do
+    symbol ":"
+    pSurface)
+  symbol "="
+  Def x a <$> pSurface
+
+pDefs :: Parser Defs
+pDefs = do
+  ws
+  d <- pDef
+  ws
+  symbol ";"
+  ws
+  ds <- pDefs <|> ([] <$ eof)
+  return (d : ds)
+
+parseStrDefs :: String -> IO Defs
+parseStrDefs src =
+  case parse pDefs "(stdin)" src of
+    Left e -> do
+      putStrLn $ errorBundlePretty e
+      exitFailure
+    Right t ->
+      pure t
+
+parseStdinDefs :: IO (Defs, String)
+parseStdinDefs = do
+  src <- getContents
+  t <- parseStrDefs src
   pure (t, src)

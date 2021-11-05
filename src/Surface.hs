@@ -1,4 +1,4 @@
-module Surface (Surface(..), fromCore) where
+module Surface (Surface(..), fromCore, Def(..), Defs, showDefs) where
 
 import GHC.Exts(IsString(..))
 import Data.List (intercalate)
@@ -69,11 +69,14 @@ showAbsBinder :: (Name, Maybe Surface) -> String
 showAbsBinder (x, Nothing) = x
 showAbsBinder (x, Just t) = "(" ++ x ++ " : " ++ show t ++ ")"
 
-showPiBinder :: (Name, Surface) -> String
-showPiBinder ("_", s@(SApp _ _)) = show s
-showPiBinder ("_", SPos _ s@(SApp _ _)) = show s
-showPiBinder ("_", s) = showS s
-showPiBinder (x, s) = "(" ++ x ++ " : " ++ show s ++ ")"
+showTelescope :: [(Name, Surface)] -> Surface -> String -> String
+showTelescope ps rt delim = go ps
+  where
+    go [] = show rt
+    go (("_", s@(SApp _ _)) : tl) = show s ++ delim ++ go tl
+    go (("_", SPos _ s@(SApp _ _)) : tl) = show s ++ delim ++ go tl
+    go (("_", s) : tl) = showS s ++ delim ++ go tl
+    go ((x, s) : tl) = "(" ++ x ++ " : " ++ show s ++ ")" ++ delim ++ go tl
 
 showProjType :: ProjType -> String
 showProjType Fst = ".1"
@@ -94,10 +97,10 @@ instance Show Surface where
     "\\" ++ unwords (map showAbsBinder as) ++ ". " ++ show s'
   show s@(SPi x t b) =
     let (as, s') = flattenPi s in
-    intercalate " -> " (map showPiBinder as) ++ " -> " ++ show s'
+    showTelescope as s' " -> "
   show s@(SSigma x t b) =
     let (as, s') = flattenSigma s in
-    intercalate " ** " (map showPiBinder as) ++ " ** " ++ show s'
+    showTelescope as s' " ** "
   show s@(SPair _ _) = "(" ++ intercalate ", " (map show $ flattenPair s) ++ ")"
   show s@(SProj _ _) = let (s', ps) = flattenProj s in showS s' ++ intercalate "" (map showProjType ps)
   show (SLet x Nothing v b) = "let " ++ x ++ " = " ++ show v ++ "; " ++ show b
@@ -118,3 +121,15 @@ fromCore ns (Pair a b _) = SPair (fromCore ns a) (fromCore ns b) -- TODO: use ty
 fromCore ns (Proj s p) = SProj (fromCore ns s) p 
 fromCore ns (U l) = SU l
 fromCore ns (Let x t v b) = SLet x (Just $ fromCore ns t) (fromCore ns v) (fromCore (x : ns) b)
+
+data Def = Def Name (Maybe Surface) Surface -- name type term
+
+instance Show Def where
+  show (Def x (Just ty) tm) = x ++ " : " ++ show ty ++ " = " ++ show tm
+  show (Def x Nothing tm) = x ++ " = " ++ show tm
+
+type Defs = [Def]
+
+showDefs :: Defs -> String
+showDefs [] = ""
+showDefs (hd : tl) = show hd ++ "\n" ++ showDefs tl

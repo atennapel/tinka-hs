@@ -1,6 +1,6 @@
-module Elaboration (elaborate) where
+module Elaboration (elaborate, elaborateDef, elaborateDefs) where
 
-import Control.Monad.Trans.Reader (ask)
+import Control.Monad.Trans.Reader (ask, local)
 
 import Ctx
 import Surface
@@ -21,34 +21,37 @@ checkOrInfer ctx v (Just t) = do
   return (cv, ct, ty)
 
 check :: Ctx -> Surface -> Val -> TC Core
-check ctx (SPos p s) ty = check (enter p ctx) s ty
-check ctx SHole ty = do
-  gs <- ask
-  err $ "hole encountered: " ++ showV gs ctx ty
-check ctx (SAbs x Nothing b) (VPi x' ty b') = do
-  gs <- ask
-  cb <- check (bind x ty ctx) b (vinst gs b' $ vvar (lvl ctx))
-  return $ Abs x (quote gs (lvl ctx) ty) cb
-check ctx (SPair a b) tt@(VSigma x ty b') = do
-  ta <- check ctx a ty
-  gs <- ask
-  tb <- check ctx b (vinst gs b' $ eval gs (vs ctx) ta)
-  return $ Pair ta tb (quote gs (lvl ctx) tt)
-check ctx (SLet x t v b) rty = do
-  (cv, ct, ty) <- checkOrInfer ctx v t
-  gs <- ask
-  cb <- check (define x ty (eval gs (vs ctx) cv) ctx) b rty
-  return $ Let x ct cv cb
-check ctx s ty = do
-  (c, ty') <- infer ctx s
-  gs <- ask
-  test (conv gs (lvl ctx) ty' ty) $ "check failed " ++ show s ++ " : " ++ showV gs ctx ty ++ ", got " ++ showV gs ctx ty'
-  return c
+check ctx tm ty =
+  let fty = force ty in
+  case (tm, fty) of
+    (SPos p s, _) -> check (enter p ctx) s ty
+    (SHole, _) -> do
+      gs <- ask
+      err $ "hole encountered: " ++ showV gs ctx ty
+    (SAbs x Nothing b, VPi x' ty b') -> do
+      gs <- ask
+      cb <- check (bind x ty ctx) b (vinst gs b' $ vvar (lvl ctx))
+      return $ Abs x (quote gs (lvl ctx) ty) cb
+    (SPair a b, VSigma x ty b') -> do
+      ta <- check ctx a ty
+      gs <- ask
+      tb <- check ctx b (vinst gs b' $ eval gs (vs ctx) ta)
+      return $ Pair ta tb (quote gs (lvl ctx) ty)
+    (SLet x t v b, _) -> do
+      (cv, ct, pty) <- checkOrInfer ctx v t
+      gs <- ask
+      cb <- check (define x pty (eval gs (vs ctx) cv) ctx) b ty
+      return $ Let x ct cv cb
+    (s, _) -> do
+      (c, ty') <- infer ctx s
+      gs <- ask
+      test (conv gs (lvl ctx) ty' ty) $ "check failed " ++ show s ++ " : " ++ showV gs ctx ty ++ ", got " ++ showV gs ctx ty'
+      return c
 
 inferUniv :: Ctx -> Surface -> TC (Core, ULvl)
 inferUniv ctx tm = do
   (c, ty) <- infer ctx tm
-  case ty of
+  case force ty of
     VU l -> return (c, l)
     _ -> do
       gs <- ask
@@ -71,7 +74,7 @@ infer ctx t@(SVar x l) = do
 infer ctx c@(SApp f a) = do
   (cf, fty) <- infer ctx f
   gs <- ask
-  case fty of
+  case force fty of
     VPi x t b -> do
       ca <- check ctx a t
       return (App cf ca, vinst gs b (eval gs (vs ctx) ca))
@@ -103,7 +106,7 @@ infer ctx (SPair a b) = do
 infer ctx c@(SProj t p) = do
   (tm, vt) <- infer ctx t
   gs <- ask
-  case (vt, p) of
+  case (force vt, p) of
     (VSigma x ty c, Fst) -> return (Proj tm p, ty)
     (VSigma x ty c, Snd) -> return (Proj tm p, vinst gs c $ vproj (eval gs (vs ctx) tm) Fst)
     _ -> err $ "not a sigma type in " ++ show c ++ ", got " ++ showV gs ctx vt
@@ -119,3 +122,20 @@ elaborate ctx s = do
   (c, ty) <- infer ctx s
   gs <- ask
   return (c, quote gs 0 ty)
+
+reduceExpectedLet :: Core -> Core
+reduceExpectedLet (Let _ _ tm _) = tm
+reduceExpectedLet tm = tm
+
+elaborateDef :: Def -> TC GlobalCtx
+elaborateDef (Def x ty tm) = do
+  (etm', ety) <- elaborate empty (SLet x ty tm (SVar x 0))
+  let etm = reduceExpectedLet etm'
+  gs <- ask
+  return $ GlobalEntry x etm ety (eval gs [] etm) (eval gs [] ety) : gs
+
+elaborateDefs :: Defs -> TC GlobalCtx
+elaborateDefs [] = do ask
+elaborateDefs (hd : tl) = do
+      ngs <- elaborateDef hd
+      local (const ngs) $ elaborateDefs tl

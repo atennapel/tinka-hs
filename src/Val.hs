@@ -69,12 +69,16 @@ vfst v = vproj v Fst
 vsnd :: Val -> Val
 vsnd v = vproj v Snd
 
+force :: Val -> Val
+force (VGlobal _ _ _ v) = v
+force v = v
+
 eval :: GlobalCtx -> Env -> Core -> Val
 eval gs e (Var i) = e !! i
 eval gs e (Global x l) =
   case getGlobal gs x of
-    Just e | l == 0 -> gval e
-    Just e -> eval gs [] (liftUniv l (gcore e))
+    Just e | l == 0 -> VGlobal x 0 [] $ gval e
+    Just e -> VGlobal x l [] $ eval gs [] (liftUniv l (gcore e))
     Nothing -> undefined
 eval gs e (App f a) = vapp gs (eval gs e f) (eval gs e a)
 eval gs e (Abs x t b) = VAbs x (eval gs e t) (Clos e b)

@@ -17,7 +17,7 @@ inferUniv :: Ctx -> Core -> TC ULvl
 inferUniv ctx tm = do
   ty <- infer ctx tm
   gs <- ask
-  case ty of
+  case force ty of
     VU l -> return l
     _ -> err $ "expected a universe but got " ++ showV gs ctx ty ++ ", while checking " ++ show tm 
 
@@ -48,7 +48,7 @@ infer ctx (Abs x t b) = do
 infer ctx c@(App f a) = do
   fty <- infer ctx f
   gs <- ask
-  case fty of
+  case force fty of
     VPi x t b -> do
       check ctx a t
       return $ vinst gs b (eval gs (vs ctx) a)
@@ -57,7 +57,7 @@ infer ctx c@(Pair a b t) = do
   inferUniv ctx t
   gs <- ask
   let vt = eval gs (vs ctx) t
-  case vt of
+  case force vt of
     VSigma x ty c -> do
       check ctx a ty
       check ctx b (vinst gs c $ eval gs (vs ctx) a)
@@ -66,7 +66,7 @@ infer ctx c@(Pair a b t) = do
 infer ctx c@(Proj t p) = do
   vt <- infer ctx t
   gs <- ask
-  case (vt, p) of
+  case (force vt, p) of
     (VSigma x ty c, Fst) -> return ty
     (VSigma x ty c, Snd) -> return $ vinst gs c (vproj (eval gs (vs ctx) t) Fst)
     _ -> err $ "not a sigma type in " ++ show c ++ ", got " ++ showV gs ctx vt

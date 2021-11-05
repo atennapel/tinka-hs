@@ -16,7 +16,6 @@ import Verification
 import Parser
 import Core
 
-
 main :: IO ()
 main = mainWith getArgs parseStdin
 
@@ -31,7 +30,7 @@ addGlobal x def gs = do
     Left msg -> putStrLn msg >> exitSuccess
 
 globals :: IO GlobalCtx
-globals = addGlobal "id" "let id : (A : Type) -> A -> A = \\A x. x; id" []
+globals = return []
 
 mainWith :: IO [String] -> IO (Surface, String) -> IO ()
 mainWith getOpt getSurface = do
@@ -49,6 +48,12 @@ mainWith getOpt getSurface = do
     ["elab"] -> do
       (c, ty) <- elab getSurface
       putStrLn $ showC empty c
+    ["parse-defs"] -> do
+      (t, file) <- parseStdinDefs
+      print t
+    ["elab-defs"] -> do
+      gs <- elabDefs parseStdinDefs
+      putStrLn $ showElabDefs gs
     _ -> do
       (c, ty) <- elab getSurface
       putStrLn $ showC empty ty
@@ -69,3 +74,20 @@ elab getSurface = do
       case resver of
         Left msg -> putStrLn msg >> exitSuccess
         Right _ -> return res
+
+elabDefs :: IO (Defs, String) -> IO GlobalCtx
+elabDefs getDefs = do
+  gs <- globals
+  (ds, file) <- getDefs
+  let elab = elaborateDefs ds
+  let res = runIdentity $ runExceptT $ runReaderT elab gs
+  case res of
+    Left msg -> putStrLn msg >> exitSuccess
+    Right gs -> return gs -- TODO: verify elaboration
+
+showElabDef :: GlobalEntry -> String
+showElabDef (GlobalEntry x etm ety _ _) = x ++ " : " ++ showC empty ety ++ " = " ++ showC empty etm
+
+showElabDefs :: GlobalCtx -> String
+showElabDefs [] = ""
+showElabDefs (hd : tl) = showElabDefs tl ++ "\n" ++ showElabDef hd
