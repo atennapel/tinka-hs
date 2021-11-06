@@ -51,6 +51,9 @@ vpi x a b = VPi x a (Fun b)
 vfun :: Val -> Val -> Val
 vfun a b = VPi "_" a (Fun $ const b)
 
+vabs :: Name -> Val -> (Val -> Val) -> Val
+vabs x a b = VAbs x a (Fun b)
+
 vvar :: Lvl -> Val
 vvar k = VNe (HVar k) []
 
@@ -80,6 +83,11 @@ vfst v = vproj v Fst
 vsnd :: Val -> Val
 vsnd v = vproj v Snd
 
+vevalprim :: GlobalCtx -> Env -> PrimName -> ULvl -> [Val] -> Val
+vevalprim gs e PIndBool l [p, t, f, VNe (HPrim PTrue _) []] = t
+vevalprim gs e PIndBool l [p, t, f, VNe (HPrim PFalse _) []] = f
+vevalprim gs e x l as = VNe (HPrim x l) (map EApp $ reverse as)
+
 force :: Val -> Val
 force (VGlobal _ _ _ v) = v
 force v = v
@@ -91,7 +99,7 @@ eval gs e (Global x l) =
     Just e | l == 0 -> VGlobal x 0 [] $ gval e
     Just e -> VGlobal x l [] $ eval gs [] (liftUniv l (gcore e))
     Nothing -> undefined
-eval gs e (Prim x l) = vprim x l
+eval gs e (Prim x l) = evalprim gs e x l
 eval gs e (App f a) = vapp gs (eval gs e f) (eval gs e a)
 eval gs e (Abs x t b) = VAbs x (eval gs e t) (Clos e b)
 eval gs e (Pi x t b) = VPi x (eval gs e t) (Clos e b)
@@ -100,6 +108,16 @@ eval gs e (Pair a b t) = VPair (eval gs e a) (eval gs e b) (eval gs e t)
 eval gs e (Proj t p) = vproj (eval gs e t) p
 eval gs e (U l) = VU l
 eval gs e (Let x t v b) = eval gs (eval gs e v : e) b
+
+evalprim :: GlobalCtx -> Env -> PrimName -> ULvl -> Val
+evalprim gs e PIndBool l =
+  let bool = vprim PBool l in
+  vabs "P" (vfun bool (VU l)) $ \p ->
+  vabs "t" (vapp [] p (vprim PTrue l)) $ \t ->
+  vabs "f" (vapp [] p (vprim PFalse l)) $ \f ->
+  vabs "b" bool $ \b ->
+  vevalprim gs e PIndBool l [p, t, f, b]
+evalprim gs e x l = vprim x l
 
 quoteHead :: Lvl -> Head -> Core
 quoteHead k (HVar l) = Var (k - l - 1)
@@ -158,3 +176,10 @@ primType PVoid l = VU l
 primType PAbsurd l = vpi "A" (VU l) $ vfun (vprim PVoid l)
 primType PUnitType l = VU l
 primType PUnit l = vprim PUnitType l
+primType PBool l = VU l
+primType PTrue l = vprim PBool l
+primType PFalse l = vprim PBool l
+-- (P : Bool^l -> Type^l) -> P True^l -> P False^l -> (b : Bool^l) -> P b
+primType PIndBool l =
+  let bool = vprim PBool l in
+  vpi "P" (vfun bool (VU l)) $ \p -> vfun (vapp [] p (vprim PTrue l)) $ vfun (vapp [] p (vprim PFalse l)) $ vpi "b" bool (vapp [] p)

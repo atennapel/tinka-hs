@@ -2,7 +2,7 @@ module Core (Core(..), liftUniv, PrimName(..), toPrimName) where
 
 import Common
 
-data PrimName = PVoid | PAbsurd | PUnitType | PUnit
+data PrimName = PVoid | PAbsurd | PUnitType | PUnit | PBool | PTrue | PFalse | PIndBool
   deriving (Eq)
 
 instance Show PrimName where
@@ -10,13 +10,21 @@ instance Show PrimName where
   show PAbsurd = "absurd"
   show PUnitType = "UnitType"
   show PUnit = "Unit"
+  show PBool = "Bool"
+  show PTrue = "True"
+  show PFalse = "False"
+  show PIndBool = "indBool"
 
 toPrimName :: String -> Maybe PrimName
-toPrimName "Void" = Just PVoid 
-toPrimName "absurd" = Just PAbsurd 
-toPrimName "UnitType" = Just PUnitType 
-toPrimName "Unit" = Just PUnit 
-toPrimName _ = Nothing 
+toPrimName "Void" = Just PVoid
+toPrimName "absurd" = Just PAbsurd
+toPrimName "UnitType" = Just PUnitType
+toPrimName "Unit" = Just PUnit
+toPrimName "Bool" = Just PBool
+toPrimName "True" = Just PTrue
+toPrimName "False" = Just PFalse
+toPrimName "indBool" = Just PIndBool
+toPrimName _ = Nothing
 
 data Core
   = Var Ix
