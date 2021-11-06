@@ -29,6 +29,7 @@ infer ctx (Global x l) = do
   gs <- ask
   let vt = if l == 0 then gvtype e else eval gs [] (liftUniv l (gtype e))
   return vt
+infer ctx (Prim x l) = return $ primType x l
 infer ctx (Pi x t b) = do
   l1 <- inferUniv ctx t
   gs <- ask

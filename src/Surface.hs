@@ -113,6 +113,7 @@ instance IsString Surface where
 fromCore :: [Name] -> Core -> Surface
 fromCore ns (Var i) = SVar (ns !! i) 0
 fromCore ns (Global x l) = SVar x l
+fromCore ns (Prim x l) = SVar (show x) l
 fromCore ns (App f a) = SApp (fromCore ns f) (fromCore ns a)
 fromCore ns (Abs x t b) = SAbs x (Just $ fromCore ns t) (fromCore (x : ns) b)
 fromCore ns (Pi x t b) = SPi x (fromCore ns t) (fromCore (x : ns) b)

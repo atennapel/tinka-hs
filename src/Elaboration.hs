@@ -60,17 +60,20 @@ inferUniv ctx tm = do
 infer :: Ctx -> Surface -> TC (Core, Val)
 infer ctx (SPos p s) = infer (enter p ctx) s
 infer ctx (SU l) = return (U l, VU (l + 1))
-infer ctx t@(SVar x l) = do
-  res <- lookupVarMaybe ctx x
-  case res of
-    Just (i, ty) -> do
-      test (l == 0) $ "cannot lift local var " ++ show t 
-      return (Var i, ty)
+infer ctx t@(SVar x l) =
+  case toPrimName x of
+    Just prim -> return (Prim prim l, primType prim l)
     Nothing -> do
-      gs <- ask
-      e <- lookupGlobal x
-      let vt = if l == 0 then gvtype e else eval gs [] (liftUniv l (gtype e))
-      return (Global x l, vt)
+      res <- lookupVarMaybe ctx x
+      case res of
+        Just (i, ty) -> do
+          test (l == 0) $ "cannot lift local var " ++ show t 
+          return (Var i, ty)
+        Nothing -> do
+          gs <- ask
+          e <- lookupGlobal x
+          let vt = if l == 0 then gvtype e else eval gs [] (liftUniv l (gtype e))
+          return (Global x l, vt)
 infer ctx c@(SApp f a) = do
   (cf, fty) <- infer ctx f
   gs <- ask

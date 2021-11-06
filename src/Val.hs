@@ -22,13 +22,15 @@ getGlobal gs x = go gs
     go (_ : ts) = go ts
 -- globals end
 
-type Head = Lvl
 type Spine = [Elim]
 type Env = [Val]
 
 data Clos
   = Clos Env Core
   | Fun (Val -> Val)
+
+data Head = HVar Lvl | HPrim PrimName ULvl
+  deriving (Eq)
 
 data Elim
   = EApp Val
@@ -43,8 +45,17 @@ data Val
   | VPair Val Val Val
   | VU ULvl
 
+vpi :: Name -> Val -> (Val -> Val) -> Val
+vpi x a b = VPi x a (Fun b)
+
+vfun :: Val -> Val -> Val
+vfun a b = VPi "_" a (Fun $ const b)
+
 vvar :: Lvl -> Val
-vvar k = VNe k []
+vvar k = VNe (HVar k) []
+
+vprim :: PrimName -> ULvl -> Val
+vprim x l = VNe (HPrim x l) []
 
 vinst :: GlobalCtx -> Clos -> Val -> Val
 vinst gs (Clos e c) v = eval gs (v : e) c
@@ -80,6 +91,7 @@ eval gs e (Global x l) =
     Just e | l == 0 -> VGlobal x 0 [] $ gval e
     Just e -> VGlobal x l [] $ eval gs [] (liftUniv l (gcore e))
     Nothing -> undefined
+eval gs e (Prim x l) = vprim x l
 eval gs e (App f a) = vapp gs (eval gs e f) (eval gs e a)
 eval gs e (Abs x t b) = VAbs x (eval gs e t) (Clos e b)
 eval gs e (Pi x t b) = VPi x (eval gs e t) (Clos e b)
@@ -90,7 +102,8 @@ eval gs e (U l) = VU l
 eval gs e (Let x t v b) = eval gs (eval gs e v : e) b
 
 quoteHead :: Lvl -> Head -> Core
-quoteHead k l = Var (k - l - 1)
+quoteHead k (HVar l) = Var (k - l - 1)
+quoteHead k (HPrim x l) = Prim x l 
 
 quoteElim :: GlobalCtx -> Lvl -> Elim -> Core -> Core
 quoteElim gs k (EApp v) t = App t (quote gs k v)
@@ -130,9 +143,18 @@ conv gs k (VPair a b _) (VPair c d _) = conv gs k a c && conv gs k b d
 conv gs k (VPair a b _) x = conv gs k a (vfst x) && conv gs k b (vsnd x)
 conv gs k x (VPair a b _) = conv gs k (vfst x) a && conv gs k (vsnd x) b
 conv gs k (VNe h sp) (VNe h' sp') | h == h' = and $ zipWith (convElim gs k) sp sp'
+conv gs k (VNe (HPrim PUnit _) []) v = True
+conv gs k v (VNe (HPrim PUnit _) []) = True
 conv gs k (VGlobal x l sp v) (VGlobal x' l' sp' v') | x == x' && l == l' =
   and (zipWith (convElim gs k) sp sp') || conv gs k v v'
 conv gs k (VGlobal _ _ _ v) (VGlobal _ _ _ v') = conv gs k v v'
 conv gs k (VGlobal _ _ _ v) v' = conv gs k v v'
 conv gs k v (VGlobal _ _ _ v') = conv gs k v v'
 conv gs k _ _ = False
+
+primType :: PrimName -> ULvl -> Val
+primType PVoid l = VU l
+-- (A : Type_l) -> Void_l -> A
+primType PAbsurd l = vpi "A" (VU l) $ vfun (vprim PVoid l)
+primType PUnitType l = VU l
+primType PUnit l = vprim PUnitType l

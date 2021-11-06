@@ -46,6 +46,7 @@ default-extensions:
 - Strict
 - TupleSections
 - ViewPatterns
+- BlockArguments
 
 source-dirs: src
 
