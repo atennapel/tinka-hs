@@ -191,6 +191,8 @@ conv gs k a b = -- trace ("conv " ++ show (quote gs k a) ++ " ~ " ++ show (quote
     (VNe h sp, VNe h' sp') | h == h' -> and $ zipWith (convElim gs k) sp sp'
     (VNe (HPrim PUnit _) [], v) -> True
     (v, VNe (HPrim PUnit _) []) -> True
+    (VNe (HPrim PHRefl _) _, v) -> True -- is this safe?
+    (v, VNe (HPrim PHRefl _) _) -> True -- is this safe?
     (VGlobal x l sp v, VGlobal x' l' sp' v') | x == x' && l == l' ->
       and (zipWith (convElim gs k) sp sp') || conv gs k v v'
     (VGlobal _ _ _ v, VGlobal _ _ _ v') -> conv gs k v v'

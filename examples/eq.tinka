@@ -1,5 +1,5 @@
 Eq : (A : Type) -> A -> A -> Type = \A x y. HEq A A x y;
-Refl : (A : Type) -> (x : A) -> Eq A x x = \A x. HRefl A x;
+Refl : (A : Type) (x : A) -> Eq A x x = \A x. HRefl A x;
 
 not : Bool -> Bool = \b. indBool (\_. Bool) False True b;
 
@@ -7,3 +7,7 @@ _ : Eq Bool True (not False) = Refl Bool True;
 
 _ : (b : Bool) -> Eq Bool b (not (not b))
 	= \b. indBool (\b. Eq Bool b (not (not b))) (Refl Bool True) (Refl Bool False) b;
+
+-- currently the system supports a definitional eta law for refl
+_ : (A : Type) (x : A) (p : Eq A x x) -> Eq (Eq A x x) p (Refl A x)
+	= \A x p. Refl (Eq A x x) (Refl A x);
