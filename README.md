@@ -25,7 +25,10 @@ Nat99 : Type100 = Nat^99;
 ```
 
 TODO:
-- [ ] parser for sigma types
+- [x] parser for sigma types
+- [ ] parser for pairs
+- [ ] parser for projections
+- [ ] parser for unit type () and nested units []
 - [ ] named sigma projection
 - [x] some base types (void, unit, bool)
 - [x] heterogenous equality type with axiom k

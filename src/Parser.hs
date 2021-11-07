@@ -37,6 +37,9 @@ parens p = char '(' *> p <* char ')'
 pArrow :: Parser String
 pArrow   = symbol "→" <|> symbol "->"
 
+pCross :: Parser String
+pCross   = symbol "×" <|> symbol "**"
+
 keyword :: String -> Bool
 keyword x = x == "let" || x == "λ" || x == "Type"
 
@@ -90,19 +93,23 @@ pLam = do
   t <- pSurface
   pure (foldr (`SAbs` Nothing) t xs)
 
-pPi :: Parser Surface
-pPi = do
+pArrowOrCross :: Parser Bool
+pArrowOrCross = (True <$ pArrow) <|> (False <$ pCross)
+
+pPiOrSigma :: Parser Surface
+pPiOrSigma = do
   dom <- some (parens ((,) <$> some pBinder <*> (char ':' *> pSurface)))
-  pArrow
+  ty <- pArrowOrCross
   cod <- pSurface
-  pure $ foldr (\(xs, a) t -> foldr (`SPi` a) t xs) cod dom
+  let tyfun a = if ty then (`SPi` a) else (`SSigma` a)
+  pure $ foldr (\(xs, a) t -> foldr (tyfun a) t xs) cod dom
 
 funOrSpine :: Parser Surface
 funOrSpine = do
   sp <- pSpine
-  optional pArrow >>= \case
+  optional pArrowOrCross >>= \case
     Nothing -> pure sp
-    Just _  -> SPi "_" sp <$> pSurface
+    Just b  -> (if b then SPi else SSigma) "_" sp <$> pSurface
 
 pLet :: Parser Surface
 pLet = do
@@ -117,7 +124,7 @@ pLet = do
   SLet x a t <$> pSurface
 
 pSurface :: Parser Surface
-pSurface = withPos (pLam <|> pLet <|> try pPi <|> funOrSpine)
+pSurface = withPos (pLam <|> pLet <|> try pPiOrSigma <|> funOrSpine)
 
 pSrc :: Parser Surface
 pSrc = ws *> pSurface <* eof

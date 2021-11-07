@@ -81,7 +81,8 @@ liftUniv :: ULvl -> Core -> Core
 liftUniv l (U l') = U (l + l')
 liftUniv l c@(Var _) = c
 liftUniv l (Global x l') = Global x (l + l')
-liftUniv l (Prim x l') = Prim x (l + l')
+liftUniv l (Prim x l') | canLiftPrim x = Prim x (l + l')
+liftUniv l c@(Prim x l') = c
 liftUniv l (App a b) = App (liftUniv l a) (liftUniv l b)
 liftUniv l (Abs x t b) = Abs x (liftUniv l t) (liftUniv l b)
 liftUniv l (Pi x t b) = Pi x (liftUniv l t) (liftUniv l b)
