@@ -20,6 +20,7 @@ data Surface
   | SPos SourcePos Surface
   | SHole
   | SLift Surface
+  | SLiftTerm Surface
 
 isSimple :: Surface -> Bool
 isSimple (SVar _ _) = True
@@ -108,6 +109,7 @@ instance Show Surface where
   show (SLet x (Just t) v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (SPos _ s) = show s
   show (SLift s) = "Lift " ++ show s
+  show (SLiftTerm s) = "lift " ++ show s
 
 instance IsString Surface where
   fromString x = SVar x 0
@@ -126,6 +128,7 @@ fromCore ns (Proj s p) = SProj (fromCore ns s) p
 fromCore ns (U l) = SU l
 fromCore ns (Let x t v b) = SLet x (Just $ fromCore ns t) (fromCore ns v) (fromCore (x : ns) b)
 fromCore ns (Lift t) = SLift (fromCore ns t)
+fromCore ns (LiftTerm t) = SLiftTerm (fromCore ns t)
 
 data Def = Def Name (Maybe Surface) Surface -- name type term
 

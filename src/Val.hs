@@ -48,6 +48,7 @@ data Val
   | VPair Val Val Val
   | VU ULvl
   | VLift Val
+  | VLiftTerm Val
 
 vpi :: Name -> Val -> (Val -> Val) -> Val
 vpi x a b = VPi x a (Fun b)
@@ -128,6 +129,7 @@ eval gs e (Proj t p) = vproj (eval gs e t) p
 eval gs e (U l) = VU l
 eval gs e (Let x t v b) = eval gs (eval gs e v : e) b
 eval gs e (Lift t) = VLift (eval gs e t)
+eval gs e (LiftTerm t) = VLiftTerm (eval gs e t)
 
 evalprim :: GlobalCtx -> Env -> PrimName -> ULvl -> Val
 evalprim gs e PIndBool l =
@@ -167,6 +169,7 @@ quote gs k (VPi x t b) = Pi x (quote gs k t) (quoteClos gs k b)
 quote gs k (VSigma x t b) = Sigma x (quote gs k t) (quoteClos gs k b)
 quote gs k (VPair a b t) = Pair (quote gs k a) (quote gs k b) (quote gs k t)
 quote gs k (VLift t) = Lift (quote gs k t)
+quote gs k (VLiftTerm t) = LiftTerm (quote gs k t)
 
 nf :: GlobalCtx -> Core -> Core
 nf gs = quote gs 0 . eval gs []
@@ -184,6 +187,7 @@ conv gs k a b = -- trace ("conv " ++ show (quote gs k a) ++ " ~ " ++ show (quote
   case (a, b) of
     (VU l1, VU l2) | l1 == l2 -> True
     (VLift t1, VLift t2) -> conv gs k t1 t2
+    (VLiftTerm t1, VLiftTerm t2) -> conv gs k t1 t2
     (VPi _ t b, VPi _ t' b') -> conv gs k t t' && convLift gs k b b'
     (VSigma _ t b, VSigma _ t' b') -> conv gs k t t' && convLift gs k b b'
     (VAbs _ _ b, VAbs _ _ b') -> convLift gs k b b'

@@ -83,6 +83,9 @@ infer ctx (Let x t v b) = do
 infer ctx (Lift t) = do
   l <- inferUniv ctx t
   return $ VU (l + 1)
+infer ctx (LiftTerm t) = do
+  ty <- infer ctx t
+  return $ VLift ty
 
 verify :: Core -> TC Core
 verify c = do
