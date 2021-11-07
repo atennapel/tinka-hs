@@ -27,7 +27,7 @@ Nat99 : Type100 = Nat^99;
 TODO:
 - [ ] parser for sigma types
 - [x] some base types (void, unit, bool)
-- [ ] equality type
+- [x] heterogenous equality type with axiom k
 - [ ] descriptions with a fixpoint
 - [ ] implicit function types
 - [ ] QTT

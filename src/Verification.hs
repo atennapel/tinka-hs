@@ -31,7 +31,8 @@ infer ctx (Global x l) = do
   return vt
 infer ctx c@(Prim x l) = do
   test (l == 0 || canLiftPrim x) $ "primitive cannot be lifted: " ++ show c
-  return $ primType x l
+  gs <- ask
+  return $ primType gs x l
 infer ctx (Pi x t b) = do
   l1 <- inferUniv ctx t
   gs <- ask

@@ -64,7 +64,8 @@ infer ctx t@(SVar x l) =
   case toPrimName x of
     Just prim -> do
       test (l == 0 || canLiftPrim prim) $ "primitive cannot be lifted: " ++ show t
-      return (Prim prim l, primType prim l)
+      gs <- ask
+      return (Prim prim l, primType gs prim l)
     Nothing -> do
       res <- lookupVarMaybe ctx x
       case res of

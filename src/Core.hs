@@ -2,7 +2,11 @@ module Core (Core(..), liftUniv, PrimName(..), toPrimName, canLiftPrim) where
 
 import Common
 
-data PrimName = PVoid | PAbsurd | PUnitType | PUnit | PBool | PTrue | PFalse | PIndBool
+data PrimName
+  = PVoid | PAbsurd
+  | PUnitType | PUnit
+  | PBool | PTrue | PFalse | PIndBool
+  | PHEq | PHRefl | PElimHEq
   deriving (Eq)
 
 instance Show PrimName where
@@ -14,10 +18,14 @@ instance Show PrimName where
   show PTrue = "True"
   show PFalse = "False"
   show PIndBool = "indBool"
+  show PHEq = "HEq"
+  show PHRefl = "HRefl"
+  show PElimHEq = "elimHEq"
 
 canLiftPrim :: PrimName -> Bool
 canLiftPrim PAbsurd = True
 canLiftPrim PIndBool = True
+canLiftPrim PElimHEq = True
 canLiftPrim _ = False
 
 toPrimName :: String -> Maybe PrimName
@@ -29,6 +37,9 @@ toPrimName "Bool" = Just PBool
 toPrimName "True" = Just PTrue
 toPrimName "False" = Just PFalse
 toPrimName "indBool" = Just PIndBool
+toPrimName "HEq" = Just PHEq
+toPrimName "HRefl" = Just PHRefl
+toPrimName "elimHEq" = Just PElimHEq
 toPrimName _ = Nothing
 
 data Core
@@ -50,7 +61,11 @@ showProjType Snd = ".2"
 
 instance Show Core where
   show (Var x) = show x
-  show (Global x l) = show x ++ "^" ++ show l
+  show (Global x 0) = x
+  show (Global x 1) = x ++ "^"
+  show (Global x l) = x ++ "^" ++ show l
+  show (Prim x 0) = show x
+  show (Prim x 1) = show x ++ "^"
   show (Prim x l) = show x ++ "^" ++ show l
   show (App f a) = "(" ++ show f ++ " " ++ show a ++ ")"
   show (Abs x t b) = "(\\(" ++ x ++ " : " ++ show t ++ "). " ++ show b ++ ")"
@@ -58,6 +73,7 @@ instance Show Core where
   show (Sigma x t b) = "((" ++ x ++ " : " ++ show t ++ ") ** " ++ show b ++ ")"
   show (Pair a b t) = "(" ++ show a ++ ", " ++ show b ++ ") : " ++ show t
   show (Proj s p) = show s ++ showProjType p
+  show (U 0) = "Type"
   show (U l) = "Type" ++ show l
   show (Let x t v b) = "(let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b ++ ")"
 
