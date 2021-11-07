@@ -38,6 +38,7 @@ data Elim
   = EApp Val
   | EProj ProjType
   | EPrim PrimName ULvl [Val]
+  | ELower
 
 data Val
   = VNe Head Spine
@@ -100,6 +101,17 @@ vfst, vsnd :: Val -> Val
 vfst v = vproj v Fst
 vsnd v = vproj v Snd
 
+vlower :: Val -> Val
+vlower (VLiftTerm v) = v
+vlower (VNe h sp) = VNe h (ELower : sp)
+vlower (VGlobal x l sp v) = VGlobal x l (ELower : sp) (vlower v)
+vlower _ = undefined
+
+vliftterm :: Val -> Val
+vliftterm (VNe h (ELower : sp)) = VNe h sp
+vliftterm (VGlobal x l (ELower : sp) v) = VGlobal x l sp (vliftterm v)
+vliftterm v = VLiftTerm v
+
 vevalprim :: GlobalCtx -> Env -> PrimName -> ULvl -> [Val] -> Val -> Val
 vevalprim gs e PIndBool l [p, t, f] (VNe (HPrim PTrue _) []) = t
 vevalprim gs e PIndBool l [p, t, f] (VNe (HPrim PFalse _) []) = f
@@ -129,7 +141,8 @@ eval gs e (Proj t p) = vproj (eval gs e t) p
 eval gs e (U l) = VU l
 eval gs e (Let x t v b) = eval gs (eval gs e v : e) b
 eval gs e (Lift t) = VLift (eval gs e t)
-eval gs e (LiftTerm t) = VLiftTerm (eval gs e t)
+eval gs e (LiftTerm t) = vliftterm (eval gs e t)
+eval gs e (Lower t) = vlower (eval gs e t)
 
 evalprim :: GlobalCtx -> Env -> PrimName -> ULvl -> Val
 evalprim gs e PIndBool l =
@@ -148,31 +161,43 @@ evalprim gs e PElimHEq l =
   vevalprim gs e PElimHEq l [ta, a, tp, h, b] p
 evalprim gs e x l = vprim x l
 
+data QuoteLevel = KeepGlobals | Full
+
 quoteHead :: Lvl -> Head -> Core
 quoteHead k (HVar l) = Var (k - l - 1)
 quoteHead k (HPrim x l) = Prim x l 
 
-quoteElim :: GlobalCtx -> Lvl -> Elim -> Core -> Core
-quoteElim gs k (EApp v) t = App t (quote gs k v)
-quoteElim gs k (EProj p) t = Proj t p
-quoteElim gs k (EPrim x l as) t = App (foldl App (Prim x l) (map (quote gs k) as)) t
+quoteElim :: QuoteLevel -> GlobalCtx -> Lvl -> Elim -> Core -> Core
+quoteElim ql gs k (EApp v) t = App t (quoteWith ql gs k v)
+quoteElim ql gs k (EProj p) t = Proj t p
+quoteElim ql gs k (EPrim x l as) t = App (foldl App (Prim x l) (map (quoteWith ql gs k) as)) t
+quoteElim ql gs k ELower t = Lower t
 
-quoteClos :: GlobalCtx -> Lvl -> Clos -> Core
-quoteClos gs k c = quote gs (k + 1) $ vinst gs c (vvar k)
+quoteClos :: QuoteLevel -> GlobalCtx -> Lvl -> Clos -> Core
+quoteClos ql gs k c = quoteWith ql gs (k + 1) $ vinst gs c (vvar k)
+
+quoteWith :: QuoteLevel -> GlobalCtx -> Lvl -> Val -> Core
+quoteWith ql gs k (VU l) = U l
+quoteWith ql gs k (VNe h sp) = foldr (quoteElim ql gs k) (quoteHead k h) sp
+quoteWith ql gs k (VGlobal x l sp v) =
+  case ql of
+    KeepGlobals -> foldr (quoteElim ql gs k) (Global x l) sp
+    Full -> quoteWith ql gs k v
+quoteWith ql gs k (VAbs x t b) = Abs x (quoteWith ql gs k t) (quoteClos ql gs k b)
+quoteWith ql gs k (VPi x t b) = Pi x (quoteWith ql gs k t) (quoteClos ql gs k b)
+quoteWith ql gs k (VSigma x t b) = Sigma x (quoteWith ql gs k t) (quoteClos ql gs k b)
+quoteWith ql gs k (VPair a b t) = Pair (quoteWith ql gs k a) (quoteWith ql gs k b) (quoteWith ql gs k t)
+quoteWith ql gs k (VLift t) = Lift (quoteWith ql gs k t)
+quoteWith ql gs k (VLiftTerm t) = LiftTerm (quoteWith ql gs k t)
 
 quote :: GlobalCtx -> Lvl -> Val -> Core
-quote gs k (VU l) = U l
-quote gs k (VNe h sp) = foldr (quoteElim gs k) (quoteHead k h) sp
-quote gs k (VGlobal x l sp _) = foldr (quoteElim gs k) (Global x l) sp -- TODO: unfold parameter
-quote gs k (VAbs x t b) = Abs x (quote gs k t) (quoteClos gs k b)
-quote gs k (VPi x t b) = Pi x (quote gs k t) (quoteClos gs k b)
-quote gs k (VSigma x t b) = Sigma x (quote gs k t) (quoteClos gs k b)
-quote gs k (VPair a b t) = Pair (quote gs k a) (quote gs k b) (quote gs k t)
-quote gs k (VLift t) = Lift (quote gs k t)
-quote gs k (VLiftTerm t) = LiftTerm (quote gs k t)
+quote = quoteWith KeepGlobals
+
+nfWith :: QuoteLevel -> GlobalCtx -> Core -> Core
+nfWith ql gs = quoteWith ql gs 0 . eval gs []
 
 nf :: GlobalCtx -> Core -> Core
-nf gs = quote gs 0 . eval gs []
+nf = nfWith KeepGlobals
 
 convLift :: GlobalCtx -> Lvl -> Clos -> Clos -> Bool
 convLift gs k c c' = let v = vvar k in conv gs (k + 1) (vinst gs c v) (vinst gs c' v)

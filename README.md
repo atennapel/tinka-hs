@@ -33,7 +33,8 @@ TODO:
 - [ ] named sigma projection
 - [x] some base types (void, unit, bool)
 - [x] heterogenous equality type with axiom k
-- [ ] Lift, lift and lower, for simple univere lifting
+- [x] Lift, lift and lower, for simple univere lifting
 - [ ] descriptions with a fixpoint
+- [ ] metas, unification and _ solving
 - [ ] implicit function types
 - [ ] QTT

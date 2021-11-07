@@ -48,6 +48,9 @@ check ctx tm ty =
     (SLiftTerm t, VLift ty) -> do
       c <- check ctx t ty
       return $ LiftTerm c
+    (SLower t, ty) -> do
+      c <- check ctx t (VLift ty)
+      return $ Lower c
     (s, _) -> do
       (c, ty') <- infer ctx s
       gs <- ask
@@ -133,6 +136,13 @@ infer ctx (SLift t) = do
 infer ctx (SLiftTerm t) = do
   (c, ty) <- infer ctx t
   return (LiftTerm c, VLift ty)
+infer ctx tm@(SLower t) = do
+  (c, ty) <- infer ctx t
+  case force ty of
+    VLift ty' -> return (Lower c, ty')
+    _ -> do
+      gs <- ask
+      err $ "expected lift type in " ++ show tm ++ " but got " ++ showV gs ctx ty
 infer ctx s = err $ "unable to infer " ++ show s
 
 elaborate :: Ctx -> Surface -> TC (Core, Core)

@@ -54,6 +54,10 @@ mainWith getOpt getSurface = do
     ["elab-defs"] -> do
       gs <- elabDefs parseStdinDefs
       putStrLn $ showElabDefs gs
+      case getGlobal gs "main" of
+        Just e ->
+          putStrLn $ showC empty (nfWith Full gs (gcore e))
+        Nothing -> return ()
     _ -> do
       (c, ty) <- elab getSurface
       putStrLn $ showC empty ty

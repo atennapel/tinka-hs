@@ -21,6 +21,7 @@ data Surface
   | SHole
   | SLift Surface
   | SLiftTerm Surface
+  | SLower Surface
 
 isSimple :: Surface -> Bool
 isSimple (SVar _ _) = True
@@ -110,6 +111,7 @@ instance Show Surface where
   show (SPos _ s) = show s
   show (SLift s) = "Lift " ++ show s
   show (SLiftTerm s) = "lift " ++ show s
+  show (SLower s) = "lower " ++ show s
 
 instance IsString Surface where
   fromString x = SVar x 0
@@ -129,6 +131,7 @@ fromCore ns (U l) = SU l
 fromCore ns (Let x t v b) = SLet x (Just $ fromCore ns t) (fromCore ns v) (fromCore (x : ns) b)
 fromCore ns (Lift t) = SLift (fromCore ns t)
 fromCore ns (LiftTerm t) = SLiftTerm (fromCore ns t)
+fromCore ns (Lower t) = SLower (fromCore ns t)
 
 data Def = Def Name (Maybe Surface) Surface -- name type term
 

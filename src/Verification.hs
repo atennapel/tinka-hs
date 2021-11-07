@@ -86,6 +86,13 @@ infer ctx (Lift t) = do
 infer ctx (LiftTerm t) = do
   ty <- infer ctx t
   return $ VLift ty
+infer ctx tm@(Lower t) = do
+  ty <- infer ctx t
+  case force ty of
+    VLift ty' -> return ty'
+    _ -> do
+      gs <- ask
+      err $ "expected lift type in " ++ show tm ++ " but got " ++ showV gs ctx ty
 
 verify :: Core -> TC Core
 verify c = do

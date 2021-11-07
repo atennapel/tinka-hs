@@ -56,6 +56,7 @@ data Core
   | Let Name Core Core Core
   | Lift Core
   | LiftTerm Core
+  | Lower Core
 
 showProjType :: ProjType -> String
 showProjType Fst = ".1"
@@ -80,6 +81,7 @@ instance Show Core where
   show (Let x t v b) = "(let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b ++ ")"
   show (Lift t) = "(Lift " ++ show t ++ ")"
   show (LiftTerm t) = "(lift " ++ show t ++ ")"
+  show (Lower t) = "(lower " ++ show t ++ ")"
 
 liftUniv :: ULvl -> Core -> Core
 liftUniv l (U l') = U (l + l')
@@ -96,3 +98,4 @@ liftUniv l (Proj t p) = Proj (liftUniv l t) p
 liftUniv l (Let x t v b) = Let x (liftUniv l t) (liftUniv l v) (liftUniv l b)
 liftUniv l (Lift t) = Lift (liftUniv l t)
 liftUniv l (LiftTerm t) = LiftTerm (liftUniv l t)
+liftUniv l (Lower t) = Lower (liftUniv l t)
