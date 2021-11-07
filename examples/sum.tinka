@@ -17,7 +17,7 @@ indSum :
 	(right : (x : B) -> P (Right A B x))
 	(sum : Sum A B)
 	-> P sum
-	= \A B P left right sum. _; 
+	= \A B P left right sum. indBool (\b. (x : if^ Type b A B) -> P (b, x)) left right (fst sum) (snd sum);
 
 sum :
 	(A B R : Type)
@@ -55,4 +55,4 @@ maybe : (A R : Type) -> (A -> R) -> R -> Maybe A -> R
 	= \A R j n m. indMaybe A (\_. R) j n m;
 
 functorMaybe : Functor Maybe
-	= \A B fn s. maybe A (Maybe B) (\x. Just (fn x)) (Nothing B) s;
+	= \A B fn s. maybe A (Maybe B) (\x. Just B (fn x)) (Nothing B) s;

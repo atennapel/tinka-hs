@@ -27,12 +27,13 @@ Nat99 : Type100 = Nat^99;
 TODO:
 - [x] parser for sigma types
 - [x] parser for pairs
-- [ ] parser for projections
+- [x] temporary parser for simple projections (fst, snd)
+- [ ] parser for post-fix projections
 - [ ] parser for unit type () and nested units []
 - [ ] named sigma projection
 - [x] some base types (void, unit, bool)
 - [x] heterogenous equality type with axiom k
-- [ ] descriptions with a fixpoint
 - [ ] Lift, lift and lower, for simple univere lifting
+- [ ] descriptions with a fixpoint
 - [ ] implicit function types
 - [ ] QTT

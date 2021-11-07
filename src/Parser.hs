@@ -41,7 +41,7 @@ pCross :: Parser String
 pCross   = symbol "×" <|> symbol "**"
 
 keyword :: String -> Bool
-keyword x = x == "let" || x == "λ" || x == "Type"
+keyword x = x == "let" || x == "λ" || x == "Type" || x == "fst" || x == "snd"
 
 pLifting :: Parser ULvl
 pLifting = do
@@ -82,12 +82,22 @@ pCommaSeparated = do
 pPair :: Parser Surface
 pPair = parens (foldr1 SPair <$> pCommaSeparated)
 
+pProjType :: Parser ProjType
+pProjType = Fst <$ symbol "fst" <|> Snd <$ symbol "snd"
+
+pProj :: Parser Surface
+pProj = do
+  ty <- pProjType
+  tm <- pSurface
+  return $ SProj tm ty
+
 pAtom :: Parser Surface
 pAtom =
   withPos (
     (SU <$> pType) <|>
     (SHole <$ symbol "_") <|>
     (uncurry SVar <$> pIdent))
+  <|> pProj
   <|> pPair
   <|> parens pSurface
 
