@@ -80,6 +80,9 @@ infer ctx (Let x t v b) = do
   let ty = eval gs (vs ctx) t
   check ctx v ty
   infer (define x ty (eval gs (vs ctx) v) ctx) b
+infer ctx (Lift t) = do
+  l <- inferUniv ctx t
+  return $ VU (l + 1)
 
 verify :: Core -> TC Core
 verify c = do

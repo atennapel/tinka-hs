@@ -41,7 +41,7 @@ pCross :: Parser String
 pCross   = symbol "×" <|> symbol "**"
 
 keyword :: String -> Bool
-keyword x = x == "let" || x == "λ" || x == "Type" || x == "fst" || x == "snd"
+keyword x = x == "let" || x == "λ" || x == "Type" || x == "fst" || x == "snd" || x == "Lift"
 
 pLifting :: Parser ULvl
 pLifting = do
@@ -91,6 +91,11 @@ pProj = do
   tm <- pSurface
   return $ SProj tm ty
 
+pLift :: Parser Surface
+pLift = do
+  symbol "Lift"
+  SLift <$> pSurface
+
 pAtom :: Parser Surface
 pAtom =
   withPos (
@@ -98,6 +103,7 @@ pAtom =
     (SHole <$ symbol "_") <|>
     (uncurry SVar <$> pIdent))
   <|> pProj
+  <|> pLift
   <|> pPair
   <|> parens pSurface
 

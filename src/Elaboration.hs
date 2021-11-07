@@ -42,6 +42,9 @@ check ctx tm ty =
       gs <- ask
       cb <- check (define x pty (eval gs (vs ctx) cv) ctx) b ty
       return $ Let x ct cv cb
+    (SLift t, VU l) | l > 0 -> do
+      c <- check ctx t (VU (l - 1))
+      return $ Lift c
     (s, _) -> do
       (c, ty') <- infer ctx s
       gs <- ask
@@ -121,6 +124,9 @@ infer ctx (SLet x t v b) = do
   gs <- ask
   (cb, rty) <- infer (define x ty (eval gs (vs ctx) cv) ctx) b
   return (Let x ct cv cb, rty)
+infer ctx (SLift t) = do
+  (c, l) <- inferUniv ctx t
+  return (Lift c, VU (l + 1))
 infer ctx s = err $ "unable to infer " ++ show s
 
 elaborate :: Ctx -> Surface -> TC (Core, Core)

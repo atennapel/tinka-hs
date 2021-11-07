@@ -54,6 +54,7 @@ data Core
   | Proj Core ProjType
   | U ULvl
   | Let Name Core Core Core
+  | Lift Core
 
 showProjType :: ProjType -> String
 showProjType Fst = ".1"
@@ -76,6 +77,7 @@ instance Show Core where
   show (U 0) = "Type"
   show (U l) = "Type" ++ show l
   show (Let x t v b) = "(let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b ++ ")"
+  show (Lift t) = "(Lift " ++ show t ++ ")"
 
 liftUniv :: ULvl -> Core -> Core
 liftUniv l (U l') = U (l + l')
@@ -90,3 +92,4 @@ liftUniv l (Sigma x t b) = Sigma x (liftUniv l t) (liftUniv l b)
 liftUniv l (Pair a b t) = Pair (liftUniv l a) (liftUniv l b) (liftUniv l t)
 liftUniv l (Proj t p) = Proj (liftUniv l t) p
 liftUniv l (Let x t v b) = Let x (liftUniv l t) (liftUniv l v) (liftUniv l b)
+liftUniv l (Lift t) = Lift (liftUniv l t)
