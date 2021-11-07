@@ -5,10 +5,10 @@ Sum : Type -> Type -> Type
 	= \A B. (b : Bool) ** if^ Type b A B;
 
 Left : (A B : Type) -> A -> Sum A B
-  = \A B x. _;
+  = \A B x. (True, x);
 
 Right : (A B : Type) -> B -> Sum A B
-  = \A B x. _;
+  = \A B x. (False, x);
 
 indSum :
 	(A B : Type)

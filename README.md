@@ -26,7 +26,7 @@ Nat99 : Type100 = Nat^99;
 
 TODO:
 - [x] parser for sigma types
-- [ ] parser for pairs
+- [x] parser for pairs
 - [ ] parser for projections
 - [ ] parser for unit type () and nested units []
 - [ ] named sigma projection

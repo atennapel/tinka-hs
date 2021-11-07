@@ -71,12 +71,24 @@ pType = do
   (takeWhile1P Nothing isAlphaNum *> empty) <|> ws
   return $ fromMaybe 0 l
 
+pCommaSeparated :: Parser [Surface]
+pCommaSeparated = do
+  first <- pSurface
+  rest <- optional (do
+    symbol ","
+    pCommaSeparated)
+  return $ maybe [first] (first :) rest
+
+pPair :: Parser Surface
+pPair = parens (foldr1 SPair <$> pCommaSeparated)
+
 pAtom :: Parser Surface
 pAtom =
   withPos (
     (SU <$> pType) <|>
     (SHole <$ symbol "_") <|>
     (uncurry SVar <$> pIdent))
+  <|> pPair
   <|> parens pSurface
 
 pBinder :: Parser Name
