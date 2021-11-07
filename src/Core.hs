@@ -1,4 +1,4 @@
-module Core (Core(..), liftUniv, PrimName(..), toPrimName) where
+module Core (Core(..), liftUniv, PrimName(..), toPrimName, canLiftPrim) where
 
 import Common
 
@@ -14,6 +14,11 @@ instance Show PrimName where
   show PTrue = "True"
   show PFalse = "False"
   show PIndBool = "indBool"
+
+canLiftPrim :: PrimName -> Bool
+canLiftPrim PAbsurd = True
+canLiftPrim PIndBool = True
+canLiftPrim _ = False
 
 toPrimName :: String -> Maybe PrimName
 toPrimName "Void" = Just PVoid

@@ -60,6 +60,14 @@ vvar k = VNe (HVar k) []
 vprim :: PrimName -> ULvl -> Val
 vprim x l = VNe (HPrim x l) []
 
+vvoid, vunittype, vunit, vbool, vtrue, vfalse :: Val
+vvoid = vprim PVoid 0
+vunittype = vprim PUnitType 0
+vunit = vprim PUnit 0
+vbool = vprim PBool 0
+vtrue = vprim PTrue 0
+vfalse = vprim PFalse 0
+
 vinst :: GlobalCtx -> Clos -> Val -> Val
 vinst gs (Clos e c) v = eval gs (v : e) c
 vinst _ (Fun f) v = f v
@@ -111,11 +119,10 @@ eval gs e (Let x t v b) = eval gs (eval gs e v : e) b
 
 evalprim :: GlobalCtx -> Env -> PrimName -> ULvl -> Val
 evalprim gs e PIndBool l =
-  let bool = vprim PBool l in
-  vabs "P" (vfun bool (VU l)) $ \p ->
-  vabs "t" (vapp [] p (vprim PTrue l)) $ \t ->
-  vabs "f" (vapp [] p (vprim PFalse l)) $ \f ->
-  vabs "b" bool $ \b ->
+  vabs "P" (vfun vbool (VU l)) $ \p ->
+  vabs "t" (vapp [] p vtrue) $ \t ->
+  vabs "f" (vapp [] p vfalse) $ \f ->
+  vabs "b" vbool $ \b ->
   vevalprim gs e PIndBool l [p, t, f, b]
 evalprim gs e x l = vprim x l
 
@@ -171,15 +178,14 @@ conv gs k v (VGlobal _ _ _ v') = conv gs k v v'
 conv gs k _ _ = False
 
 primType :: PrimName -> ULvl -> Val
-primType PVoid l = VU l
--- (A : Type_l) -> Void_l -> A
-primType PAbsurd l = vpi "A" (VU l) $ vfun (vprim PVoid l)
-primType PUnitType l = VU l
-primType PUnit l = vprim PUnitType l
-primType PBool l = VU l
-primType PTrue l = vprim PBool l
-primType PFalse l = vprim PBool l
--- (P : Bool^l -> Type^l) -> P True^l -> P False^l -> (b : Bool^l) -> P b
+primType PVoid _ = VU 0
+-- (A : Type_l) -> Void -> A
+primType PAbsurd l = vpi "A" (VU l) $ vfun vvoid
+primType PUnitType _ = VU 0
+primType PUnit _ = vunittype
+primType PBool _ = VU 0
+primType PTrue _ = vbool
+primType PFalse _ = vbool
+-- (P : Bool -> Type^l) -> P True -> P False -> (b : Bool) -> P b
 primType PIndBool l =
-  let bool = vprim PBool l in
-  vpi "P" (vfun bool (VU l)) $ \p -> vfun (vapp [] p (vprim PTrue l)) $ vfun (vapp [] p (vprim PFalse l)) $ vpi "b" bool (vapp [] p)
+  vpi "P" (vfun vbool (VU l)) $ \p -> vfun (vapp [] p vtrue) $ vfun (vapp [] p vfalse) $ vpi "b" vbool (vapp [] p)

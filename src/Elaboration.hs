@@ -62,7 +62,9 @@ infer ctx (SPos p s) = infer (enter p ctx) s
 infer ctx (SU l) = return (U l, VU (l + 1))
 infer ctx t@(SVar x l) =
   case toPrimName x of
-    Just prim -> return (Prim prim l, primType prim l)
+    Just prim -> do
+      test (l == 0 || canLiftPrim prim) $ "primitive cannot be lifted: " ++ show t
+      return (Prim prim l, primType prim l)
     Nothing -> do
       res <- lookupVarMaybe ctx x
       case res of
