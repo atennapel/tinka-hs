@@ -13,15 +13,32 @@ Elaborate definitions
 stack run elab-defs < defs.txt
 ```
 
-Currently supports only pi-types and a predicative non-cumulative hierarchy of universes, with a lifting operator for globals.
+Currently supports:
+- pi-types
+- sigma-types
+- Void, Unit, Bool primitive types
+- predicative non-cumulative hierarchy of universes, with a lifting operator for globals
+
 For example:
 ```
-Nat : Type1 = (A : Type) -> A -> (A -> A) -> A;
-Z : Nat = \A z s. z;
-S : Nat -> Nat = \n A z s. s (n A z s);
+Sum : Type -> Type -> Type
+  = \A B. (b : Bool) ** (elim Bool 1) (\_. Type) A B b;
 
-Nat1 : Type2 = Nat^;
-Nat99 : Type100 = Nat^99;
+Left : (A B : Type) -> A -> Sum A B
+  = \A B x. (True, x);
+
+Right : (A B : Type) -> B -> Sum A B
+  = \A B x. (False, x);
+
+indSum :
+  (A B : Type)
+  (P : Sum A B -> Type)
+  (left : (x : A) -> P (Left A B x))
+  (right : (x : B) -> P (Right A B x))
+  (sum : Sum A B)
+  -> P sum
+  = \A B P left right sum.
+    (elim Bool) (\b. (x : (elim Bool 1) (\_. Type) A B b) -> P (b, x)) left right (fst sum) (snd sum);
 ```
 
 TODO:
@@ -33,7 +50,7 @@ TODO:
 - [ ] named sigma projection
 - [x] some base types (void, unit, bool)
 - [x] heterogenous equality type with axiom k
-- [x] Lift, lift and lower, for simple univere lifting
+- [x] Lift, lift and lower, for simple universe lifting
 - [ ] descriptions with a fixpoint
 - [ ] metas, unification and _ solving
 - [ ] implicit function types
