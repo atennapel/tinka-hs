@@ -72,7 +72,6 @@ infer ctx (SU l) = return (U l, VU (l + 1))
 infer ctx t@(SVar x l) =
   case toPrimName x of
     Just prim -> do
-      test (l == 0 || canLiftPrim prim) $ "primitive cannot be lifted: " ++ show t
       gs <- ask
       return (Prim prim l, primType gs prim l)
     Nothing -> do
@@ -86,6 +85,12 @@ infer ctx t@(SVar x l) =
           e <- lookupGlobal x
           let vt = if l == 0 then gvtype e else eval gs [] (liftUniv l (gtype e))
           return (Global x l, vt)
+infer ctx (SPrimElim x l k) = do
+  case toPrimElimName x of
+    Just prim -> do
+      gs <- ask
+      return (PrimElim prim l k, primElimType gs prim l k)
+    Nothing -> err $ "undefined primitive " ++ x
 infer ctx c@(SApp f a) = do
   (cf, fty) <- infer ctx f
   gs <- ask

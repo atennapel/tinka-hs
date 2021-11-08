@@ -1,8 +1,5 @@
-if : (A : Type) -> Bool -> A -> A -> A
-	= \A b t f. indBool (\_. A) t f b;
-
 Sum : Type -> Type -> Type
-	= \A B. (b : Bool) ** if^ Type b A B;
+	= \A B. (b : Bool) ** (elim Bool 1) (\_. Type) A B b;
 
 Left : (A B : Type) -> A -> Sum A B
   = \A B x. (True, x);
@@ -17,7 +14,7 @@ indSum :
 	(right : (x : B) -> P (Right A B x))
 	(sum : Sum A B)
 	-> P sum
-	= \A B P left right sum. indBool (\b. (x : if^ Type b A B) -> P (b, x)) left right (fst sum) (snd sum);
+	= \A B P left right sum. (elim Bool) (\b. (x : (elim Bool 1) (\_. Type) A B b) -> P (b, x)) left right (fst sum) (snd sum);
 
 sum :
 	(A B R : Type)

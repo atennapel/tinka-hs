@@ -1,66 +1,73 @@
-module Core (Core(..), liftUniv, PrimName(..), toPrimName, canLiftPrim) where
+module Core (Core(..), liftUniv, PrimName(..), PrimElimName(..), toPrimName, toPrimElimName) where
 
 import Common
 
 data PrimName
-  = PVoid | PAbsurd
+  = PVoid
   | PUnitType | PUnit
-  | PBool | PTrue | PFalse | PIndBool
-  | PHEq | PHRefl | PElimHEq
-  | PDesc | PEnd | PArg | PInd | PEl | PData | PCon
+  | PBool | PTrue | PFalse
+  | PHEq | PHRefl
+  | PDesc | PEnd | PArg | PInd | PData | PCon
+  deriving (Eq)
+
+data PrimElimName
+  = PEVoid
+  | PEBool
+  | PEHEq
+  | PEEl
   deriving (Eq)
 
 instance Show PrimName where
   show PVoid = "Void"
-  show PAbsurd = "absurd"
   show PUnitType = "UnitType"
   show PUnit = "Unit"
   show PBool = "Bool"
   show PTrue = "True"
   show PFalse = "False"
-  show PIndBool = "indBool"
   show PHEq = "HEq"
   show PHRefl = "HRefl"
-  show PElimHEq = "elimHEq"
   show PDesc = "Desc"
   show PEnd = "End"
   show PArg = "Arg"
   show PInd = "Ind"
-  show PEl = "El"
   show PData = "Data"
   show PCon = "Con"
 
-canLiftPrim :: PrimName -> Bool
-canLiftPrim PAbsurd = True
-canLiftPrim PIndBool = True
-canLiftPrim PElimHEq = True
-canLiftPrim _ = False
+instance Show PrimElimName where
+  show PEVoid = "Void"
+  show PEBool = "Bool"
+  show PEHEq = "HEq"
+  show PEEl = "El"
 
 toPrimName :: String -> Maybe PrimName
 toPrimName "Void" = Just PVoid
-toPrimName "absurd" = Just PAbsurd
 toPrimName "UnitType" = Just PUnitType
 toPrimName "Unit" = Just PUnit
 toPrimName "Bool" = Just PBool
 toPrimName "True" = Just PTrue
 toPrimName "False" = Just PFalse
-toPrimName "indBool" = Just PIndBool
 toPrimName "HEq" = Just PHEq
 toPrimName "HRefl" = Just PHRefl
-toPrimName "elimHEq" = Just PElimHEq
 toPrimName "Desc" = Just PDesc
 toPrimName "End" = Just PEnd
 toPrimName "Arg" = Just PArg
 toPrimName "Ind" = Just PInd
-toPrimName "El" = Just PEl
 toPrimName "Data" = Just PData
 toPrimName "Con" = Just PCon
 toPrimName _ = Nothing
+
+toPrimElimName :: String -> Maybe PrimElimName
+toPrimElimName "Void" = Just PEVoid
+toPrimElimName "Bool" = Just PEBool
+toPrimElimName "HEq" = Just PEHEq
+toPrimElimName "El" = Just PEEl
+toPrimElimName _ = Nothing
 
 data Core
   = Var Ix
   | Global Name ULvl
   | Prim PrimName ULvl
+  | PrimElim PrimElimName ULvl ULvl
   | App Core Core
   | Abs Name Core Core
   | Pi Name Core Core
@@ -85,6 +92,9 @@ instance Show Core where
   show (Prim x 0) = show x
   show (Prim x 1) = show x ++ "^"
   show (Prim x l) = show x ++ "^" ++ show l
+  show (PrimElim x 0 k) = "elim " ++ show x ++ (if k == 0 then "" else " " ++ show k)
+  show (PrimElim x 1 k) = "elim " ++ show x ++ "^" ++ (if k == 0 then "" else " " ++ show k)
+  show (PrimElim x l k) = "elim " ++ show x ++ "^" ++ show l ++ (if k == 0 then "" else " " ++ show k)
   show (App f a) = "(" ++ show f ++ " " ++ show a ++ ")"
   show (Abs x t b) = "(\\(" ++ x ++ " : " ++ show t ++ "). " ++ show b ++ ")"
   show (Pi x t b) = "((" ++ x ++ " : " ++ show t ++ ") -> " ++ show b ++ ")"
@@ -102,8 +112,8 @@ liftUniv :: ULvl -> Core -> Core
 liftUniv l (U l') = U (l + l')
 liftUniv l c@(Var _) = c
 liftUniv l (Global x l') = Global x (l + l')
-liftUniv l (Prim x l') | canLiftPrim x = Prim x (l + l')
-liftUniv l c@(Prim x l') = c
+liftUniv l (Prim x l') = Prim x (l + l')
+liftUniv l (PrimElim x l' k) = PrimElim x (l + l') k
 liftUniv l (App a b) = App (liftUniv l a) (liftUniv l b)
 liftUniv l (Abs x t b) = Abs x (liftUniv l t) (liftUniv l b)
 liftUniv l (Pi x t b) = Pi x (liftUniv l t) (liftUniv l b)

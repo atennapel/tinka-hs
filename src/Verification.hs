@@ -30,9 +30,11 @@ infer ctx (Global x l) = do
   let vt = if l == 0 then gvtype e else eval gs [] (liftUniv l (gtype e))
   return vt
 infer ctx c@(Prim x l) = do
-  test (l == 0 || canLiftPrim x) $ "primitive cannot be lifted: " ++ show c
   gs <- ask
   return $ primType gs x l
+infer ctx (PrimElim x l k) = do
+  gs <- ask
+  return $ primElimType gs x l k
 infer ctx (Pi x t b) = do
   l1 <- inferUniv ctx t
   gs <- ask

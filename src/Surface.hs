@@ -9,6 +9,7 @@ import Core
 
 data Surface
   = SVar Name ULvl
+  | SPrimElim Name ULvl ULvl
   | SApp Surface Surface
   | SAbs Name (Maybe Surface) Surface
   | SPi Name Surface Surface
@@ -89,6 +90,9 @@ instance Show Surface where
   show (SVar x 0) = x
   show (SVar x 1) = x ++ "^"
   show (SVar x l) = x ++ "^" ++ show l
+  show (SPrimElim x 0 k) = "elim " ++ x ++ (if k == 0 then "" else " " ++ show k)
+  show (SPrimElim x 1 k) = "elim " ++ x ++ "^" ++ (if k == 0 then "" else " " ++ show k)
+  show (SPrimElim x l k) = "elim " ++ x ++ "^" ++ show l ++ (if k == 0 then "" else " " ++ show k)
   show (SU 0) = "Type"
   show (SU l) = "Type" ++ show l
   show SHole = "_"
@@ -121,6 +125,7 @@ fromCore :: [Name] -> Core -> Surface
 fromCore ns (Var i) = SVar (ns !! i) 0
 fromCore ns (Global x l) = SVar x l
 fromCore ns (Prim x l) = SVar (show x) l
+fromCore ns (PrimElim x l k) = SPrimElim (show x) l k
 fromCore ns (App f a) = SApp (fromCore ns f) (fromCore ns a)
 fromCore ns (Abs x t b) = SAbs x (Just $ fromCore ns t) (fromCore (x : ns) b)
 fromCore ns (Pi x t b) = SPi x (fromCore ns t) (fromCore (x : ns) b)
