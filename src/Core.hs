@@ -7,7 +7,7 @@ data PrimName
   | PUnitType | PUnit
   | PBool | PTrue | PFalse
   | PHEq | PHRefl
-  | PDesc | PEnd | PArg | PInd | PData
+  | PDesc | PEnd | PArg | PInd | PData | PCon
   deriving (Eq)
 
 data PrimElimName
@@ -31,6 +31,7 @@ instance Show PrimName where
   show PArg = "Arg"
   show PInd = "Ind"
   show PData = "Data"
+  show PCon = "Con"
 
 instance Show PrimElimName where
   show PEVoid = "Void"
@@ -52,6 +53,7 @@ toPrimName "End" = Just PEnd
 toPrimName "Arg" = Just PArg
 toPrimName "Ind" = Just PInd
 toPrimName "Data" = Just PData
+toPrimName "Con" = Just PCon
 toPrimName _ = Nothing
 
 toPrimElimName :: String -> Maybe PrimElimName

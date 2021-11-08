@@ -17,3 +17,5 @@ SumD : Desc -> Desc -> Desc
 
 NatD = SumD (Ind End) End;
 Nat = Data NatD;
+Z : Nat = Con NatD (False, Unit);
+S : Nat -> Nat = \n. Con NatD (True, n, Unit);

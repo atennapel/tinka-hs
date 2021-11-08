@@ -142,8 +142,25 @@ vprimelim gs x l k as (VNe h sp) = VNe h (EPrimElim x l k as : sp)
 vprimelim gs p l k as (VGlobal x kk sp v) = VGlobal x kk (EPrimElim p l k as : sp) (vprimelim gs p l k as v)
 vprimelim gs x l k as _ = undefined
 
+{-
+El : Desc -> Type -> Type
+  = \D X. (elim Desc 1) (\_. Type)
+      UnitType
+      (\A K R. (x : A) ** R x)
+      (\K R. X ** R)
+      D;
+-}
+vel :: GlobalCtx -> ULvl -> Val -> Val -> Val
+vel gs l d x = vprimelim gs PEDesc l (l + 1)
+  [
+    vabs "_" (vdesc l) $ \_ -> VU l,
+    vunittype l,
+    vabs "A" (VU l) $ \a -> vabs "K" (vfun a (vdesc l)) $ \_ -> vabs "R" (vfun a (VU l)) $ \r -> vsigma "x" a $ \x -> vapp gs r x,
+    vabs "K" (vdesc l) $ \_ -> vabs "R" (VU l) $ \r -> vpairty x r
+  ] d
+
 force :: Val -> Val
-force (VGlobal _ _ _ v) = v
+force (VGlobal _ _ _ v) = force v
 force v = v
 
 eval :: GlobalCtx -> Env -> Core -> Val
@@ -192,7 +209,7 @@ evalprimelim gs PEDesc l k =
   vabs "arg" (vpi "A" (VU l) $ \a -> vpi "K" (vfun a (vdesc l)) $ \kk -> vfun (vpi "x" a $ \x -> vapp gs p (vapp gs kk x)) (vapp gs p (varg l a kk))) $ \arg ->
   vabs "ind" (vpi "K" (vdesc l) $ \kk -> vfun (vapp gs p kk) (vapp gs p (vind l kk))) $ \ind ->
   vabs "d" (vdesc l) $ \d ->
-  vprimelim gs PEDesc  l k [p, end, arg, ind] d
+  vprimelim gs PEDesc l k [p, end, arg, ind] d
 
 data QuoteLevel = KeepGlobals | Full
 
@@ -285,6 +302,9 @@ primType gs PEnd l = vdesc l
 primType gs PArg l = vpi "A" (VU l) $ \a -> vfun (vfun a (vdesc l)) (vdesc l)
 primType gs PInd l = vfun (vdesc l) (vdesc l)
 primType gs PData l = vfun (vdesc l) (VU l)
+-- (D : Desc^l) -> El^l D (Data^l D) -> Data^l D
+primType gs PCon l =
+  vpi "D" (vdesc l) $ \d -> vfun (vel gs l d (vdata l d)) (vdata l d)
 
 primElimType :: GlobalCtx -> PrimElimName -> ULvl -> ULvl -> Val
 -- (A : Type^(l + k)) -> Void^l -> A
