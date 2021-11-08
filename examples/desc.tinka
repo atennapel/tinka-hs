@@ -1,0 +1,19 @@
+El : Desc -> Type -> Type
+  = \D X. (elim Desc 1) (\_. Type)
+      UnitType
+      (\A K R. (x : A) ** R x)
+      (\K R. X ** R)
+      D;
+
+map : (D : Desc) -> (A B : Type) -> (A -> B) -> El D A -> El D B
+  = \D A B f. (elim Desc) (\D. El D A -> El D B)
+      (\_. Unit)
+      (\A K R p. (fst p, R (fst p) (snd p)))
+      (\K R p. (f (fst p), R (snd p)))
+      D;
+
+SumD : Desc -> Desc -> Desc
+  = \A B. Arg Bool ((elim Bool 1) (\_. Desc) A B);
+
+NatD = SumD (Ind End) End;
+Nat = Data NatD;

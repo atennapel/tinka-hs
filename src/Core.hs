@@ -7,14 +7,14 @@ data PrimName
   | PUnitType | PUnit
   | PBool | PTrue | PFalse
   | PHEq | PHRefl
-  | PDesc | PEnd | PArg | PInd | PData | PCon
+  | PDesc | PEnd | PArg | PInd | PData
   deriving (Eq)
 
 data PrimElimName
   = PEVoid
   | PEBool
   | PEHEq
-  | PEEl
+  | PEDesc
   deriving (Eq)
 
 instance Show PrimName where
@@ -31,13 +31,12 @@ instance Show PrimName where
   show PArg = "Arg"
   show PInd = "Ind"
   show PData = "Data"
-  show PCon = "Con"
 
 instance Show PrimElimName where
   show PEVoid = "Void"
   show PEBool = "Bool"
   show PEHEq = "HEq"
-  show PEEl = "El"
+  show PEDesc = "Desc"
 
 toPrimName :: String -> Maybe PrimName
 toPrimName "Void" = Just PVoid
@@ -53,14 +52,13 @@ toPrimName "End" = Just PEnd
 toPrimName "Arg" = Just PArg
 toPrimName "Ind" = Just PInd
 toPrimName "Data" = Just PData
-toPrimName "Con" = Just PCon
 toPrimName _ = Nothing
 
 toPrimElimName :: String -> Maybe PrimElimName
 toPrimElimName "Void" = Just PEVoid
 toPrimElimName "Bool" = Just PEBool
 toPrimElimName "HEq" = Just PEHEq
-toPrimElimName "El" = Just PEEl
+toPrimElimName "Desc" = Just PEDesc
 toPrimElimName _ = Nothing
 
 data Core

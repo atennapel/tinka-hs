@@ -1,4 +1,0 @@
-NatD = Arg Bool ((elim Bool 1) (\_. Desc) (Ind End) End);
-Nat = Data NatD;
-Z : Nat = Con NatD (False, Unit);
-S : Nat -> Nat = \n. Con NatD (True, n, Unit);

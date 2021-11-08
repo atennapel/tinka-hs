@@ -72,7 +72,7 @@ vvar k = VNe (HVar k) []
 vprim :: PrimName -> ULvl -> Val
 vprim x l = VNe (HPrim x l) []
 
-vvoid, vunittype, vunit, vbool, vtrue, vfalse, vdesc :: ULvl -> Val
+vvoid, vunittype, vunit, vbool, vtrue, vfalse, vdesc, vend :: ULvl -> Val
 vvoid = vprim PVoid
 vunittype = vprim PUnitType
 vunit = vprim PUnit
@@ -80,6 +80,13 @@ vbool = vprim PBool
 vtrue = vprim PTrue
 vfalse = vprim PFalse
 vdesc = vprim PDesc
+vend = vprim PEnd
+
+varg :: ULvl -> Val -> Val -> Val
+varg l a k = VNe (HPrim PArg l) [EApp k, EApp a]
+
+vind :: ULvl -> Val -> Val
+vind l k = VNe (HPrim PInd l) [EApp k]
 
 vheq :: ULvl -> Val -> Val -> Val -> Val -> Val
 vheq l a b x y = VNe (HPrim PHEq l) [EApp y, EApp x, EApp b, EApp a]
@@ -126,15 +133,14 @@ vprimelim :: GlobalCtx -> PrimElimName -> ULvl -> ULvl -> [Val] -> Val -> Val
 vprimelim gs PEBool l k [p, t, f] (VNe (HPrim PTrue _) []) = t
 vprimelim gs PEBool l k [p, t, f] (VNe (HPrim PFalse _) []) = f
 vprimelim gs PEHEq l k [ta, a, tp, h, b] (VNe (HPrim PHRefl _) _) = h
-vprimelim gs PEEl l k [x] (VNe (HPrim PEnd _) _) = vunittype l
-vprimelim gs PEEl l k [x] (VNe (HPrim PArg _) [EApp kk, EApp a]) = vsigma "x" a $ \rest -> vprimelim gs PEEl l k [x] (vapp gs kk rest)
-vprimelim gs PEEl l k [x] (VNe (HPrim PInd _) [EApp kk]) = vpairty x (vprimelim gs PEEl l k [x] kk)
+vprimelim gs PEDesc l k [p, end, arg, ind] (VNe (HPrim PEnd _) []) = end
+vprimelim gs PEDesc l k [p, end, arg, ind] (VNe (HPrim PArg _) [EApp kk, EApp a]) =
+  vapp gs (vapp gs (vapp gs arg a) kk) (vabs "x" a $ \x -> vprimelim gs PEDesc l k [p, end, arg, ind] (vapp gs kk x))
+vprimelim gs PEDesc l k [p, end, arg, ind] (VNe (HPrim PInd _) [EApp kk]) =
+  vapp gs (vapp gs ind kk) (vprimelim gs PEDesc l k [p, end, arg, ind] kk)
 vprimelim gs x l k as (VNe h sp) = VNe h (EPrimElim x l k as : sp)
 vprimelim gs p l k as (VGlobal x kk sp v) = VGlobal x kk (EPrimElim p l k as : sp) (vprimelim gs p l k as v)
 vprimelim gs x l k as _ = undefined
-
-vel :: GlobalCtx -> ULvl -> ULvl -> Val -> Val -> Val
-vel gs l1 l2 d x = vprimelim gs PEEl l1 l2 [x] d
 
 force :: Val -> Val
 force (VGlobal _ _ _ v) = v
@@ -176,14 +182,17 @@ evalprimelim gs PEHEq l k =
   vabs "b" ta $ \b ->
   vabs "p" (vheq l ta ta a b) $ \p ->
   vprimelim gs PEHEq l k [ta, a, tp, h, b] p
-evalprimelim gs PEEl l k =
-  vabs "X" (VU (l + k)) $ \x ->
-  vabs "D" (vdesc l) $ \d ->
-  vprimelim gs PEEl l k [x] d
 evalprimelim gs PEVoid l k =
   vabs "A" (VU (l + k)) $ \a ->
   vabs "v" (vvoid l) $ \v ->
   vprimelim gs PEVoid l k [a] v
+evalprimelim gs PEDesc l k =
+  vabs "P" (vfun (vdesc l) (VU (l + k))) $ \p ->
+  vabs "end" (vapp gs p (vend l)) $ \end ->
+  vabs "arg" (vpi "A" (VU l) $ \a -> vpi "K" (vfun a (vdesc l)) $ \kk -> vfun (vpi "x" a $ \x -> vapp gs p (vapp gs kk x)) (vapp gs p (varg l a kk))) $ \arg ->
+  vabs "ind" (vpi "K" (vdesc l) $ \kk -> vfun (vapp gs p kk) (vapp gs p (vind l kk))) $ \ind ->
+  vabs "d" (vdesc l) $ \d ->
+  vprimelim gs PEDesc  l k [p, end, arg, ind] d
 
 data QuoteLevel = KeepGlobals | Full
 
@@ -276,8 +285,6 @@ primType gs PEnd l = vdesc l
 primType gs PArg l = vpi "A" (VU l) $ \a -> vfun (vfun a (vdesc l)) (vdesc l)
 primType gs PInd l = vfun (vdesc l) (vdesc l)
 primType gs PData l = vfun (vdesc l) (VU l)
--- (D : Desc^l) -> El^l 0 D (Data^l D) -> Data^l D
-primType gs PCon l = vpi "D" (vdesc l) $ \d -> vfun (vel gs l 0 d (vdata l d)) (vdata l d)
 
 primElimType :: GlobalCtx -> PrimElimName -> ULvl -> ULvl -> Val
 -- (A : Type^(l + k)) -> Void^l -> A
@@ -288,13 +295,15 @@ primElimType gs PEBool l k =
   vfun (vapp gs p (vtrue l)) $
   vfun (vapp gs p (vfalse l)) $
   vpi "b" (vbool l) (vapp gs p)
--- (A : Type^l)
--- -> (a : A)
--- -> (P : (b : A) -> HEq^l A A a b -> Type^(l + k))
--- -> P a (HRefl^l A a)
--- -> (b : A)
--- -> (p : HEq^l A A a b)
--- -> P b p
+{-
+(A : Type^l)
+-> (a : A)
+-> (P : (b : A) -> HEq^l A A a b -> Type^(l + k))
+-> P a (HRefl^l A a)
+-> (b : A)
+-> (p : HEq^l A A a b)
+-> P b p
+-}
 primElimType gs PEHEq l k =
   vpi "A" (VU l) $ \ta ->
   vpi "a" ta $ \a ->
@@ -303,5 +312,18 @@ primElimType gs PEHEq l k =
   vpi "b" ta $ \b ->
   vpi "p" (vheq l ta ta a b) $ \p ->
   vapp gs (vapp gs tp b) p
--- Type^(l + k) -> Desc^l -> Type^(l + k)
-primElimType gs PEEl l k = vfun (VU (l + k)) $ vfun (vdesc l) (VU (l + k))
+{-
+(P : Desc^l -> Type^(l + k))
+-> P End^l
+-> ((A : Type^l) -> (K : A -> Desc^l) -> ((x : A) -> P (K x)) -> P (Arg^l A K))
+-> ((K : Desc^l) -> P K -> P (Ind^l K))
+-> (d : Desc^l)
+-> P d
+-}
+primElimType gs PEDesc l k =
+  vpi "P" (vfun (vdesc l) (VU (l + k))) $ \p ->
+  vfun (vapp gs p (vend l)) $
+  vfun (vpi "A" (VU l) $ \a -> vpi "K" (vfun a (vdesc l)) $ \kk -> vfun (vpi "x" a $ \x -> vapp gs p (vapp gs kk x)) (vapp gs p (varg l a kk))) $
+  vfun (vpi "K" (vdesc l) $ \kk -> vfun (vapp gs p kk) (vapp gs p (vind l kk))) $
+  vpi "d" (vdesc l) $ \d ->
+  vapp gs p d

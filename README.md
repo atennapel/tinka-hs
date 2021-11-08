@@ -51,7 +51,8 @@ TODO:
 - [x] some base types (void, unit, bool)
 - [x] heterogenous equality type with axiom k
 - [x] Lift, lift and lower, for simple universe lifting
-- [ ] descriptions with a fixpoint
+- [x] simple descriptions: Desc, End, Arg and Ind and Desc elimination
+- [ ] descriptions fixpoint: Data, Con and Data elimination
 - [ ] metas, unification and _ solving
 - [ ] implicit function types
 - [ ] QTT
