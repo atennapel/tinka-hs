@@ -1,0 +1,7 @@
+if : (A : Type) -> Bool -> A -> A -> A
+	= \A b t f. indBool (\_. A) t f b;
+
+NatD = Arg Bool (\b. if^ Desc b (Ind End) End);
+Nat = Data NatD;
+Z : Nat = Con NatD (False, Unit);
+S : Nat -> Nat = \n. Con NatD (True, n, Unit);

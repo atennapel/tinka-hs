@@ -3,7 +3,7 @@ module Val where
 import Common
 import Core
 
--- import Debug.Trace (trace)
+import Debug.Trace (trace)
 
 -- context for global definitions, it's in here because of cyclic modules
 data GlobalEntry = GlobalEntry {
@@ -54,8 +54,14 @@ data Val
 vpi :: Name -> Val -> (Val -> Val) -> Val
 vpi x a b = VPi x a (Fun b)
 
+vsigma :: Name -> Val -> (Val -> Val) -> Val
+vsigma x a b = VSigma x a (Fun b)
+
 vfun :: Val -> Val -> Val
 vfun a b = VPi "_" a (Fun $ const b)
+
+vpairty :: Val -> Val -> Val
+vpairty a b = VSigma "_" a (Fun $ const b)
 
 vabs :: Name -> Val -> (Val -> Val) -> Val
 vabs x a b = VAbs x a (Fun b)
@@ -66,19 +72,23 @@ vvar k = VNe (HVar k) []
 vprim :: PrimName -> ULvl -> Val
 vprim x l = VNe (HPrim x l) []
 
-vvoid, vunittype, vunit, vbool, vtrue, vfalse :: Val
+vvoid, vunittype, vunit, vbool, vtrue, vfalse, vdesc :: Val
 vvoid = vprim PVoid 0
 vunittype = vprim PUnitType 0
 vunit = vprim PUnit 0
 vbool = vprim PBool 0
 vtrue = vprim PTrue 0
 vfalse = vprim PFalse 0
+vdesc = vprim PDesc 0
 
 vheq :: Val -> Val -> Val -> Val -> Val
 vheq a b x y = VNe (HPrim PHEq 0) [EApp y, EApp x, EApp b, EApp a]
 
 vhrefl :: Val -> Val -> Val
 vhrefl a x = VNe (HPrim PHRefl 0) [EApp x, EApp a]
+
+vdata :: Val -> Val
+vdata v = VNe (HPrim PData 0) [EApp v]
 
 vinst :: GlobalCtx -> Clos -> Val -> Val
 vinst gs (Clos e c) v = eval gs (v : e) c
@@ -112,13 +122,19 @@ vliftterm (VNe h (ELower : sp)) = VNe h sp
 vliftterm (VGlobal x l (ELower : sp) v) = VGlobal x l sp (vliftterm v)
 vliftterm v = VLiftTerm v
 
-vevalprim :: GlobalCtx -> Env -> PrimName -> ULvl -> [Val] -> Val -> Val
-vevalprim gs e PIndBool l [p, t, f] (VNe (HPrim PTrue _) []) = t
-vevalprim gs e PIndBool l [p, t, f] (VNe (HPrim PFalse _) []) = f
-vevalprim gs e PElimHEq l [ta, a, tp, h, b] (VNe (HPrim PHRefl _) _) = h
-vevalprim gs e x l as (VNe h sp) = VNe h (EPrim x l as : sp)
-vevalprim gs e p l as (VGlobal x k sp v) = VGlobal x k (EPrim p l as : sp) (vevalprim gs e p l as v)
-vevalprim gs e x l as _ = undefined
+vevalprim :: GlobalCtx -> PrimName -> ULvl -> [Val] -> Val -> Val
+vevalprim gs PIndBool l [p, t, f] (VNe (HPrim PTrue _) []) = t
+vevalprim gs PIndBool l [p, t, f] (VNe (HPrim PFalse _) []) = f
+vevalprim gs PElimHEq l [ta, a, tp, h, b] (VNe (HPrim PHRefl _) _) = h
+vevalprim gs PEl l [x] (VNe (HPrim PEnd _) _) = vunittype
+vevalprim gs PEl l [x] (VNe (HPrim PArg _) [EApp k, EApp a]) = vsigma "x" a $ \rest -> vevalprim gs PEl l [x] (vapp gs k rest)
+vevalprim gs PEl l [x] (VNe (HPrim PInd _) [EApp k]) = vpairty x (vevalprim gs PEl l [x] k)
+vevalprim gs x l as (VNe h sp) = VNe h (EPrim x l as : sp)
+vevalprim gs p l as (VGlobal x k sp v) = VGlobal x k (EPrim p l as : sp) (vevalprim gs p l as v)
+vevalprim gs x l as _ = undefined
+
+vel :: GlobalCtx -> Val -> Val -> Val
+vel gs d x = vevalprim gs PEl 0 [x] d
 
 force :: Val -> Val
 force (VGlobal _ _ _ v) = v
@@ -131,7 +147,7 @@ eval gs e (Global x l) =
     Just e | l == 0 -> VGlobal x 0 [] $ gval e
     Just e -> VGlobal x l [] $ eval gs [] (liftUniv l (gcore e))
     Nothing -> undefined
-eval gs e (Prim x l) = evalprim gs e x l
+eval gs e (Prim x l) = evalprim gs x l
 eval gs e (App f a) = vapp gs (eval gs e f) (eval gs e a)
 eval gs e (Abs x t b) = VAbs x (eval gs e t) (Clos e b)
 eval gs e (Pi x t b) = VPi x (eval gs e t) (Clos e b)
@@ -144,22 +160,26 @@ eval gs e (Lift t) = VLift (eval gs e t)
 eval gs e (LiftTerm t) = vliftterm (eval gs e t)
 eval gs e (Lower t) = vlower (eval gs e t)
 
-evalprim :: GlobalCtx -> Env -> PrimName -> ULvl -> Val
-evalprim gs e PIndBool l =
+evalprim :: GlobalCtx -> PrimName -> ULvl -> Val
+evalprim gs PIndBool l =
   vabs "P" (vfun vbool (VU l)) $ \p ->
   vabs "t" (vapp gs p vtrue) $ \t ->
   vabs "f" (vapp gs p vfalse) $ \f ->
   vabs "b" vbool $ \b ->
-  vevalprim gs e PIndBool l [p, t, f] b
-evalprim gs e PElimHEq l =
+  vevalprim gs PIndBool l [p, t, f] b
+evalprim gs PElimHEq l =
   vabs "A" (VU 0) $ \ta ->
   vabs "a" ta $ \a ->
   vabs "P" (vpi "b" ta $ \b -> vfun (vheq ta ta a b) (VU l)) $ \tp ->
   vabs "h" (vapp gs (vapp gs tp ta) (vhrefl ta a)) $ \h ->
   vabs "b" ta $ \b ->
   vabs "p" (vheq ta ta a b) $ \p ->
-  vevalprim gs e PElimHEq l [ta, a, tp, h, b] p
-evalprim gs e x l = vprim x l
+  vevalprim gs PElimHEq l [ta, a, tp, h, b] p
+evalprim gs PEl l =
+  vabs "X" (VU 0) $ \x ->
+  vabs "D" vdesc $ \d ->
+  vevalprim gs PEl l [x] d
+evalprim gs x l = vprim x l
 
 data QuoteLevel = KeepGlobals | Full
 
@@ -208,7 +228,7 @@ convElim gs k (EProj p) (EProj p') = p == p'
 convElim gs k _ _ = False
 
 conv :: GlobalCtx -> Lvl -> Val -> Val -> Bool
-conv gs k a b = -- trace ("conv " ++ show (quote gs k a) ++ " ~ " ++ show (quote gs k b)) $ do
+conv gs k a b = trace ("conv " ++ show (quote gs k a) ++ " ~ " ++ show (quote gs k b)) $ do
   case (a, b) of
     (VU l1, VU l2) | l1 == l2 -> True
     (VLift t1, VLift t2) -> conv gs k t1 t2
@@ -264,3 +284,11 @@ primType gs PElimHEq l =
   vpi "b" ta $ \b ->
   vpi "p" (vheq ta ta a b) $ \p ->
   vapp gs (vapp gs tp b) p
+primType gs PDesc l = VU 1
+primType gs PEnd l = vdesc
+primType gs PArg l = vpi "A" (VU 0) $ \a -> vfun (vfun a vdesc) vdesc
+primType gs PInd l = vfun vdesc vdesc
+primType gs PEl l = vfun (VU 0) $ vfun vdesc (VU 0)
+primType gs PData l = vfun vdesc (VU 0)
+-- (D : Desc) -> El D (Data D) -> Data D
+primType gs PCon l = vpi "D" vdesc $ \d -> vfun (vel gs d (vdata d)) (vdata d)

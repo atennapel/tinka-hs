@@ -7,6 +7,7 @@ data PrimName
   | PUnitType | PUnit
   | PBool | PTrue | PFalse | PIndBool
   | PHEq | PHRefl | PElimHEq
+  | PDesc | PEnd | PArg | PInd | PEl | PData | PCon
   deriving (Eq)
 
 instance Show PrimName where
@@ -21,6 +22,13 @@ instance Show PrimName where
   show PHEq = "HEq"
   show PHRefl = "HRefl"
   show PElimHEq = "elimHEq"
+  show PDesc = "Desc"
+  show PEnd = "End"
+  show PArg = "Arg"
+  show PInd = "Ind"
+  show PEl = "El"
+  show PData = "Data"
+  show PCon = "Con"
 
 canLiftPrim :: PrimName -> Bool
 canLiftPrim PAbsurd = True
@@ -40,6 +48,13 @@ toPrimName "indBool" = Just PIndBool
 toPrimName "HEq" = Just PHEq
 toPrimName "HRefl" = Just PHRefl
 toPrimName "elimHEq" = Just PElimHEq
+toPrimName "Desc" = Just PDesc
+toPrimName "End" = Just PEnd
+toPrimName "Arg" = Just PArg
+toPrimName "Ind" = Just PInd
+toPrimName "El" = Just PEl
+toPrimName "Data" = Just PData
+toPrimName "Con" = Just PCon
 toPrimName _ = Nothing
 
 data Core
