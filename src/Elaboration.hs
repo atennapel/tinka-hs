@@ -27,7 +27,7 @@ check ctx tm ty =
     (SPos p s, _) -> check (enter p ctx) s ty
     (SHole, _) -> do
       gs <- ask
-      err $ "hole encountered: " ++ showV gs ctx ty
+      err $ "hole encountered: " ++ showV gs ctx ty ++ "\n\n" ++ showLocal gs ctx
     (SAbs x Nothing b, VPi x' ty b') -> do
       gs <- ask
       cb <- check (bind x ty ctx) b (vinst gs b' $ vvar (lvl ctx))

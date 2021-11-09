@@ -15,6 +15,7 @@ data PrimElimName
   | PEBool
   | PEHEq
   | PEDesc
+  | PEData
   deriving (Eq)
 
 instance Show PrimName where
@@ -38,6 +39,7 @@ instance Show PrimElimName where
   show PEBool = "Bool"
   show PEHEq = "HEq"
   show PEDesc = "Desc"
+  show PEData = "Data"
 
 toPrimName :: String -> Maybe PrimName
 toPrimName "Void" = Just PVoid
@@ -61,6 +63,7 @@ toPrimElimName "Void" = Just PEVoid
 toPrimElimName "Bool" = Just PEBool
 toPrimElimName "HEq" = Just PEHEq
 toPrimElimName "Desc" = Just PEDesc
+toPrimElimName "Data" = Just PEData
 toPrimElimName _ = Nothing
 
 data Core

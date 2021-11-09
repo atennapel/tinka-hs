@@ -19,3 +19,27 @@ NatD = SumD (Ind End) End;
 Nat = Data NatD;
 Z : Nat = Con NatD (False, Unit);
 S : Nat -> Nat = \n. Con NatD (True, n, Unit);
+
+indNat :
+  (P : Nat -> Type)
+  -> P Z
+  -> ((m : Nat) -> P m -> P (S m))
+  -> (n : Nat)
+  -> P n
+  = \P z s n. (elim Data) NatD P (\R case ind y.
+      (elim Bool) (\b. (rest : El ((elim Bool 1) (\_. Desc) (Ind End) End b) R) -> P (Con NatD (b, map ((elim Bool 1) (\_. Desc) (Ind End) End b) R (Data NatD) case rest)))
+        (\p. s (case (fst p)) (ind (fst p)))
+        (\_. z)
+        (fst y) (snd y)) n;
+
+paraNat : (A : Type) -> Nat -> A -> (Nat -> A -> A) -> A
+  = \A n z s. indNat (\_. A) z s n;
+
+caseNat : (A : Type) -> Nat -> A -> (Nat -> A) -> A
+  = \A n z s. paraNat A n z (\m _. s m);
+
+cataNat : (A : Type) -> Nat -> A -> (A -> A) -> A
+  = \A n z s. paraNat A n z (\_. s);
+
+pred : Nat -> Nat = \n. caseNat Nat n Z (\x. x);
+add : Nat -> Nat -> Nat = \a b. cataNat Nat a b S;

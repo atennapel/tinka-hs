@@ -5,6 +5,7 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Class
 import Data.Functor.Identity (Identity)
+import Data.List (intercalate)
 
 import Common
 import Core
@@ -48,6 +49,14 @@ showC ctx c = show $ fromCore (ns ctx) c
 
 showV :: GlobalCtx -> Ctx -> Val -> String
 showV gs ctx v = show $ fromCore (ns ctx) (quote gs (lvl ctx) v)
+
+showLocal :: GlobalCtx -> Ctx -> String
+showLocal gs ctx = let zipped = zip3 (ns ctx) (ts ctx) (vs ctx) in
+  intercalate "\n" $ map format zipped
+    where
+      format (x, t, v) = case showV gs ctx v of
+        y | x == y -> x ++ " : " ++ showV gs ctx t
+        sv -> x ++ " : " ++ showV gs ctx t ++ " = " ++ sv
 
 lookupVarMaybe :: Ctx -> Name -> TC (Maybe (Ix, Val))
 lookupVarMaybe ctx x = go (ns ctx) (ts ctx) 0
