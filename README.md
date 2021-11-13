@@ -52,7 +52,13 @@ TODO:
 - [x] heterogenous equality type with axiom k
 - [x] Lift, lift and lower, for simple universe lifting
 - [x] simple descriptions: Desc, End, Arg and Ind and Desc elimination
-- [/] descriptions fixpoint: Data, Con and Data elimination
+- [ ] descriptions fixpoint: Data, Con and Data elimination
+  - [ ] make scrutinees first argument of eliminators
+  - [ ] add All
+  - [ ] add all
+  - [ ] add Data elimination
+- [ ] gentle art of levitation
+- [ ] indexed descriptions
 - [ ] metas, unification and _ solving
 - [ ] implicit function types
 - [ ] QTT

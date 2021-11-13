@@ -1,9 +1,5 @@
 El : Desc -> Type -> Type
-  = \D X. (elim Desc 1) (\_. Type)
-      UnitType
-      (\A K R. (x : A) ** R x)
-      (\K R. X ** R)
-      D;
+  = \D X. (elim El) X D;
 
 map : (D : Desc) -> (A B : Type) -> (A -> B) -> El D A -> El D B
   = \D A B f. (elim Desc) (\D. El D A -> El D B)
