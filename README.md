@@ -55,8 +55,9 @@ TODO:
 - [ ] descriptions fixpoint: Data, Con and Data elimination
   - [x] make some scrutinees first argument of eliminators
   - [x] add All
-  - [ ] add all
+  - [x] add all
   - [ ] add Data elimination
+  - [ ] add HInd
 - [ ] gentle art of levitation
 - [ ] indexed descriptions
 - [ ] metas, unification and _ solving

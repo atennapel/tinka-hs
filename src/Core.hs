@@ -17,6 +17,7 @@ data PrimElimName
   | PEDesc
   | PEEl
   | PEAll
+  | PEall
   | PEData
   deriving (Eq)
 
@@ -43,6 +44,7 @@ instance Show PrimElimName where
   show PEDesc = "Desc"
   show PEEl = "El"
   show PEAll = "All"
+  show PEall = "all"
   show PEData = "Data"
 
 toPrimName :: String -> Maybe PrimName
@@ -69,6 +71,7 @@ toPrimElimName "HEq" = Just PEHEq
 toPrimElimName "Desc" = Just PEDesc
 toPrimElimName "El" = Just PEEl
 toPrimElimName "All" = Just PEAll
+toPrimElimName "all" = Just PEall
 toPrimElimName "Data" = Just PEData
 toPrimElimName _ = Nothing
 
@@ -76,6 +79,7 @@ data PrimElimPosition = PEPFirst | PEPLast
 
 primElimPosition :: PrimElimName -> PrimElimPosition
 primElimPosition PEAll = PEPFirst
+primElimPosition PEall = PEPFirst
 primElimPosition _ = PEPLast
 
 data Core
