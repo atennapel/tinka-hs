@@ -8,8 +8,11 @@ map : (D : Desc) -> (A B : Type) -> (A -> B) -> El D A -> El D B
       (\K R p. (f (fst p), R (snd p)))
       D;
 
+SumDBody : Desc -> Desc -> Bool -> Desc
+  = \A B. (elim Bool 1) (\_. Desc) A B;
+
 SumD : Desc -> Desc -> Desc
-  = \A B. Arg Bool ((elim Bool 1) (\_. Desc) A B);
+  = \A B. Arg Bool (SumDBody A B);
 
 NatD = SumD (Ind End) End;
 Nat = Data NatD;
@@ -22,11 +25,16 @@ indNat :
   -> ((m : Nat) -> P m -> P (S m))
   -> (n : Nat)
   -> P n
-  = \P z s n. (elim Data) NatD P (\R case ind y.
-      (elim Bool) (\b. (rest : El ((elim Bool 1) (\_. Desc) (Ind End) End b) R) -> P (Con NatD (b, map ((elim Bool 1) (\_. Desc) (Ind End) End b) R (Data NatD) case rest)))
-        (\p. s (case (fst p)) (ind (fst p)))
-        (\_. z)
-        (fst y) (snd y)) n;
+  = \P z s n. (elim Data) NatD P
+      (\d. (elim Bool)
+        (\b. (xs : El (SumDBody (Ind End) End b) Nat) ->
+             ((elim All) (SumDBody (Ind End) End b) Nat P xs) ->
+             P (Con NatD (b, xs)))
+        (\xs h. s (fst xs) (fst h))
+        (\_ _. z)
+        (fst d)
+        (snd d))
+      n;
 
 paraNat : (A : Type) -> Nat -> A -> (Nat -> A -> A) -> A
   = \A n z s. indNat (\_. A) z s n;

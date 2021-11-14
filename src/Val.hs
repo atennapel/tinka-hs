@@ -3,7 +3,7 @@ module Val where
 import Common
 import Core
 
-import Debug.Trace (trace)
+-- import Debug.Trace (trace)
 
 -- context for global definitions, it's in here because of cyclic modules
 data GlobalEntry = GlobalEntry {
@@ -170,9 +170,9 @@ vprimelim gs PEall l k [x, p, pp, xs] (VNe (HPrim PArg _) [EApp kk, EApp a]) =
 vprimelim gs PEall l k [x, p, pp, xs] d@(VNe (HPrim PInd _) [EApp kk]) =
   VPair (vapp gs pp (vfst xs)) (vprimelim gs PEall l k [x, p, pp, vsnd xs] kk) (vAll gs l k d x p xs)
 
--- elim Data^l k d p alg (Con d x) ~> alg (Data^l d) (\(z : Data^l d). z) (\(z : Data^l d). vprimelim gs PEData l k [d, p, alg] z) x
-vprimelim gs PEData l k [d, p, alg] (VNe (HPrim PInd _) [EApp x, EApp _]) =
-  vapp gs (vapp gs (vapp gs (vapp gs alg (vdata l d)) (vabs "z" (vdata l d) id)) (vabs "z" (vdata l d) $ \z -> vprimelim gs PEData l k [d, p, alg] z)) x
+-- (elim Data) D P p (Con _ x) = p x (all D (Data D) P ((elim Data) D P p) x)
+vprimelim gs PEData l k [d, p, pp] (VNe (HPrim PCon _) [EApp x, EApp _]) =
+  vapp gs (vapp gs pp x) (vall gs l k d (vdata l d) p (vabs "y" (vdata l d) $ vprimelim gs PEData l k [d, p, pp]) x)
 
 vprimelim gs x l k as (VNe h sp) = VNe h (EPrimElim x l k as : sp)
 vprimelim gs p l k as (VGlobal x kk sp v) = VGlobal x kk (EPrimElim p l k as : sp) (vprimelim gs p l k as v)
@@ -186,29 +186,6 @@ vAll gs l k d x p xs = vprimelim gs PEAll l k [x, p, xs] d
 
 vall :: GlobalCtx -> ULvl -> ULvl -> Val -> Val -> Val -> Val -> Val -> Val
 vall gs l k d x p pp xs = vprimelim gs PEall l k [x, p, pp, xs] d
-
-{-
-map : (D : Desc) -> (A B : Type) -> (A -> B) -> El D A -> El D B
-  = \D A B f x. (elim Desc) (\D. El D A -> El D B)
-      (\_. Unit)
-      (\A K R p. (fst p, R (fst p) (snd p)))
-      (\K R p. (f (fst p), R (snd p)))
-      D x;
--}
-vdescmap :: GlobalCtx -> ULvl -> Val -> Val -> Val -> Val -> Val -> Val
-vdescmap gs l d a b f = vapp gs (vprimelim gs PEDesc l 0
-  [
-    vabs "D" (vdesc l) $ \d -> vfun (vel gs l l d a) (vel gs l l d b),
-    vabs "A" (VU l) $ \aa ->
-      vabs "K" (vfun aa (vdesc l)) $ \kk ->
-      vabs "R" (vpi "x" aa $ \x -> vfun (vel gs l l (vapp gs kk x) a) (vel gs l l (vapp gs kk x) b)) $ \r ->
-      vabs "p" (vel gs l l (varg l aa kk) a) $ \p ->
-      VPair (vfst p) (vapp gs (vapp gs r (vfst p)) (vsnd p)) (vel gs l l (varg l aa kk) b),
-    vabs "K" (vdesc l) $ \kk ->
-      vabs "R" (vfun (vel gs l l kk a) (vel gs l l kk b)) $ \r ->
-      vabs "p" (vel gs l l (vind l kk) a) $ \p ->
-      VPair (vapp gs f (vfst p)) (vapp gs r (vsnd p)) (vel gs l l (vind l kk) b)
-  ] d)
 
 force :: Val -> Val
 force (VGlobal _ _ _ v) = force v
@@ -281,15 +258,13 @@ evalprimelim gs PEall l k =
 evalprimelim gs PEData l k =
   vabs "D" (vdesc l) $ \d ->
   vabs "P" (vfun (vdata l d) (VU (l + k))) $ \p ->
-  vabs "alg" (
-    vpi "R" (VU l) $ \r ->
-    vpi "case" (vfun r (vdata l d)) $ \cs ->
-    vpi "ind" (vpi "z" r $ \z -> vapp gs p (vapp gs cs z)) $ \ind ->
-    vpi "y" (vel gs l k d r) $ \y ->
-    vapp gs p (vcon l d (vdescmap gs l d r (vdata l d) cs y))
-  ) $ \alg ->
+  vabs "p" (
+    vpi "d" (vel gs l 0 d (vdata l d)) $ \dd ->
+    vfun (vAll gs l k d (vdata l d) p dd) $
+    vapp gs p (vcon l d dd)
+  ) $ \pp ->
   vabs "x" (vdata l d) $ \x ->
-  vprimelim gs PEData l k [d, p, alg] x
+  vprimelim gs PEData l k [d, p, pp] x
 
 data QuoteLevel = KeepGlobals | Full
 
@@ -344,7 +319,7 @@ convElim gs k (EPrimElim x1 l1 k1 as1) (EPrimElim x2 l2 k2 as2) =
 convElim gs k _ _ = False
 
 conv :: GlobalCtx -> Lvl -> Val -> Val -> Bool
-conv gs k a b = trace ("conv " ++ show (quote gs k a) ++ " ~ " ++ show (quote gs k b)) $ do
+conv gs k a b = -- trace ("conv " ++ show (quote gs k a) ++ " ~ " ++ show (quote gs k b)) $ do
   case (a, b) of
     (VU l1, VU l2) | l1 == l2 -> True
     (VLift t1, VLift t2) -> conv gs k t1 t2
@@ -449,26 +424,18 @@ primElimType gs PEall l k =
   vAll gs l k d x p xs
 {-
 (D : Desc^l)
--> (P : Data^l D -> Type^(l + k))
--> (
-  (R : Type^l)
-  -> (case : R -> Data^l D)
-  -> (ind : (z : R) -> P (case z))
-  -> (y : El^l D R)
-  -> P (Con^l D (descmap^l D R (Data^l D) case y))
-)
--> (x : Data^l D)
+(P : Data^l D -> Type^(l + k))
+((d : El^l 0 D (Data^l D)) -> All^l k D (Data^l D) P d -> P (Con^l D d))
+(x : Data^l D)
 -> P x
 -}
 primElimType gs PEData l k =
   vpi "D" (vdesc l) $ \d ->
   vpi "P" (vfun (vdata l d) (VU (l + k))) $ \p ->
   vfun (
-    vpi "R" (VU l) $ \r ->
-    vpi "case" (vfun r (vdata l d)) $ \cs ->
-    vpi "ind" (vpi "z" r $ \z -> vapp gs p (vapp gs cs z)) $ \ind ->
-    vpi "y" (vel gs l k d r) $ \y ->
-    vapp gs p (vcon l d (vdescmap gs l d r (vdata l d) cs y))
+    vpi "d" (vel gs l 0 d (vdata l d)) $ \dd ->
+    vfun (vAll gs l k d (vdata l d) p dd) $
+    vapp gs p (vcon l d dd)
   ) $
   vpi "x" (vdata l d) $ \x ->
   vapp gs p x

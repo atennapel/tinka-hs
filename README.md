@@ -56,8 +56,9 @@ TODO:
   - [x] make some scrutinees first argument of eliminators
   - [x] add All
   - [x] add all
-  - [ ] add Data elimination
+  - [x] add Data elimination
   - [ ] add HInd
+  - [ ] fix universe level issues
 - [ ] gentle art of levitation
 - [ ] indexed descriptions
 - [ ] metas, unification and _ solving
