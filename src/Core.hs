@@ -1,4 +1,4 @@
-module Core (Core(..), liftUniv, PrimName(..), PrimElimName(..), toPrimName, toPrimElimName) where
+module Core (Core(..), liftUniv, PrimName(..), PrimElimName(..), toPrimName, toPrimElimName, PrimElimPosition(..), primElimPosition) where
 
 import Common
 
@@ -16,6 +16,7 @@ data PrimElimName
   | PEHEq
   | PEDesc
   | PEEl
+  | PEAll
   | PEData
   deriving (Eq)
 
@@ -41,6 +42,7 @@ instance Show PrimElimName where
   show PEHEq = "HEq"
   show PEDesc = "Desc"
   show PEEl = "El"
+  show PEAll = "All"
   show PEData = "Data"
 
 toPrimName :: String -> Maybe PrimName
@@ -66,8 +68,15 @@ toPrimElimName "Bool" = Just PEBool
 toPrimElimName "HEq" = Just PEHEq
 toPrimElimName "Desc" = Just PEDesc
 toPrimElimName "El" = Just PEEl
+toPrimElimName "All" = Just PEAll
 toPrimElimName "Data" = Just PEData
 toPrimElimName _ = Nothing
+
+data PrimElimPosition = PEPFirst | PEPLast
+
+primElimPosition :: PrimElimName -> PrimElimPosition
+primElimPosition PEAll = PEPFirst
+primElimPosition _ = PEPLast
 
 data Core
   = Var Ix

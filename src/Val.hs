@@ -152,6 +152,15 @@ vprimelim gs PEEl l k [x] (VNe (HPrim PArg _) [EApp kk, EApp a]) =
 -- El X (Ind^l K) = X ** El X K
 vprimelim gs PEEl l k [x] (VNe (HPrim PInd _) [EApp kk]) = vpairty x $ vprimelim gs PEEl l k [x] kk
 
+-- All End X P _ = UnitType
+vprimelim gs PEAll l k [x, p, xs] (VNe (HPrim PEnd _) []) = vunittype (l + k)
+-- All (Arg A K) X P xs = All (K (fst xs)) X P (snd xs)
+vprimelim gs PEAll l k [x, p, xs] (VNe (HPrim PArg _) [EApp kk, EApp a]) =
+  vprimelim gs PEAll l k [x, p, vsnd xs] (vapp gs kk (vfst xs))
+-- All (Ind K) X P xs = P (fst xs) ** All K X P (snd xs)
+vprimelim gs PEAll l k [x, p, xs] (VNe (HPrim PInd _) [EApp kk]) =
+  vpairty (vapp gs p (vfst xs)) $ vprimelim gs PEAll l k [x, p, vsnd xs] kk
+
 -- elim Data^l k d p alg (Con d x) ~> alg (Data^l d) (\(z : Data^l d). z) (\(z : Data^l d). vprimelim gs PEData l k [d, p, alg] z) x
 vprimelim gs PEData l k [d, p, alg] (VNe (HPrim PInd _) [EApp x, EApp _]) =
   vapp gs (vapp gs (vapp gs (vapp gs alg (vdata l d)) (vabs "z" (vdata l d) id)) (vabs "z" (vdata l d) $ \z -> vprimelim gs PEData l k [d, p, alg] z)) x
@@ -241,6 +250,12 @@ evalprimelim gs PEEl l k =
   vabs "X" (VU (l + k)) $ \x ->
   vabs "D" (vdesc l) $ \d ->
   vprimelim gs PEEl l k [x] d
+evalprimelim gs PEAll l k =
+  vabs "D" (vdesc l) $ \d ->
+  vabs "X" (VU (l + k)) \x ->
+  vabs "P" (vfun x (VU (l + k))) $ \p ->
+  vabs "xs" (vel gs l k d x) $ \xs ->
+  vprimelim gs PEAll l k [x, p, xs] d
 evalprimelim gs PEData l k =
   vabs "D" (vdesc l) $ \d ->
   vabs "P" (vfun (vdata l d) (VU (l + k))) $ \p ->
@@ -263,7 +278,10 @@ quoteHead k (HPrim x l) = Prim x l
 quoteElim :: QuoteLevel -> GlobalCtx -> Lvl -> Elim -> Core -> Core
 quoteElim ql gs k (EApp v) t = App t (quoteWith ql gs k v)
 quoteElim ql gs k (EProj p) t = Proj t p
-quoteElim ql gs k (EPrimElim x l1 l2 as) t = App (foldl App (PrimElim x l1 l2) (map (quoteWith ql gs k) as)) t
+quoteElim ql gs k (EPrimElim x l1 l2 as) t =
+  case primElimPosition x of
+    PEPLast -> App (foldl App (PrimElim x l1 l2) (map (quoteWith ql gs k) as)) t
+    PEPFirst -> foldl App (App (PrimElim x l1 l2) t) (map (quoteWith ql gs k) as)
 quoteElim ql gs k ELower t = Lower t
 
 quoteClos :: QuoteLevel -> GlobalCtx -> Lvl -> Clos -> Core
@@ -392,6 +410,13 @@ primElimType gs PEDesc l k =
   vapp gs p d
 {- El : Type^(l + k) -> Desc^l -> Type^(l + k) -}
 primElimType gs PEEl l k = vfun (VU (l + k)) $ vfun (vdesc l) (VU (l + k))
+{- All : (D : Desc^l) -> (X : Type^(l + k)) -> (P : X -> Type^(l + k)) -> (xs : El^l k D X) -> Type^(l + k) -}
+primElimType gs PEAll l k =
+  vpi "D" (vdesc l) $ \d ->
+  vpi "X" (VU (l + k)) \x ->
+  vfun (vfun x (VU (l + k))) $
+  vfun (vel gs l k d x) $
+  VU (l + k)
 {-
 (D : Desc^l)
 -> (P : Data^l D -> Type^(l + k))
