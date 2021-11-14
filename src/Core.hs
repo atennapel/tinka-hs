@@ -7,7 +7,7 @@ data PrimName
   | PUnitType | PUnit
   | PBool | PTrue | PFalse
   | PHEq | PHRefl
-  | PDesc | PEnd | PArg | PInd | PData | PCon
+  | PDesc | PEnd | PArg | PInd | PHInd | PData | PCon
   deriving (Eq)
 
 data PrimElimName
@@ -34,6 +34,7 @@ instance Show PrimName where
   show PEnd = "End"
   show PArg = "Arg"
   show PInd = "Ind"
+  show PHInd = "HInd"
   show PData = "Data"
   show PCon = "Con"
 
@@ -60,6 +61,7 @@ toPrimName "Desc" = Just PDesc
 toPrimName "End" = Just PEnd
 toPrimName "Arg" = Just PArg
 toPrimName "Ind" = Just PInd
+toPrimName "HInd" = Just PHInd
 toPrimName "Data" = Just PData
 toPrimName "Con" = Just PCon
 toPrimName _ = Nothing

@@ -6,14 +6,15 @@ map : (D : Desc) -> (A B : Type) -> (A -> B) -> El D A -> El D B
       (\_. Unit)
       (\A K R p. (fst p, R (fst p) (snd p)))
       (\K R p. (f (fst p), R (snd p)))
+      (\A K R p. (\x. f ((fst p) x), R (snd p)))
       D;
 
 SumDBody : Desc -> Desc -> Bool -> Desc
   = \A B. (elim Bool 1) (\_. Desc) A B;
-
 SumD : Desc -> Desc -> Desc
   = \A B. Arg Bool (SumDBody A B);
 
+-- Nat
 NatD = SumD (Ind End) End;
 Nat = Data NatD;
 Z : Nat = Con NatD (False, Unit);
@@ -47,3 +48,61 @@ cataNat : (A : Type) -> Nat -> A -> (A -> A) -> A
 
 pred : Nat -> Nat = \n. caseNat Nat n Z (\x. x);
 add : Nat -> Nat -> Nat = \a b. cataNat Nat a b S;
+
+-- List
+ListD : Type -> Desc = \A. SumD (Arg A (\_. Ind End)) End;
+List : Type -> Type = \A. Data (ListD A);
+
+Nil : (A : Type) -> List A = \A. Con (ListD A) (False, Unit);
+Cons : (A : Type) -> A -> List A -> List A
+  = \A hd tl. Con (ListD A) (True, hd, tl, Unit);
+
+indList :
+  (A : Type)
+  (P : List A -> Type)
+  -> P (Nil A)
+  -> ((hd : A) (tl : List A) -> P tl -> P (Cons A hd tl))
+  -> (l : List A)
+  -> P l
+  = \A P nil cons l. (elim Data) (ListD A) P
+      (\d. (elim Bool)
+        (\b. (xs : El (SumDBody (Arg A (\_. Ind End)) End b) (List A)) ->
+             ((elim All) (SumDBody (Arg A (\_. Ind End)) End b) (List A) P xs) ->
+             P (Con (ListD A) (b, xs)))
+        (\xs h. cons (fst xs) (fst (snd xs)) (fst h))
+        (\_ _. nil)
+        (fst d)
+        (snd d))
+      l;
+
+paraList : (A R : Type) -> List A -> R -> (A -> List A -> R -> R) -> R
+  = \A R l nil cons. indList A (\_. R) nil cons l;
+
+caseList : (A R : Type) -> List A -> R -> (A -> List A -> R) -> R
+  = \A R l nil cons. paraList A R l nil (\hd tl _. cons hd tl);
+
+cataList : (A R : Type) -> List A -> R -> (A -> R -> R) -> R
+  = \A R l nil cons. paraList A R l nil (\hd _ tl. cons hd tl);
+
+mapList : (A B : Type) -> (A -> B) -> List A -> List B
+  = \A B fn l. cataList A (List B) l (Nil B) (\hd tl. Cons B (fn hd) tl);
+
+appendList : (A : Type) -> List A -> List A -> List A
+  = \A l1 l2. cataList A (List A) l1 l2 (\hd tl. Cons A hd tl);
+
+-- Desc
+DescD = SumD^ End^ (SumD^ (Arg^ Type (\A. HInd^ (Lift A) End^)) (SumD^ (Ind^ End^) (Arg^ Type (\_. Ind^ End^))));
+DDesc = Data^ DescD;
+
+DEnd : DDesc = Con^ DescD (True^, Unit^);
+DArg : (A : Type) -> (A -> DDesc) -> DDesc
+  = \A K. Con^ DescD (False^, True^, A, \x. K (lower x), Unit^);
+DInd : DDesc -> DDesc = \K. Con^ DescD (False^, False^, True^, K, Unit^);
+DHind : Type -> DDesc -> DDesc = \A K. Con^ DescD (False^, False^, False^, A, K, Unit^);
+
+SumDDBody : DDesc -> DDesc -> Bool -> DDesc
+  = \A B. (elim Bool 1) (\_. DDesc) A B;
+SumDD : DDesc -> DDesc -> DDesc
+  = \A B. DArg Bool (SumDDBody A B);
+NatDD = SumDD (DInd DEnd) DEnd;
+ListDD : Type -> DDesc = \A. SumDD (DArg A (\_. DInd DEnd)) DEnd;
