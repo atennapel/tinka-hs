@@ -7,14 +7,14 @@ data PrimName
   | PUnitType | PUnit
   | PBool | PTrue | PFalse
   | PHEq | PHRefl
-  | PDesc | PEnd | PArg | PInd | PHInd | PData | PCon
+  | PData | PCon | PConD
   deriving (Eq)
 
 data PrimElimName
   = PEVoid
   | PEBool
+  | PEBoolDesc
   | PEHEq
-  | PEDesc
   | PEEl
   | PEAll
   | PEall
@@ -30,19 +30,15 @@ instance Show PrimName where
   show PFalse = "False"
   show PHEq = "HEq"
   show PHRefl = "HRefl"
-  show PDesc = "Desc"
-  show PEnd = "End"
-  show PArg = "Arg"
-  show PInd = "Ind"
-  show PHInd = "HInd"
   show PData = "Data"
   show PCon = "Con"
+  show PConD = "ConD"
 
 instance Show PrimElimName where
   show PEVoid = "Void"
   show PEBool = "Bool"
+  show PEBoolDesc = "BoolDesc"
   show PEHEq = "HEq"
-  show PEDesc = "Desc"
   show PEEl = "El"
   show PEAll = "All"
   show PEall = "all"
@@ -57,20 +53,16 @@ toPrimName "True" = Just PTrue
 toPrimName "False" = Just PFalse
 toPrimName "HEq" = Just PHEq
 toPrimName "HRefl" = Just PHRefl
-toPrimName "Desc" = Just PDesc
-toPrimName "End" = Just PEnd
-toPrimName "Arg" = Just PArg
-toPrimName "Ind" = Just PInd
-toPrimName "HInd" = Just PHInd
 toPrimName "Data" = Just PData
 toPrimName "Con" = Just PCon
+toPrimName "ConD" = Just PConD
 toPrimName _ = Nothing
 
 toPrimElimName :: String -> Maybe PrimElimName
 toPrimElimName "Void" = Just PEVoid
 toPrimElimName "Bool" = Just PEBool
+toPrimElimName "BoolDesc" = Just PEBoolDesc
 toPrimElimName "HEq" = Just PEHEq
-toPrimElimName "Desc" = Just PEDesc
 toPrimElimName "El" = Just PEEl
 toPrimElimName "All" = Just PEAll
 toPrimElimName "all" = Just PEall

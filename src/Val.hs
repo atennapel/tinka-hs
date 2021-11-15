@@ -72,27 +72,19 @@ vvar k = VNe (HVar k) []
 vprim :: PrimName -> ULvl -> Val
 vprim x l = VNe (HPrim x l) []
 
-vvoid, vunittype, vunit, vbool, vtrue, vfalse, vdesc, vend :: ULvl -> Val
+vvoid, vunittype, vunit, vbool, vtrue, vfalse :: ULvl -> Val
 vvoid = vprim PVoid
 vunittype = vprim PUnitType
 vunit = vprim PUnit
 vbool = vprim PBool
 vtrue = vprim PTrue
 vfalse = vprim PFalse
-vdesc = vprim PDesc
-vend = vprim PEnd
-
-varg :: ULvl -> Val -> Val -> Val
-varg l a k = VNe (HPrim PArg l) [EApp k, EApp a]
-
-vind :: ULvl -> Val -> Val
-vind l k = VNe (HPrim PInd l) [EApp k]
-
-vhind :: ULvl -> Val -> Val -> Val
-vhind l a k = VNe (HPrim PHInd l) [EApp k, EApp a]
 
 vcon :: ULvl -> Val -> Val -> Val
 vcon l d c = VNe (HPrim PCon l) [EApp c, EApp d]
+
+vConD :: ULvl -> Val -> Val
+vConD l x = VNe (HPrim PConD l) [EApp x]
 
 vheq :: ULvl -> Val -> Val -> Val -> Val -> Val
 vheq l a b x y = VNe (HPrim PHEq l) [EApp y, EApp x, EApp b, EApp a]
@@ -135,57 +127,58 @@ vliftterm (VNe h (ELower : sp)) = VNe h sp
 vliftterm (VGlobal x l (ELower : sp) v) = VGlobal x l sp (vliftterm v)
 vliftterm v = VLiftTerm v
 
+pattern VTrue l = VNe (HPrim PTrue l) []
+pattern VFalse l = VNe (HPrim PFalse l) []
+
 vprimelim :: GlobalCtx -> PrimElimName -> ULvl -> ULvl -> [Val] -> Val -> Val
 vprimelim gs PEBool l k [p, t, f] (VNe (HPrim PTrue _) []) = t
 vprimelim gs PEBool l k [p, t, f] (VNe (HPrim PFalse _) []) = f
+vprimelim gs PEBoolDesc l k [t, f] (VNe (HPrim PTrue _) []) = t
+vprimelim gs PEBoolDesc l k [t, f] (VNe (HPrim PFalse _) []) = f
 
 vprimelim gs PEHEq l k [ta, a, tp, h, b] (VNe (HPrim PHRefl _) _) = h
 
-vprimelim gs PEDesc l k [p, end, arg, ind, hind] (VNe (HPrim PEnd _) []) = end
-vprimelim gs PEDesc l k [p, end, arg, ind, hind] (VNe (HPrim PArg _) [EApp kk, EApp a]) =
-  vapp gs (vapp gs (vapp gs arg a) kk) (vabs "x" a $ \x -> vprimelim gs PEDesc l k [p, end, arg, ind, hind] (vapp gs kk x))
-vprimelim gs PEDesc l k [p, end, arg, ind, hind] (VNe (HPrim PInd _) [EApp kk]) =
-  vapp gs (vapp gs ind kk) (vprimelim gs PEDesc l k [p, end, arg, ind, hind] kk)
-vprimelim gs PEDesc l k [p, end, arg, ind, hind] (VNe (HPrim PHInd _) [EApp kk, EApp a]) =
-  vapp gs (vapp gs (vapp gs hind a) kk) (vprimelim gs PEDesc l k [p, end, arg, ind, hind] kk)
-
 -- El X End^l = UnitType^(l + k)
-vprimelim gs PEEl l k [x] (VNe (HPrim PEnd _) []) = vunittype (l + k)
+vprimelim gs PEEl l k [x] (VPair (VTrue _) _ _) = vunittype (l + k)
 -- El X (Arg^l A K) = (x : A) ** El X (K x)
-vprimelim gs PEEl l k [x] (VNe (HPrim PArg _) [EApp kk, EApp a]) =
+vprimelim gs PEEl l k [x] (VPair (VFalse _) (VPair (VTrue _) (VPair a (VPair kk _ _) _) _) _) =
   vsigma "x" a $ \xx -> vprimelim gs PEEl l k [x] (vapp gs kk xx)
 -- El X (Ind^l K) = X ** El X K
-vprimelim gs PEEl l k [x] (VNe (HPrim PInd _) [EApp kk]) = vpairty x $ vprimelim gs PEEl l k [x] kk
+vprimelim gs PEEl l k [x] (VPair (VFalse _) (VPair (VFalse _) (VPair (VTrue _) (VPair kk _ _) _) _) _) =
+  vpairty x $ vprimelim gs PEEl l k [x] kk
 -- El X (HInd^l A K) = (A -> X) ** El K X
-vprimelim gs PEEl l k [x] (VNe (HPrim PHInd _) [EApp kk, EApp a]) = vpairty (vfun a x) $ vprimelim gs PEEl l k [x] kk
+vprimelim gs PEEl l k [x] (VPair (VFalse _) (VPair (VFalse _) (VPair (VFalse _) (VPair a (VPair kk _ _) _) _) _) _) =
+  vpairty (vfun a x) $ vprimelim gs PEEl l k [x] kk
 
 -- All End X P _ = UnitType
-vprimelim gs PEAll l k [x, p, xs] (VNe (HPrim PEnd _) []) = vunittype (l + k)
+vprimelim gs PEAll l k [x, p, xs] (VPair (VTrue _) _ _) = vunittype (l + k)
 -- All (Arg A K) X P xs = All (K (fst xs)) X P (snd xs)
-vprimelim gs PEAll l k [x, p, xs] (VNe (HPrim PArg _) [EApp kk, EApp a]) =
+vprimelim gs PEAll l k [x, p, xs] (VPair (VFalse _) (VPair (VTrue _) (VPair a (VPair kk _ _) _) _) _) =
   vprimelim gs PEAll l k [x, p, vsnd xs] (vapp gs kk (vfst xs))
 -- All (Ind K) X P xs = P (fst xs) ** All K X P (snd xs)
-vprimelim gs PEAll l k [x, p, xs] (VNe (HPrim PInd _) [EApp kk]) =
+vprimelim gs PEAll l k [x, p, xs] (VPair (VFalse _) (VPair (VFalse _) (VPair (VTrue _) (VPair kk _ _) _) _) _) =
   vpairty (vapp gs p (vfst xs)) $ vprimelim gs PEAll l k [x, p, vsnd xs] kk
 -- All (HInd A K) X P xs = ((x : A) -> P ((fst xs) x)) ** All K X P (snd xs)
-vprimelim gs PEAll l k [x, p, xs] (VNe (HPrim PHInd _) [EApp kk, EApp a]) =
+vprimelim gs PEAll l k [x, p, xs] (VPair (VFalse _) (VPair (VFalse _) (VPair (VFalse _) (VPair a (VPair kk _ _) _) _) _) _) =
   vpairty (vpi "x" a $ \x -> vapp gs p (vapp gs (vfst xs) x)) $ vprimelim gs PEAll l k [x, p, vsnd xs] kk
 
 -- all End X P p _ = Unit
-vprimelim gs PEall l k [x, p, pp, xs] (VNe (HPrim PEnd _) []) = vunit (l + k)
+vprimelim gs PEall l k [x, p, pp, xs] (VPair (VTrue _) _ _) = vunit (l + k)
 -- all (Arg A K) X P p xs = all (K (fst xs)) X P p (snd xs)
-vprimelim gs PEall l k [x, p, pp, xs] (VNe (HPrim PArg _) [EApp kk, EApp a]) =
+vprimelim gs PEall l k [x, p, pp, xs] (VPair (VFalse _) (VPair (VTrue _) (VPair a (VPair kk _ _) _) _) _) =
   vprimelim gs PEall l k [x, p, pp, vsnd xs] (vapp gs kk (vfst xs))
 -- all (Ind K) X P p xs = (p (fst xs), all K X P p (snd xs))
-vprimelim gs PEall l k [x, p, pp, xs] d@(VNe (HPrim PInd _) [EApp kk]) =
+vprimelim gs PEall l k [x, p, pp, xs] d@(VPair (VFalse _) (VPair (VFalse _) (VPair (VTrue _) (VPair kk _ _) _) _) _) =
   VPair (vapp gs pp (vfst xs)) (vprimelim gs PEall l k [x, p, pp, vsnd xs] kk) (vAll gs l k d x p xs)
 -- all (HInd A K) X P p xs = (\h. p ((fst xs) h), all K X P p (snd xs))
-vprimelim gs PEall l k [x, p, pp, xs] d@(VNe (HPrim PHInd _) [EApp kk, EApp a]) =
+vprimelim gs PEall l k [x, p, pp, xs] d@(VPair (VFalse _) (VPair (VFalse _) (VPair (VFalse _) (VPair a (VPair kk _ _) _) _) _) _) =
   VPair (vabs "h" a $ \h -> vapp gs p (vapp gs (vfst xs) h)) (vprimelim gs PEall l k [x, p, pp, vsnd xs] kk) (vAll gs l k d x p xs)
 
 -- (elim Data) D P p (Con _ x) = p x (all D (Data D) P ((elim Data) D P p) x)
 vprimelim gs PEData l k [d, p, pp] (VNe (HPrim PCon _) [EApp x, EApp _]) =
   vapp gs (vapp gs pp x) (vall gs l k d (vdata l d) p (vabs "y" (vdata l d) $ vprimelim gs PEData l k [d, p, pp]) x)
+vprimelim gs PEData l k [d, p, pp] (VNe (HPrim PConD _) [EApp x]) =
+  vprimelim gs PEData l k [d, p, pp] (VNe (HPrim PCon l) [EApp x, EApp d])
 
 vprimelim gs x l k as (VNe h sp) = VNe h (EPrimElim x l k as : sp)
 vprimelim gs p l k as (VGlobal x kk sp v) = VGlobal x kk (EPrimElim p l k as : sp) (vprimelim gs p l k as v)
@@ -232,6 +225,11 @@ evalprimelim gs PEBool l k =
   vabs "f" (vapp gs p (vfalse l)) $ \f ->
   vabs "b" (vbool l) $ \b ->
   vprimelim gs PEBool l k [p, t, f] b
+evalprimelim gs PEBoolDesc l k =
+  vabs "t" (vDesc gs (l + k)) $ \t ->
+  vabs "f" (vDesc gs (l + k)) $ \f ->
+  vabs "b" (vbool l) $ \b ->
+  vprimelim gs PEBoolDesc l k [t, f] b
 evalprimelim gs PEHEq l k =
   vabs "A" (VU l) $ \ta ->
   vabs "a" ta $ \a ->
@@ -244,33 +242,25 @@ evalprimelim gs PEVoid l k =
   vabs "A" (VU (l + k)) $ \a ->
   vabs "v" (vvoid l) $ \v ->
   vprimelim gs PEVoid l k [a] v
-evalprimelim gs PEDesc l k =
-  vabs "P" (vfun (vdesc l) (VU (l + k))) $ \p ->
-  vabs "end" (vapp gs p (vend l)) $ \end ->
-  vabs "arg" (vpi "A" (VU l) $ \a -> vpi "K" (vfun a (vdesc l)) $ \kk -> vfun (vpi "x" a $ \x -> vapp gs p (vapp gs kk x)) (vapp gs p (varg l a kk))) $ \arg ->
-  vabs "ind" (vpi "K" (vdesc l) $ \kk -> vfun (vapp gs p kk) (vapp gs p (vind l kk))) $ \ind ->
-  vabs "hind" (vpi "A" (VU l) $ \a -> vpi "K" (vdesc l) $ \kk -> vfun (vapp gs p kk) (vapp gs p (vhind l a kk))) $ \hind ->
-  vabs "d" (vdesc l) $ \d ->
-  vprimelim gs PEDesc l k [p, end, arg, ind, hind] d
 evalprimelim gs PEEl l k =
   vabs "X" (VU (l + k)) $ \x ->
-  vabs "D" (vdesc l) $ \d ->
+  vabs "D" (vDesc gs l) $ \d ->
   vprimelim gs PEEl l k [x] d
 evalprimelim gs PEAll l k =
-  vabs "D" (vdesc l) $ \d ->
+  vabs "D" (vDesc gs l) $ \d ->
   vabs "X" (VU (l + k)) \x ->
   vabs "P" (vfun x (VU (l + k))) $ \p ->
   vabs "xs" (vel gs l k d x) $ \xs ->
   vprimelim gs PEAll l k [x, p, xs] d
 evalprimelim gs PEall l k =
-  vabs "D" (vdesc l) $ \d ->
+  vabs "D" (vDesc gs l) $ \d ->
   vabs "X" (VU (l + k)) $ \x ->
   vabs "P" (vfun x (VU (l + k))) $ \p ->
   vabs "p" (vpi "x" x $ \xx -> vapp gs p xx) $ \pp ->
   vabs "xs" (vel gs l k d x) $ \xs ->
   vprimelim gs PEall l k [x, p, pp, xs] d
 evalprimelim gs PEData l k =
-  vabs "D" (vdesc l) $ \d ->
+  vabs "D" (vDesc gs l) $ \d ->
   vabs "P" (vfun (vdata l d) (VU (l + k))) $ \p ->
   vabs "p" (
     vpi "d" (vel gs l 0 d (vdata l d)) $ \dd ->
@@ -347,10 +337,19 @@ conv gs k a b = -- trace ("conv " ++ show (quote gs k a) ++ " ~ " ++ show (quote
     (VPair a b _, x) -> conv gs k a (vfst x) && conv gs k b (vsnd x)
     (x, VPair a b _) -> conv gs k (vfst x) a && conv gs k (vsnd x) b
     (VNe h sp, VNe h' sp') | h == h' -> and $ zipWith (convElim gs k) sp sp'
+    
     (VNe (HPrim PUnit _) [], v) -> True
     (v, VNe (HPrim PUnit _) []) -> True
+    
     (VNe (HPrim PHRefl _) _, v) -> True -- is this safe?
     (v, VNe (HPrim PHRefl _) _) -> True -- is this safe?
+
+    -- ConD^l x ~ Con^(l + 1) DescD^l x
+    (VNe (HPrim PConD l1) [EApp x], VNe (HPrim PCon l2) [EApp y, EApp d]) ->
+      l1 + 1 == l2 && conv gs k (vDescD gs l1) d && conv gs k x y
+    (VNe (HPrim PCon l2) [EApp y, EApp d], VNe (HPrim PConD l1) [EApp x]) ->
+      l1 + 1 == l2 && conv gs k d (vDescD gs l1) && conv gs k y x
+
     (VGlobal x l sp v, VGlobal x' l' sp' v') | x == x' && l == l' ->
       and (zipWith (convElim gs k) sp sp') || conv gs k v v'
     (VGlobal _ _ _ v, VGlobal _ _ _ v') -> conv gs k v v'
@@ -369,15 +368,13 @@ primType gs PFalse l = vbool l
 primType gs PHEq l = vpi "A" (VU l) $ \a -> vpi "B" (VU l) $ \b -> vfun a $ vfun b $ VU l
 -- (A : Type^l) -> (x : A) -> HEq^l A A x x
 primType gs PHRefl l = vpi "A" (VU l) $ \a -> vpi "x" a $ \x -> vheq l a a x x
-primType gs PDesc l = VU (l + 1)
-primType gs PEnd l = vdesc l
-primType gs PArg l = vpi "A" (VU l) $ \a -> vfun (vfun a (vdesc l)) (vdesc l)
-primType gs PInd l = vfun (vdesc l) (vdesc l)
-primType gs PHInd l = vfun (VU l) $ vfun (vdesc l) (vdesc l)
-primType gs PData l = vfun (vdesc l) (VU l)
+primType gs PData l = vfun (vDesc gs l) (VU l)
 -- (D : Desc^l) -> El^l 0 D (Data^l D) -> Data^l D
 primType gs PCon l =
-  vpi "D" (vdesc l) $ \d -> vfun (vel gs l 0 d (vdata l d)) (vdata l d)
+  vpi "D" (vDesc gs l) $ \d -> vfun (vel gs l 0 d (vdata l d)) (vdata l d)
+-- El^(l + 1) DescD^l Desc^l -> Desc^l
+primType gs PConD l =
+  vfun (vel gs (l + 1) 0 (vDescD gs l) (vDesc gs l)) (vDesc gs l)
 
 primElimType :: GlobalCtx -> PrimElimName -> ULvl -> ULvl -> Val
 -- (A : Type^(l + k)) -> Void^l -> A
@@ -388,6 +385,12 @@ primElimType gs PEBool l k =
   vfun (vapp gs p (vtrue l)) $
   vfun (vapp gs p (vfalse l)) $
   vpi "b" (vbool l) (vapp gs p)
+-- Desc^(l + k) -> Desc^(l + k) -> Bool^l -> Desc^(l + k)
+primElimType gs PEBoolDesc l k =
+  vfun (vDesc gs (l + k)) $
+  vfun (vDesc gs (l + k)) $
+  vfun (vbool l) $
+  vDesc gs (l + k)
 {-
 (A : Type^l)
 -> (a : A)
@@ -405,35 +408,18 @@ primElimType gs PEHEq l k =
   vpi "b" ta $ \b ->
   vpi "p" (vheq l ta ta a b) $ \p ->
   vapp gs (vapp gs tp b) p
-{-
-(P : Desc^l -> Type^(l + k))
--> P End^l
--> ((A : Type^l) -> (K : A -> Desc^l) -> ((x : A) -> P (K x)) -> P (Arg^l A K))
--> ((K : Desc^l) -> P K -> P (Ind^l K))
--> ((A : Type^l) -> (K : Desc^l) -> P K -> P (HInd^l A K))
--> (d : Desc^l)
--> P d
--}
-primElimType gs PEDesc l k =
-  vpi "P" (vfun (vdesc l) (VU (l + k))) $ \p ->
-  vfun (vapp gs p (vend l)) $
-  vfun (vpi "A" (VU l) $ \a -> vpi "K" (vfun a (vdesc l)) $ \kk -> vfun (vpi "x" a $ \x -> vapp gs p (vapp gs kk x)) (vapp gs p (varg l a kk))) $
-  vfun (vpi "K" (vdesc l) $ \kk -> vfun (vapp gs p kk) (vapp gs p (vind l kk))) $
-  vfun (vpi "A" (VU l) $ \a -> vpi "K" (vdesc l) $ \kk -> vfun (vapp gs p kk) (vapp gs p (vhind l a kk))) $
-  vpi "d" (vdesc l) $ \d ->
-  vapp gs p d
 {- El : Type^(l + k) -> Desc^l -> Type^(l + k) -}
-primElimType gs PEEl l k = vfun (VU (l + k)) $ vfun (vdesc l) (VU (l + k))
+primElimType gs PEEl l k = vfun (VU (l + k)) $ vfun (vDesc gs l) (VU (l + k))
 {- All : (D : Desc^l) -> (X : Type^(l + k)) -> (P : X -> Type^(l + k)) -> (xs : El^l k D X) -> Type^(l + k) -}
 primElimType gs PEAll l k =
-  vpi "D" (vdesc l) $ \d ->
+  vpi "D" (vDesc gs l) $ \d ->
   vpi "X" (VU (l + k)) \x ->
   vfun (vfun x (VU (l + k))) $
   vfun (vel gs l k d x) $
   VU (l + k)
 {- all : (D : Desc^l) -> (X : Type^(l + k)) -> (P : X -> Type^(l + k)) -> ((x : X) -> P x) -> (xs : El^l k D X) -> All^l k D X P xs -}
 primElimType gs PEall l k =
-  vpi "D" (vdesc l) $ \d ->
+  vpi "D" (vDesc gs l) $ \d ->
   vpi "X" (VU (l + k)) $ \x ->
   vpi "P" (vfun x (VU (l + k))) $ \p ->
   vfun (vpi "x" x $ \xx -> vapp gs p xx) $
@@ -447,7 +433,7 @@ primElimType gs PEall l k =
 -> P x
 -}
 primElimType gs PEData l k =
-  vpi "D" (vdesc l) $ \d ->
+  vpi "D" (vDesc gs l) $ \d ->
   vpi "P" (vfun (vdata l d) (VU (l + k))) $ \p ->
   vfun (
     vpi "d" (vel gs l 0 d (vdata l d)) $ \dd ->
@@ -456,3 +442,74 @@ primElimType gs PEData l k =
   ) $
   vpi "x" (vdata l d) $ \x ->
   vapp gs p x
+
+-- levitation follows
+-- SumD : Desc -> Desc -> Desc = \A B. Arg^(l + 1) Bool^(l + 1) ((elim BoolDesc^l) A B)
+vSumD :: GlobalCtx -> ULvl -> Val -> Val -> Val
+vSumD gs l a b = vArg gs (l + 1) (vbool (l + 1)) (vabs "tag" (vbool (l + 1)) $ vprimelim gs PEBoolDesc l 0 [a, b])
+
+-- End = ConD^l (True^(l + 1), Unit^(l + 1)) : El^(l + 1) DescD^l Desc^l
+vEnd :: GlobalCtx -> ULvl -> Val
+vEnd gs l = vConD l (VPair (vtrue (l + 1)) (vunit (l + 1)) (vel gs (l + 1) 0 (vDescD gs l) (vDesc gs l)))
+
+vpair :: Val -> Val -> Val -> Val
+vpair a b t = VPair a t b
+
+-- Arg A K = ConD^l (False^(l + 1), True^(l + 1), A, \(x : A). K (lower x), Unit^(l + 1))
+vArg :: GlobalCtx -> ULvl -> Val -> Val -> Val
+vArg gs l a k =
+  vConD l $
+  vpair (vfalse (l + 1)) (vel gs (l + 1) 0 (vDescD gs l) (vDesc gs l)) $
+  vpair (vtrue (l + 1)) (vel gs (l + 1) 0 (vDescD1 gs l) (vDesc gs l)) $
+  vpair a (vel gs (l + 1) 0 (vDescD2 gs l) (vDesc gs l)) $
+  vpair (vabs "x" a $ \x -> vapp gs k (vlower x)) (vel gs (l + 1) 0 (vDescD3 gs l) (vDesc gs l)) $
+  vunit (l + 1)
+
+-- Ind K = ConD^l (False^(l + 1), False^(l + 1), True^(l + 1), K, Unit^(l + 1))
+vInd :: GlobalCtx -> ULvl -> Val -> Val
+vInd gs l k =
+  vConD l $
+  vpair (vfalse (l + 1)) (vel gs (l + 1) 0 (vDescD gs l) (vDesc gs l)) $
+  vpair (vfalse (l + 1)) (vel gs (l + 1) 0 (vDescD1 gs l) (vDesc gs l)) $
+  vpair (vtrue (l + 1)) (vel gs (l + 1) 0 (vDescD2 gs l) (vDesc gs l)) $
+  vpair k (vel gs (l + 1) 0 (vDescD3 gs l) (vDesc gs l)) $
+  vunit (l + 1)
+
+-- HInd A K = ConD^l (False^(l + 1), False^(l + 1), False^(l + 1), A, K, Unit^(l + 1))
+vHInd :: GlobalCtx -> ULvl -> Val -> Val -> Val
+vHInd gs l a k =
+  vConD l $
+  vpair (vfalse (l + 1)) (vel gs (l + 1) 0 (vDescD gs l) (vDesc gs l)) $
+  vpair (vfalse (l + 1)) (vel gs (l + 1) 0 (vDescD1 gs l) (vDesc gs l)) $
+  vpair (vfalse (l + 1)) (vel gs (l + 1) 0 (vDescD2 gs l) (vDesc gs l)) $
+  vpair a (vel gs (l + 1) 0 (vDescD3 gs l) (vDesc gs l)) $
+  vpair k (vel gs (l + 1) 0 (vDescD4 gs l) (vDesc gs l)) $
+  vunit (l + 1)
+
+{- DescD =
+  SumD^(l + 1) End^(l + 1) (
+  SumD^(l + 1) (Arg^(l + 1) Type^l (\(A : Type^l). HInd^(l + 1) (Lift A) End^(l + 1))) (
+  SumD^(l + 1) (Ind^(l + 1) End^(l + 1))
+  (Arg^(l + 1) Type^l (\(_ : Type^l). Ind^(l + 1) End^(l + 1)))))
+-}
+vDescD :: GlobalCtx -> ULvl -> Val
+vDescD gs l =
+  vSumD gs (l + 1) (vEnd gs (l + 1)) $
+  vSumD gs (l + 1) (vArg gs (l + 1) (VU l) (vabs "A" (VU l) $ \a -> vHInd gs (l + 1) (VLift a) (vEnd gs (l + 1)))) $
+  vSumD gs (l + 1) (vInd gs (l + 1) (vEnd gs (l + 1))) $
+  vArg gs (l + 1) (VU l) (vabs "_" (VU l) $ \_ -> vInd gs (l + 1) (vEnd gs (l + 1)))
+
+vDescD1 gs l =
+  vSumD gs (l + 1) (vArg gs (l + 1) (VU l) (vabs "A" (VU l) $ \a -> vHInd gs (l + 1) (VLift a) (vEnd gs (l + 1)))) $
+  vSumD gs (l + 1) (vInd gs (l + 1) (vEnd gs (l + 1))) $
+  vArg gs (l + 1) (VU l) (vabs "_" (VU l) $ \_ -> vInd gs (l + 1) (vEnd gs (l + 1)))
+vDescD2 gs l =
+  vSumD gs (l + 1) (vInd gs (l + 1) (vEnd gs (l + 1))) $
+  vArg gs (l + 1) (VU l) (vabs "_" (VU l) $ \_ -> vInd gs (l + 1) (vEnd gs (l + 1)))
+vDescD3 gs l =
+  vArg gs (l + 1) (VU l) (vabs "_" (VU l) $ \_ -> vInd gs (l + 1) (vEnd gs (l + 1)))
+vDescD4 gs l = vInd gs (l + 1) (vEnd gs (l + 1))
+
+-- Desc : Type1 = Data^(l + 1) DescD^l
+vDesc :: GlobalCtx -> ULvl -> Val
+vDesc gs l = vdata (l + 1) (vDescD gs l)
