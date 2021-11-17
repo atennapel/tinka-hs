@@ -76,22 +76,22 @@ primElimPosition PEAll = PEPFirst
 primElimPosition PEall = PEPFirst
 primElimPosition _ = PEPLast
 
-data Core
-  = Var Ix
-  | Global Name ULvl
-  | Prim PrimName ULvl
-  | PrimElim PrimElimName ULvl ULvl
-  | App Core Core
-  | Abs Name Core Core
-  | Pi Name Core Core
-  | Sigma Name Core Core
-  | Pair Core Core Core
-  | Proj Core ProjType
-  | U ULvl
-  | Let Name Core Core Core
-  | Lift Core
-  | LiftTerm Core
-  | Lower Core
+data Core where
+  Var :: Ix -> Core
+  Global :: Name -> ULvl -> Core
+  Prim :: PrimName -> ULvl -> Core
+  PrimElim :: PrimElimName -> ULvl -> ULvl -> Core
+  App :: Core -> Core -> Core
+  Abs :: Name -> Core -> Core
+  Pi :: Name -> Core -> Core -> Core
+  Sigma :: Name -> Core -> Core -> Core
+  Pair :: Core -> Core -> Core
+  Proj :: Core -> ProjType -> Core
+  U :: ULvl -> Core
+  Let :: Name -> Core -> Core -> Core -> Core
+  Lift :: Core -> Core
+  LiftTerm :: Core -> Core
+  Lower :: Core -> Core
 
 showProjType :: ProjType -> String
 showProjType Fst = ".1"
@@ -109,10 +109,10 @@ instance Show Core where
   show (PrimElim x 1 k) = "elim " ++ show x ++ "^" ++ (if k == 0 then "" else " " ++ show k)
   show (PrimElim x l k) = "elim " ++ show x ++ "^" ++ show l ++ (if k == 0 then "" else " " ++ show k)
   show (App f a) = "(" ++ show f ++ " " ++ show a ++ ")"
-  show (Abs x t b) = "(\\(" ++ x ++ " : " ++ show t ++ "). " ++ show b ++ ")"
+  show (Abs x b) = "(\\" ++ x ++ ". " ++ show b ++ ")"
   show (Pi x t b) = "((" ++ x ++ " : " ++ show t ++ ") -> " ++ show b ++ ")"
   show (Sigma x t b) = "((" ++ x ++ " : " ++ show t ++ ") ** " ++ show b ++ ")"
-  show (Pair a b t) = "(" ++ show a ++ ", " ++ show b ++ ") : " ++ show t
+  show (Pair a b) = "(" ++ show a ++ ", " ++ show b ++ ")"
   show (Proj s p) = show s ++ showProjType p
   show (U 0) = "Type"
   show (U l) = "Type" ++ show l
@@ -128,10 +128,10 @@ liftUniv l (Global x l') = Global x (l + l')
 liftUniv l (Prim x l') = Prim x (l + l')
 liftUniv l (PrimElim x l' k) = PrimElim x (l + l') k
 liftUniv l (App a b) = App (liftUniv l a) (liftUniv l b)
-liftUniv l (Abs x t b) = Abs x (liftUniv l t) (liftUniv l b)
+liftUniv l (Abs x b) = Abs x (liftUniv l b)
 liftUniv l (Pi x t b) = Pi x (liftUniv l t) (liftUniv l b)
 liftUniv l (Sigma x t b) = Sigma x (liftUniv l t) (liftUniv l b)
-liftUniv l (Pair a b t) = Pair (liftUniv l a) (liftUniv l b) (liftUniv l t)
+liftUniv l (Pair a b) = Pair (liftUniv l a) (liftUniv l b)
 liftUniv l (Proj t p) = Proj (liftUniv l t) p
 liftUniv l (Let x t v b) = Let x (liftUniv l t) (liftUniv l v) (liftUniv l b)
 liftUniv l (Lift t) = Lift (liftUniv l t)

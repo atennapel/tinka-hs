@@ -139,7 +139,7 @@ pLam = do
   xs <- some pBinder
   char '.'
   t <- pSurface
-  pure (foldr (`SAbs` Nothing) t xs)
+  pure (foldr SAbs t xs)
 
 pArrowOrCross :: Parser Bool
 pArrowOrCross = (True <$ pArrow) <|> (False <$ pCross)

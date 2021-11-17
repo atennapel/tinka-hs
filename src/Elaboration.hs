@@ -8,6 +8,8 @@ import Core
 import Val
 import Common
 
+-- import Debug.Trace (trace)
+
 checkOrInfer :: Ctx -> Surface -> Maybe Surface -> TC (Core, Core, Val)
 checkOrInfer ctx v Nothing = do
   (cv, ty) <- infer ctx v
@@ -21,22 +23,23 @@ checkOrInfer ctx v (Just t) = do
   return (cv, ct, ty)
 
 check :: Ctx -> Surface -> Val -> TC Core
-check ctx tm ty =
-  let fty = force ty in
+check ctx tm ty = do
+  gs <- ask
+  let fty = {-trace ("check (" ++ show tm ++ ") : " ++ showV gs ctx ty) $-} force ty
   case (tm, fty) of
     (SPos p s, _) -> check (enter p ctx) s ty
     (SHole, _) -> do
       gs <- ask
       err $ "hole encountered: " ++ showV gs ctx ty ++ "\n\n" ++ showLocal gs ctx
-    (SAbs x Nothing b, VPi x' ty b') -> do
+    (SAbs x b, VPi x' ty b') -> do
       gs <- ask
       cb <- check (bind x ty ctx) b (vinst gs b' $ vvar (lvl ctx))
-      return $ Abs x (quote gs (lvl ctx) ty) cb
+      return $ Abs x cb
     (SPair a b, VSigma x ty b') -> do
       ta <- check ctx a ty
       gs <- ask
       tb <- check ctx b (vinst gs b' $ eval gs (vs ctx) ta)
-      return $ Pair ta tb (quote gs (lvl ctx) ty)
+      return $ Pair ta tb
     (SLet x t v b, _) -> do
       (cv, ct, pty) <- checkOrInfer ctx v t
       gs <- ask
@@ -99,12 +102,6 @@ infer ctx c@(SApp f a) = do
       ca <- check ctx a t
       return (App cf ca, vinst gs b (eval gs (vs ctx) ca))
     _ -> err $ "not a pi type in " ++ show c ++ ", got " ++ showV gs ctx fty
-infer ctx (SAbs x (Just t) b) = do
-  (ct, _) <- inferUniv ctx t
-  gs <- ask
-  let ty = eval gs (vs ctx) ct
-  (cb, rty) <- infer (bind x ty ctx) b
-  return (Abs x ct cb, VPi x ty $ closeVal gs ctx rty)
 infer ctx (SPi x t b) = do
   (ct, l1) <- inferUniv ctx t
   gs <- ask
@@ -122,7 +119,7 @@ infer ctx (SPair a b) = do
   (tb, vb) <- infer ctx b
   let vt = VSigma "_" va (Fun $ const vb)
   gs <- ask
-  return (Pair ta tb (quote gs (lvl ctx) vt), vt)
+  return (Let "p" (quote gs (lvl ctx) vt) (Pair ta tb) (Var 0), vt)
 infer ctx c@(SProj t p) = do
   (tm, vt) <- infer ctx t
   gs <- ask
@@ -162,10 +159,13 @@ reduceExpectedLet tm = tm
 
 elaborateDef :: Def -> TC GlobalCtx
 elaborateDef (Def x ty tm) = do
-  (etm', ety) <- elaborate empty (SLet x ty tm (SVar x 0))
-  let etm = reduceExpectedLet etm'
   gs <- ask
-  return $ GlobalEntry x etm ety (eval gs [] etm) (eval gs [] ety) : gs
+  case getGlobal gs x of
+    Just _ | x /= "_" -> err $ "cannot redefine global " ++ x
+    _ -> do
+      (etm', ety) <- elaborate empty (SLet x ty tm (SVar x 0))
+      let etm = reduceExpectedLet etm'
+      return $ GlobalEntry x etm ety (eval gs [] etm) (eval gs [] ety) : gs
 
 elaborateDefs :: Defs -> TC GlobalCtx
 elaborateDefs [] = do ask

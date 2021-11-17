@@ -47,6 +47,9 @@ closeVal gs ctx v = Clos (vs ctx) (quote gs (lvl ctx + 1) v)
 showC :: Ctx -> Core -> String
 showC ctx c = show $ fromCore (ns ctx) c
 
+showVWith :: QuoteLevel -> GlobalCtx -> Ctx -> Val -> String
+showVWith ql gs ctx v = show $ fromCore (ns ctx) (quoteWith ql gs (lvl ctx) v)
+
 showV :: GlobalCtx -> Ctx -> Val -> String
 showV gs ctx v = show $ fromCore (ns ctx) (quote gs (lvl ctx) v)
 

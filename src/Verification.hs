@@ -8,10 +8,30 @@ import Val
 import Common
 
 check :: Ctx -> Core -> Val -> TC ()
-check ctx c ty = do
-  ty' <- infer ctx c
-  gs <- ask
-  test (conv gs (lvl ctx) ty' ty) $ "check failed " ++ show c ++ " : " ++ showV gs ctx ty ++ ", got " ++ showV gs ctx ty'
+check ctx c ty =
+  let fty = force ty in
+  case (c, fty) of
+    (Abs x b, VPi x' ty b') -> do
+      gs <- ask
+      check (bind x ty ctx) b (vinst gs b' $ vvar (lvl ctx))
+    (Pair a b, VSigma x ty b') -> do
+      _ <- check ctx a ty
+      gs <- ask
+      check ctx b (vinst gs b' $ eval gs (vs ctx) a)
+    (Let x t v b, _) -> do
+      _ <- inferUniv ctx t
+      gs <- ask
+      let pty = eval gs (vs ctx) t
+      _ <- check ctx v ty
+      gs <- ask
+      check (define x pty (eval gs (vs ctx) v) ctx) b ty
+    (Lift t, VU l) | l > 0 -> check ctx t (VU (l - 1))
+    (LiftTerm t, VLift ty) -> check ctx t ty
+    (Lower t, ty) -> check ctx t (VLift ty)
+    (c, _) -> do
+      ty' <- infer ctx c
+      gs <- ask
+      test (conv gs (lvl ctx) ty' ty) $ "check failed " ++ show c ++ " : " ++ showV gs ctx ty ++ ", got " ++ showV gs ctx ty'
 
 inferUniv :: Ctx -> Core -> TC ULvl
 inferUniv ctx tm = do
@@ -45,12 +65,6 @@ infer ctx (Sigma x t b) = do
   gs <- ask
   l2 <- inferUniv (bind x (eval gs (vs ctx) t) ctx) b
   return $ VU (max l1 l2)
-infer ctx (Abs x t b) = do
-  inferUniv ctx t
-  gs <- ask
-  let ty = eval gs (vs ctx) t
-  rty <- infer (bind x ty ctx) b
-  return $ VPi x ty (closeVal gs ctx rty)
 infer ctx c@(App f a) = do
   fty <- infer ctx f
   gs <- ask
@@ -59,16 +73,6 @@ infer ctx c@(App f a) = do
       check ctx a t
       return $ vinst gs b (eval gs (vs ctx) a)
     _ -> err $ "not a pi type in " ++ show c ++ ", got " ++ showV gs ctx fty
-infer ctx c@(Pair a b t) = do
-  inferUniv ctx t
-  gs <- ask
-  let vt = eval gs (vs ctx) t
-  case force vt of
-    VSigma x ty c -> do
-      check ctx a ty
-      check ctx b (vinst gs c $ eval gs (vs ctx) a)
-      return vt
-    _ -> err $ "not a sigma type in " ++ show c
 infer ctx c@(Proj t p) = do
   vt <- infer ctx t
   gs <- ask
@@ -95,6 +99,7 @@ infer ctx tm@(Lower t) = do
     _ -> do
       gs <- ask
       err $ "expected lift type in " ++ show tm ++ " but got " ++ showV gs ctx ty
+infer ctx tm = err $ "verify: cannot infer: " ++ show tm
 
 verify :: Core -> TC Core
 verify c = do
