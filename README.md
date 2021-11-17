@@ -17,7 +17,8 @@ Currently supports:
 - pi-types
 - sigma-types
 - Void, Unit, Bool primitive types
-- predicative non-cumulative hierarchy of universes, with a lifting operator for globals
+- predicative non-cumulative hierarchy of universes, with a lifting operator for globals and Lift for non-globals
+- "Gentle art of Levitation"-style descriptions
 
 For example:
 ```
@@ -61,6 +62,7 @@ TODO:
   - [x] fix universe level issues
 - [x] gentle art of levitation
 - [ ] clean up GlobalCtx mess
+- [ ] get rid of ConD?
 - [ ] allow redefinition of globals?
 - [ ] indexed descriptions
 - [ ] metas, unification and _ solving
