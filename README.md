@@ -59,9 +59,10 @@ TODO:
   - [x] add Data elimination
   - [x] add HInd
   - [x] fix universe level issues
-- [ ] gentle art of levitation
-- [ ] indexed descriptions
+- [x] gentle art of levitation
 - [ ] clean up GlobalCtx mess
+- [ ] allow redefinition of globals?
+- [ ] indexed descriptions
 - [ ] metas, unification and _ solving
 - [ ] implicit function types
 - [ ] QTT
