@@ -61,7 +61,7 @@ TODO:
   - [x] add HInd
   - [x] fix universe level issues
 - [x] gentle art of levitation
-- [ ] clean up GlobalCtx mess
+- [x] clean up GlobalCtx mess
 - [ ] get rid of ConD?
 - [ ] allow redefinition of globals?
 - [ ] indexed descriptions

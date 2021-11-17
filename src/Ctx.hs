@@ -1,10 +1,6 @@
 module Ctx where
 
 import Text.Megaparsec (SourcePos)
-import Control.Monad.Trans.Reader
-import Control.Monad.Trans.Except
-import Control.Monad.Trans.Class
-import Data.Functor.Identity (Identity)
 import Data.List (intercalate)
 
 import Common
@@ -12,10 +8,10 @@ import Core
 import Surface
 import Val
 
-type TC t = ReaderT GlobalCtx (ExceptT String Identity) t
+type TC t = Either String t
 
 err :: String -> TC t
-err = lift . throwE
+err = Left
 
 test :: Bool -> String -> TC ()
 test True _ = return ()
@@ -41,25 +37,25 @@ bind x t ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs 
 enter :: SourcePos -> Ctx -> Ctx
 enter p ctx = ctx { pos = Just p }
 
-closeVal :: GlobalCtx -> Ctx -> Val -> Clos
-closeVal gs ctx v = Clos (vs ctx) (quote gs (lvl ctx + 1) v)
+closeVal :: Ctx -> Val -> Clos
+closeVal ctx v = Clos (vs ctx) (quote (lvl ctx + 1) v)
 
 showC :: Ctx -> Core -> String
 showC ctx c = show $ fromCore (ns ctx) c
 
-showVWith :: QuoteLevel -> GlobalCtx -> Ctx -> Val -> String
-showVWith ql gs ctx v = show $ fromCore (ns ctx) (quoteWith ql gs (lvl ctx) v)
+showVWith :: QuoteLevel -> Ctx -> Val -> String
+showVWith ql ctx v = show $ fromCore (ns ctx) (quoteWith ql (lvl ctx) v)
 
-showV :: GlobalCtx -> Ctx -> Val -> String
-showV gs ctx v = show $ fromCore (ns ctx) (quote gs (lvl ctx) v)
+showV :: Ctx -> Val -> String
+showV ctx v = show $ fromCore (ns ctx) (quote (lvl ctx) v)
 
-showLocal :: GlobalCtx -> Ctx -> String
-showLocal gs ctx = let zipped = zip3 (ns ctx) (ts ctx) (vs ctx) in
+showLocal :: Ctx -> String
+showLocal ctx = let zipped = zip3 (ns ctx) (ts ctx) (vs ctx) in
   intercalate "\n" $ map format zipped
     where
-      format (x, t, v) = case showV gs ctx v of
-        y | x == y -> x ++ " : " ++ showV gs ctx t
-        sv -> x ++ " : " ++ showV gs ctx t ++ " = " ++ sv
+      format (x, t, v) = case showV ctx v of
+        y | x == y -> x ++ " : " ++ showV ctx t
+        sv -> x ++ " : " ++ showV ctx t ++ " = " ++ sv
 
 lookupVarMaybe :: Ctx -> Name -> TC (Maybe (Ix, Val))
 lookupVarMaybe ctx x = go (ns ctx) (ts ctx) 0
@@ -86,7 +82,6 @@ indexCtx ctx = go (ts ctx)
 
 lookupGlobal :: Name -> TC GlobalEntry
 lookupGlobal x = do
-  gs <- ask
-  case getGlobal gs x of
+  case getGlobal x of
     Just e -> return e
     Nothing -> err $ "undefined global " ++ x
