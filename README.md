@@ -62,8 +62,9 @@ TODO:
   - [x] fix universe level issues
 - [x] gentle art of levitation
 - [x] clean up GlobalCtx mess
-- [ ] get rid of ConD?
-- [ ] allow redefinition of globals?
+- [x] get rid of ConD
+- [ ] add some cumulativity in elaboration
+- [ ] could levels be removed from primitives because of bidirectional core?
 - [ ] indexed descriptions
 - [ ] metas, unification and _ solving
 - [ ] implicit function types

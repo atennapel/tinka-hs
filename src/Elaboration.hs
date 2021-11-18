@@ -21,8 +21,8 @@ checkOrInfer ctx v (Just t) = do
 
 check :: Ctx -> Surface -> Val -> TC Core
 check ctx tm ty = do
-  let fty = {-trace ("check (" ++ show tm ++ ") : " ++ showV gs ctx ty) $-} force ty
-  case (tm, fty) of
+  let fty = force ty
+  case (tm, {-trace ("check (" ++ show tm ++ ") : " ++ showV ctx ty ++ " ~> " ++ showV ctx fty) $ -}fty) of
     (SPos p s, _) -> check (enter p ctx) s ty
     (SHole, _) -> err $ "hole encountered: " ++ showV ctx ty ++ "\n\n" ++ showLocal ctx
     (SAbs x b, VPi x' ty b') -> do
@@ -45,6 +45,9 @@ check ctx tm ty = do
     (SLower t, ty) -> do
       c <- check ctx t (VLift ty)
       return $ Lower c
+    (SCon t, x@(VData l d)) -> do
+      c <- check ctx t (vel l 0 d x)
+      return $ Con c
     (s, _) -> do
       (c, ty') <- infer ctx s
       test (conv (lvl ctx) ty' ty) $ "check failed " ++ show s ++ " : " ++ showV ctx ty ++ ", got " ++ showV ctx ty'

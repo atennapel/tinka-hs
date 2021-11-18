@@ -7,7 +7,7 @@ data PrimName
   | PUnitType | PUnit
   | PBool | PTrue | PFalse
   | PHEq | PHRefl
-  | PData | PCon | PConD
+  | PData
   deriving (Eq)
 
 data PrimElimName
@@ -31,8 +31,6 @@ instance Show PrimName where
   show PHEq = "HEq"
   show PHRefl = "HRefl"
   show PData = "Data"
-  show PCon = "Con"
-  show PConD = "ConD"
 
 instance Show PrimElimName where
   show PEVoid = "Void"
@@ -54,8 +52,6 @@ toPrimName "False" = Just PFalse
 toPrimName "HEq" = Just PHEq
 toPrimName "HRefl" = Just PHRefl
 toPrimName "Data" = Just PData
-toPrimName "Con" = Just PCon
-toPrimName "ConD" = Just PConD
 toPrimName _ = Nothing
 
 toPrimElimName :: String -> Maybe PrimElimName
@@ -76,22 +72,23 @@ primElimPosition PEAll = PEPFirst
 primElimPosition PEall = PEPFirst
 primElimPosition _ = PEPLast
 
-data Core where
-  Var :: Ix -> Core
-  Global :: Name -> ULvl -> Core
-  Prim :: PrimName -> ULvl -> Core
-  PrimElim :: PrimElimName -> ULvl -> ULvl -> Core
-  App :: Core -> Core -> Core
-  Abs :: Name -> Core -> Core
-  Pi :: Name -> Core -> Core -> Core
-  Sigma :: Name -> Core -> Core -> Core
-  Pair :: Core -> Core -> Core
-  Proj :: Core -> ProjType -> Core
-  U :: ULvl -> Core
-  Let :: Name -> Core -> Core -> Core -> Core
-  Lift :: Core -> Core
-  LiftTerm :: Core -> Core
-  Lower :: Core -> Core
+data Core
+  = Var Ix
+  | Global Name ULvl
+  | Prim PrimName ULvl
+  | PrimElim PrimElimName ULvl ULvl
+  | App Core Core
+  | Abs Name Core
+  | Pi Name Core Core
+  | Sigma Name Core Core
+  | Pair Core Core
+  | Proj Core ProjType
+  | U ULvl
+  | Let Name Core Core Core
+  | Lift Core
+  | LiftTerm Core
+  | Lower Core
+  | Con Core
 
 showProjType :: ProjType -> String
 showProjType Fst = ".1"
@@ -120,6 +117,7 @@ instance Show Core where
   show (Lift t) = "(Lift " ++ show t ++ ")"
   show (LiftTerm t) = "(lift " ++ show t ++ ")"
   show (Lower t) = "(lower " ++ show t ++ ")"
+  show (Con t) = "(Con " ++ show t ++ ")"
 
 liftUniv :: ULvl -> Core -> Core
 liftUniv l (U l') = U (l + l')
@@ -137,3 +135,4 @@ liftUniv l (Let x t v b) = Let x (liftUniv l t) (liftUniv l v) (liftUniv l b)
 liftUniv l (Lift t) = Lift (liftUniv l t)
 liftUniv l (LiftTerm t) = LiftTerm (liftUniv l t)
 liftUniv l (Lower t) = Lower (liftUniv l t)
+liftUniv l (Con t) = Con (liftUniv l t)

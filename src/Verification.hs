@@ -21,16 +21,17 @@ check ctx c ty =
     (Lift t, VU l) | l > 0 -> check ctx t (VU (l - 1))
     (LiftTerm t, VLift ty) -> check ctx t ty
     (Lower t, ty) -> check ctx t (VLift ty)
+    (Con t, x@(VData l d)) -> check ctx t (vel l 0 d x)
     (c, _) -> do
       ty' <- infer ctx c
-      test (conv (lvl ctx) ty' ty) $ "check failed " ++ show c ++ " : " ++ showV ctx ty ++ ", got " ++ showV ctx ty'
+      test (conv (lvl ctx) ty' ty) $ "verify: check failed " ++ show c ++ " : " ++ showV ctx ty ++ ", got " ++ showV ctx ty'
 
 inferUniv :: Ctx -> Core -> TC ULvl
 inferUniv ctx tm = do
   ty <- infer ctx tm
   case force ty of
     VU l -> return l
-    _ -> err $ "expected a universe but got " ++ showV ctx ty ++ ", while checking " ++ show tm 
+    _ -> err $ "verify: expected a universe but got " ++ showV ctx ty ++ ", while checking " ++ show tm 
 
 infer :: Ctx -> Core -> TC Val
 infer ctx (U l) = return $ VU (l + 1)

@@ -1,16 +1,14 @@
 -- levitation
-DescD =
-  ConD^ (False^2, True^2, Bool^, \x. (elim BoolDesc^) (ConD^ (True^2, Unit^2))
-    (ConD^ (False^2, True^2, Bool^, \x. (elim BoolDesc^)
-      (ConD^ (False^2, True^2, Type, \x. ConD^ (False^2, False^2, False^2, Lift lower x, ConD^ (True^2, Unit^2), Unit^2), Unit^2))
-        (ConD^ (False^2, True^2, Bool^, \x. (elim BoolDesc^) (ConD^ (False^2, False^2, True^2, ConD^ (True^2, Unit^2), Unit^2))
-          (ConD^ (False^2, True^2, Type, \x. ConD^ (False^2, False^2, True^2, ConD^ (True^2, Unit^2), Unit^2), Unit^2)) (lower x), Unit^2)) (lower x), Unit^2)) (lower x), Unit^2);
-Desc = Data^ DescD;
+Desc = Data^ (
+  Con (False^2, True^2, Bool^, \x. (elim BoolDesc^) (Con (True^2, Unit^2)) (
+  Con (False^2, True^2, Bool^, \x. (elim BoolDesc^) (Con (False^2, True^2, Type, \x. Con (False^2, False^2, False^2, Lift (lower x), Con (True^2, Unit^2), Unit^2), Unit^2)) (
+  Con (False^2, True^2, Bool^, \x. (elim BoolDesc^) (Con (False^2, False^2, True^2, Con (True^2, Unit^2), Unit^2)) (
+  Con (False^2, True^2, Type, \x. Con (False^2, False^2, True^2, Con (True^2, Unit^2), Unit^2), Unit^2)) (lower x), Unit^2)) (lower x), Unit^2)) (lower x), Unit^2));
 
-End : Desc = ConD (True^, Unit^);
-Arg : (A : Type) -> (A -> Desc) -> Desc = \A K. ConD (False^, True^, A, \x. K (lower x), Unit^);
-Ind : Desc -> Desc = \K. ConD (False^, False^, True^, K, Unit^);
-HInd : Type -> Desc -> Desc = \A K. ConD (False^, False^, False^, A, K, Unit^);
+End : Desc = Con (True^, Unit^);
+Arg : (A : Type) -> (A -> Desc) -> Desc = \A K. Con (False^, True^, A, \x. K (lower x), Unit^);
+Ind : Desc -> Desc = \K. Con (False^, False^, True^, K, Unit^);
+HInd : Type -> Desc -> Desc = \A K. Con (False^, False^, False^, A, K, Unit^);
 
 El : Desc -> Type -> Type
   = \D X. (elim El) X D;
@@ -23,20 +21,19 @@ SumDBody : Desc -> Desc -> Bool -> Desc
 SumD : Desc -> Desc -> Desc
   = \A B. Arg Bool (SumDBody A B);
 
--- DescD : Desc^ = SumD^ End^ (SumD^ (Arg^ Type (\A. HInd^ (Lift A) End^)) (SumD^ (Ind^ End^) (Arg^ Type (\_. Ind^ End^))));
--- Desc = Data^ DescD;
+DescD : Desc^ = SumD^ End^ (SumD^ (Arg^ Type (\A. HInd^ (Lift A) End^)) (SumD^ (Ind^ End^) (Arg^ Type (\_. Ind^ End^))));
 
 indSumD :
   (A : Desc)
   (B : Desc)
   (P : Data (SumD A B) -> Type)
-  (a : (d : El A (Data (SumD A B))) -> All A (Data (SumD A B)) P d -> P (Con (SumD A B) (True, d)))
-  (b : (d : El B (Data (SumD A B))) -> All B (Data (SumD A B)) P d -> P (Con (SumD A B) (False, d)))
+  (a : (d : El A (Data (SumD A B))) -> All A (Data (SumD A B)) P d -> P (Con (True, d)))
+  (b : (d : El B (Data (SumD A B))) -> All B (Data (SumD A B)) P d -> P (Con (False, d)))
   (x : Data (SumD A B))
   -> P x
   = \A B P a b x. (elim Data) (SumD A B) P
       (\d hs. (elim Bool)
-        (\b. (xs : El (SumDBody A B b) (Data (SumD A B))) -> All (SumD A B) (Data (SumD A B)) P (b, xs) -> P (Con (SumD A B) (b, xs)))
+        (\b. (xs : El (SumDBody A B b) (Data (SumD A B))) -> All (SumD A B) (Data (SumD A B)) P (b, xs) -> P (Con (b, xs)))
         (\xs h. a xs h)
         (\xs h. b xs h)
         (fst d) (snd d) hs) x;
@@ -44,8 +41,8 @@ indSumD :
 -- Nat
 NatD = SumD (Ind End) End;
 Nat = Data NatD;
-Z : Nat = Con NatD (False, Unit);
-S : Nat -> Nat = \n. Con NatD (True, n, Unit);
+Z : Nat = Con (False, Unit);
+S : Nat -> Nat = \n. Con (True, n, Unit);
 
 indNat :
   (P : Nat -> Type)
@@ -74,9 +71,9 @@ add : Nat -> Nat -> Nat = \a b. cataNat Nat a b S;
 ListD : Type -> Desc = \A. SumD (Arg A (\_. Ind End)) End;
 List : Type -> Type = \A. Data (ListD A);
 
-Nil : (A : Type) -> List A = \A. Con (ListD A) (False, Unit);
+Nil : (A : Type) -> List A = \A. Con (False, Unit);
 Cons : (A : Type) -> A -> List A -> List A
-  = \A hd tl. Con (ListD A) (True, hd, tl, Unit);
+  = \A hd tl. Con (True, hd, tl, Unit);
 
 indList :
   (A : Type)
