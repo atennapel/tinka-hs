@@ -6,6 +6,8 @@ import Core
 import Val
 import Common
 import Verification (verify)
+import Evaluation
+import Globals
 
 -- import Debug.Trace (trace)
 

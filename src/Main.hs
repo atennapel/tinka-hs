@@ -6,11 +6,12 @@ import Text.Megaparsec (initialPos)
 
 import Surface
 import Ctx
-import Val
 import Elaboration
 import Verification
 import Parser
 import Core
+import Evaluation
+import Globals
 
 main :: IO ()
 main = mainWith getArgs parseStdin

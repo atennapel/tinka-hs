@@ -7,6 +7,8 @@ import Common
 import Core
 import Surface
 import Val
+import Evaluation
+import Globals
 
 type TC t = Either String t
 

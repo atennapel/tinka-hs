@@ -61,15 +61,13 @@ TODO:
 - [x] clean up GlobalCtx mess
 - [x] get rid of ConD
 - [x] add some cumulativity in elaboration
+- [ ] add primitive Refl
 - [ ] REPL
-- [ ] indexed descriptions
 - [ ] parser for post-fix projections
 - [ ] parser for unit type () and nested units []
 - [ ] named sigma projection
-- [ ] could levels be removed from primitives because of bidirectional core?
-- [ ] add arguments to primitives to allow for more cumulativity
-- [ ] add cumulativity for Lift, x : Lift A ~> lift x
 - [ ] metas, unification and _ solving
 - [ ] named holes
 - [ ] implicit function types
+- [ ] indexed descriptions
 - [ ] QTT
