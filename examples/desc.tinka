@@ -1,14 +1,14 @@
 -- levitation
 Desc = Data^ (
-  Con (False^2, True^2, Bool^, \x. (elim BoolDesc^) (Con (True^2, Unit^2)) (
-  Con (False^2, True^2, Bool^, \x. (elim BoolDesc^) (Con (False^2, True^2, Type, \x. Con (False^2, False^2, False^2, Lift (lower x), Con (True^2, Unit^2), Unit^2), Unit^2)) (
-  Con (False^2, True^2, Bool^, \x. (elim BoolDesc^) (Con (False^2, False^2, True^2, Con (True^2, Unit^2), Unit^2)) (
-  Con (False^2, True^2, Type, \x. Con (False^2, False^2, True^2, Con (True^2, Unit^2), Unit^2), Unit^2)) (lower x), Unit^2)) (lower x), Unit^2)) (lower x), Unit^2));
+  Con (False, True, Bool, \x. (elim BoolDesc^) (Con (True, Unit)) (
+  Con (False, True, Bool, \x. (elim BoolDesc^) (Con (False, True, Type, \x. Con (False, False, False, Lift (lower x), Con (True, Unit), Unit), Unit)) (
+  Con (False, True, Bool, \x. (elim BoolDesc^) (Con (False, False, True, Con (True, Unit), Unit)) (
+  Con (False, True, Type, \x. Con (False, False, True, Con (True, Unit), Unit), Unit)) (lower x), Unit)) (lower x), Unit)) (lower x), Unit));
 
-End : Desc = Con (True^, Unit^);
-Arg : (A : Type) -> (A -> Desc) -> Desc = \A K. Con (False^, True^, A, \x. K (lower x), Unit^);
-Ind : Desc -> Desc = \K. Con (False^, False^, True^, K, Unit^);
-HInd : Type -> Desc -> Desc = \A K. Con (False^, False^, False^, A, K, Unit^);
+End : Desc = Con (True, Unit);
+Arg : (A : Type) -> (A -> Desc) -> Desc = \A K. Con (False, True, A, \x. K (lower x), Unit);
+Ind : Desc -> Desc = \K. Con (False, False, True, K, Unit);
+HInd : Type -> Desc -> Desc = \A K. Con (False, False, False, A, K, Unit);
 
 El : Desc -> Type -> Type
   = \D X. (elim El) X D;

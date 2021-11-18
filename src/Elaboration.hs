@@ -48,6 +48,24 @@ check ctx tm ty = do
     (SCon t, x@(VData l d)) -> do
       c <- check ctx t (vel l 0 d x)
       return $ Con c
+
+    -- some cumulativity
+    -- Void^l : Type^k ~> Void^k (if l <= k)
+    -- UnitType^l : Type^k ~> Void^k (if l <= k)
+    -- Bool^l : Type^k ~> Void^k (if l <= k)
+    --
+    -- Unit^l : UnitType^k ~> Unit^k (if l <= k)
+    -- True/False^l : Bool^k ~> True/False^k (if l <= k)
+    -- TODO: HEq, HRefl, Data cumulativity
+    (SVar x l, VU k) | toPrimName x == Just PVoid && l <= k -> return $ Prim PVoid k
+    (SVar x l, VU k) | toPrimName x == Just PUnitType && l <= k -> return $ Prim PUnitType k
+    (SVar x l, VU k) | toPrimName x == Just PBool && l <= k -> return $ Prim PBool k
+
+    (SVar x l, VNe (HPrim PUnitType k) []) | toPrimName x == Just PUnit && l <= k -> return $ Prim PUnit k
+    (SVar x l, VNe (HPrim PBool k) []) | toPrimName x == Just PTrue && l <= k -> return $ Prim PTrue k
+    (SVar x l, VNe (HPrim PBool k) []) | toPrimName x == Just PFalse && l <= k -> return $ Prim PFalse k
+
+    -- infer fallback
     (s, _) -> do
       (c, ty') <- infer ctx s
       test (conv (lvl ctx) ty' ty) $ "check failed " ++ show s ++ " : " ++ showV ctx ty ++ ", got " ++ showV ctx ty'

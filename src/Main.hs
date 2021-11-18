@@ -17,7 +17,6 @@ main = mainWith getArgs parseStdin
 
 mainWith :: IO [String] -> IO (Surface, String) -> IO ()
 mainWith getOpt getSurface = do
-  -- addGlobal (GlobalEntry "Desc" (quote 0 $ vDesc 0) (U 1) (vDesc 0) (VU 1))
   getOpt >>= \case
     ["parse"] -> do
       (t, file) <- getSurface
