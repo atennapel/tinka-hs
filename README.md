@@ -69,6 +69,7 @@ TODO:
 - [x] add primitive Refl
 - [x] REPL
 - [x] simple imports
+- [ ] store what file globals come from
 - [ ] handle double imports (topological sort of imports)
 - [ ] metas, unification and _ solving
 - [ ] parser for post-fix projections

@@ -165,7 +165,7 @@ reduceExpectedLet tm = tm
 elaborateDefDef :: Name -> Maybe Surface -> Surface -> TC GlobalEntry
 elaborateDefDef x ty tm =
   case getGlobal x of
-    Just _ | x /= "_" -> err $ "cannot redefine global " ++ x
+    -- Just _ | x /= "_" -> err $ "cannot redefine global " ++ x
     _ -> do
       (etm', ety) <- elaborate empty (SLet x ty tm (SVar x 0))
       verify etm'
