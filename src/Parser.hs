@@ -207,24 +207,34 @@ parseStdin = do
   t <- parseStr src
   pure (t, src)
 
-pDef :: Parser Def
-pDef = do
+pDefDef :: Parser [Def]
+pDefDef = do
   x <- pBinder
   a <- optional (do
     symbol ":"
     pSurface)
   symbol "="
-  Def x a <$> pSurface
+  body <- pSurface
+  return [Def x a body]
+
+pImport :: Parser [Def]
+pImport = do
+  symbol "import"
+  names <- many (lexeme $ takeWhile1P Nothing (\x -> isAlphaNum x || x == '/' || x == '\\' || x == '.'))
+  return $ Import <$> names
+
+pDef :: Parser [Def]
+pDef = pImport <|> pDefDef
 
 pDefs :: Parser Defs
 pDefs = do
   ws
-  d <- pDef
+  ds <- pDef
   ws
   symbol ";"
   ws
-  ds <- pDefs <|> ([] <$ eof)
-  return (d : ds)
+  dsrest <- pDefs <|> ([] <$ eof)
+  return (ds ++ dsrest)
 
 parseStrDefs :: String -> IO Defs
 parseStrDefs src =

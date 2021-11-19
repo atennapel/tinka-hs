@@ -141,11 +141,14 @@ fromCore ns (Lower t) = SLower (fromCore ns t)
 fromCore ns (Con t) = SCon (fromCore ns t)
 fromCore _ Refl = SRefl
 
-data Def = Def Name (Maybe Surface) Surface -- name type term
+data Def
+  = Def Name (Maybe Surface) Surface -- name type term
+  | Import String -- filename
 
 instance Show Def where
   show (Def x (Just ty) tm) = x ++ " : " ++ show ty ++ " = " ++ show tm
   show (Def x Nothing tm) = x ++ " = " ++ show tm
+  show (Import x) = "import " ++ x
 
 type Defs = [Def]
 

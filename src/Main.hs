@@ -6,9 +6,6 @@ import Text.Megaparsec (initialPos)
 import System.IO
 import GHC.IO.Encoding
 import Data.List (isPrefixOf)
-import Control.Monad (forM_)
-import Control.Exception (try)
-import Data.Bifunctor (first)
 
 import Surface
 import Ctx
@@ -32,7 +29,7 @@ mainWith getOpt getSurface = do
       print t
     ["nf"] -> do
       (c, ty) <- elab getSurface
-      putStrLn $ showC empty $ nf c
+      putStrLn $ showC empty $ nfWith Full c
     ["type"] -> do
       (c, ty) <- elab getSurface
       putStrLn $ showC empty ty
@@ -57,7 +54,7 @@ mainWith getOpt getSurface = do
       (c, ty) <- elab getSurface
       putStrLn $ showC empty ty
       putStrLn $ showC empty c
-      putStrLn $ showC empty $ nf c
+      putStrLn $ showC empty $ nfWith Full c
 
 repl :: IO ()
 repl = do
@@ -65,20 +62,12 @@ repl = do
   hFlush stdout
   inp <- getLine
   case inp of
-    defs | ":def " `isPrefixOf` defs -> do
-       ds <- parseAndElabDefs (drop 5 defs)
-       showError ds $ \ds -> do
+    defs | ":let " `isPrefixOf` defs || ":import " `isPrefixOf` defs -> do
+      let prefixN = if ":let " `isPrefixOf` defs then 5 else 1
+      ds <- parseAndElabDefs (drop prefixN defs)
+      showError ds $ \ds -> do
         gs <- getGlobals
         putStrLn $ showElabDefs $ take (length ds) gs
-    defs | ":import " `isPrefixOf` defs -> do
-      let files = words (drop 8 defs)
-      forM_ files $ \file -> do
-        srcE <- first showIOError <$> try (readFile file)
-        showError srcE $ \src -> do
-          ds <- parseAndElabDefs src
-          showError ds $ \ds -> do
-            gs <- getGlobals
-            putStrLn $ showElabDefs $ take (length ds) gs
     ":globals" -> do
       gs <- getGlobals
       putStrLn $ showElabDefs gs
@@ -88,7 +77,7 @@ repl = do
     inp -> showError (parseAndElabSurface "(repl)" inp) $ \(c, ty) -> do
       putStrLn $ showC empty ty
       putStrLn $ showC empty c
-      putStrLn $ showC empty $ nf c
+      putStrLn $ showC empty $ nfWith Full c
   repl
 
 showIOError :: IOError -> String
@@ -108,19 +97,6 @@ parseAndElabSurface :: String -> String -> Either String (Core, Core)
 parseAndElabSurface file src = do
   t <- parseStrEither src
   elabSurface file t
-
-fraggle :: IO (Either e a) -> (a -> IO (Either e b)) -> IO (Either e (a, b))
-fraggle x k = do
-  e1 <- x
-  let e2 = k <$> e1
-  e3 <- sequence e2
-  let e4 = (>>= id) e3
-  return $ (,) <$> e1 <*> e4
-
-parseAndElabDefs :: String -> IO (Either String Defs)
-parseAndElabDefs src = do
-  res <- fraggle (return $ parseStrDefsEither src) elaborateDefs
-  return $ fst <$> res
 
 elab :: IO (Surface, String) -> IO (Core, Core)
 elab getSurface = do

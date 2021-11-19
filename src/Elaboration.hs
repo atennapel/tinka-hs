@@ -1,4 +1,4 @@
-module Elaboration (elaborate, elaborateDef, elaborateDefs) where
+module Elaboration (elaborate, elaborateDef, elaborateDefs, parseAndElabDefs) where
 
 import Ctx
 import Surface
@@ -8,6 +8,10 @@ import Common
 import Verification (verify)
 import Evaluation
 import Globals
+import Parser
+
+import Control.Exception (try)
+import Data.Bifunctor (first)
 
 -- import Debug.Trace (trace)
 
@@ -158,8 +162,8 @@ reduceExpectedLet :: Core -> Core
 reduceExpectedLet (Let _ _ tm _) = tm
 reduceExpectedLet tm = tm
 
-elaborateDef :: Def -> TC GlobalEntry
-elaborateDef (Def x ty tm) =
+elaborateDefDef :: Name -> Maybe Surface -> Surface -> TC GlobalEntry
+elaborateDefDef x ty tm =
   case getGlobal x of
     Just _ | x /= "_" -> err $ "cannot redefine global " ++ x
     _ -> do
@@ -168,11 +172,45 @@ elaborateDef (Def x ty tm) =
       let etm = reduceExpectedLet etm'
       return $ GlobalEntry x etm ety (eval [] etm) (eval [] ety)
 
-elaborateDefs :: Defs -> IO (TC ())
-elaborateDefs [] = return $ return ()
-elaborateDefs (hd : tl) =
-  case elaborateDef hd of
-    Left msg -> return $ Left msg
+elaborateDef :: Def -> IO (TC Defs)
+elaborateDef d@(Def x ty tm) =
+  case elaborateDefDef x ty tm of
+    Left err -> return $ Left err
     Right entry -> do
       addGlobal entry
-      elaborateDefs tl
+      return $ Right [d]
+elaborateDef (Import x) = do
+  src <- first showIOError <$> try (readFile $ handleFilename x)
+  case src of
+    Left err -> return $ Left err
+    Right inp -> do
+      res <- parseAndElabDefs inp
+      case res of
+        Left err -> return $ Left err
+        Right ds -> return $ Right ds
+
+showIOError :: IOError -> String
+showIOError = show
+
+elaborateDefs :: Defs -> IO (TC Defs)
+elaborateDefs [] = return $ return []
+elaborateDefs (hd : tl) = do
+  res <- elaborateDef hd
+  case res of
+    Left msg -> return $ Left msg
+    Right ds -> do
+      next <- elaborateDefs tl
+      case next of
+        Left msg -> return $ Left msg
+        Right nextds -> return $ Right (ds ++ nextds)
+
+parseAndElabDefs :: String -> IO (Either String Defs)
+parseAndElabDefs src = fraggle (return $ parseStrDefsEither src) elaborateDefs
+  where
+    fraggle :: IO (Either e a) -> (a -> IO (Either e b)) -> IO (Either e b)
+    fraggle x k = do
+      e1 <- x
+      let e2 = k <$> e1
+      e3 <- sequence e2
+      let e4 = (>>= id) e3
+      return e4

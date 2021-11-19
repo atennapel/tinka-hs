@@ -1,0 +1,29 @@
+import lib/desc;
+
+NatD = SumD (Ind End) End;
+Nat = Data NatD;
+Z : Nat = Con (False, Unit);
+S : Nat -> Nat = \n. Con (True, n, Unit);
+
+indNat :
+  (P : Nat -> Type)
+  -> P Z
+  -> ((m : Nat) -> P m -> P (S m))
+  -> (n : Nat)
+  -> P n
+  = \P z s n. indSumD (Ind End) End P
+        (\xs h. s (fst xs) (fst h))
+        (\_ _. z)
+        n;
+
+paraNat : (A : Type) -> Nat -> A -> (Nat -> A -> A) -> A
+  = \A n z s. indNat (\_. A) z s n;
+
+caseNat : (A : Type) -> Nat -> A -> (Nat -> A) -> A
+  = \A n z s. paraNat A n z (\m _. s m);
+
+cataNat : (A : Type) -> Nat -> A -> (A -> A) -> A
+  = \A n z s. paraNat A n z (\_. s);
+
+pred : Nat -> Nat = \n. caseNat Nat n Z (\x. x);
+add : Nat -> Nat -> Nat = \a b. cataNat Nat a b S;

@@ -68,11 +68,12 @@ TODO:
 - [x] add some cumulativity in elaboration
 - [x] add primitive Refl
 - [x] REPL
-- [ ] imports
+- [x] simple imports
+- [ ] handle double imports (topological sort of imports)
+- [ ] metas, unification and _ solving
 - [ ] parser for post-fix projections
 - [ ] parser for unit type () and nested units []
 - [ ] named sigma projection
-- [ ] metas, unification and _ solving
 - [ ] named holes
 - [ ] implicit function types
 - [ ] indexed descriptions
