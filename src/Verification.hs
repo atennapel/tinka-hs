@@ -24,6 +24,9 @@ check ctx c ty =
     (LiftTerm t, VLift ty) -> check ctx t ty
     (Lower t, ty) -> check ctx t (VLift ty)
     (Con t, x@(VData l d)) -> check ctx t (vel l 0 d x)
+    (Refl, VNe (HPrim PHEq _) [EApp y, EApp x, EApp b, EApp a]) -> do
+      test (conv (lvl ctx) a b) $ "verify: type mismatch in Refl: " ++ showV ctx ty
+      test (conv (lvl ctx) x y) $ "verify: value mismatch in Refl: " ++ showV ctx ty
     (c, _) -> do
       ty' <- infer ctx c
       test (conv (lvl ctx) ty' ty) $ "verify: check failed " ++ show c ++ " : " ++ showV ctx ty ++ ", got " ++ showV ctx ty'

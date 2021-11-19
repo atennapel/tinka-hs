@@ -30,6 +30,7 @@ data Val
   | VLift Val
   | VLiftTerm Val
   | VCon Val
+  | VRefl
 
 vpi :: Name -> Val -> (Val -> Val) -> Val
 vpi x a b = VPi x a (Fun b)
@@ -62,9 +63,6 @@ vfalse = vprim PFalse
 
 vheq :: ULvl -> Val -> Val -> Val -> Val -> Val
 vheq l a b x y = VNe (HPrim PHEq l) [EApp y, EApp x, EApp b, EApp a]
-
-vhrefl :: ULvl -> Val -> Val -> Val
-vhrefl l a x = VNe (HPrim PHRefl l) [EApp x, EApp a]
 
 vdata :: ULvl -> Val -> Val
 vdata l v = VNe (HPrim PData l) [EApp v]

@@ -49,7 +49,7 @@ vprimelim PEBool l k [p, t, f] (VNe (HPrim PFalse _) []) = f
 vprimelim PEBoolDesc l k [t, f] (VNe (HPrim PTrue _) []) = t
 vprimelim PEBoolDesc l k [t, f] (VNe (HPrim PFalse _) []) = f
 
-vprimelim PEHEq l k [ta, a, tp, h, b] (VNe (HPrim PHRefl _) _) = h
+vprimelim PEHEq l k [ta, a, tp, h, b] VRefl = h
 
 -- El X End^l = UnitType^(l + k)
 vprimelim PEEl l k [x] (VCon (VPair (VTrue _) _)) = vunittype (l + k)
@@ -129,6 +129,7 @@ eval e (Lift t) = VLift (eval e t)
 eval e (LiftTerm t) = vliftterm (eval e t)
 eval e (Lower t) = vlower (eval e t)
 eval e (Con t) = VCon (eval e t)
+eval e Refl = VRefl
 
 evalprimelim :: PrimElimName -> ULvl -> ULvl -> Val
 evalprimelim PEBool l k =
@@ -210,6 +211,7 @@ quoteWith ql k (VPair a b) = Pair (quoteWith ql k a) (quoteWith ql k b)
 quoteWith ql k (VLift t) = Lift (quoteWith ql k t)
 quoteWith ql k (VLiftTerm t) = LiftTerm (quoteWith ql k t)
 quoteWith ql k (VCon t) = Con (quoteWith ql k t)
+quoteWith _ _ VRefl = Refl
 
 quote :: Lvl -> Val -> Core
 quote = quoteWith KeepGlobals
@@ -255,8 +257,8 @@ conv k a b = -- trace ("conv " ++ show (quote k a) ++ " ~ " ++ show (quote k b))
     (VNe (HPrim PUnit _) [], v) -> True
     (v, VNe (HPrim PUnit _) []) -> True
     
-    (VNe (HPrim PHRefl _) _, v) -> True -- is this safe?
-    (v, VNe (HPrim PHRefl _) _) -> True -- is this safe?
+    (VRefl, v) -> True -- is this safe?
+    (v, VRefl) -> True -- is this safe?
 
     (VGlobal x l sp v, VGlobal x' l' sp' v') | x == x' && l == l' ->
       and (zipWith (convElim k) sp sp') || conv k v v'
@@ -274,8 +276,6 @@ primType PTrue l = vbool l
 primType PFalse l = vbool l
 -- (A B : Type^l) -> A -> B -> Type^l
 primType PHEq l = vpi "A" (VU l) $ \a -> vpi "B" (VU l) $ \b -> vfun a $ vfun b $ VU l
--- (A : Type^l) -> (x : A) -> HEq^l A A x x
-primType PHRefl l = vpi "A" (VU l) $ \a -> vpi "x" a $ \x -> vheq l a a x x
 primType PData l = vfun (vDesc l) (VU l)
 
 primElimType :: PrimElimName -> ULvl -> ULvl -> Val
@@ -306,7 +306,7 @@ primElimType PEHEq l k =
   vpi "A" (VU l) $ \ta ->
   vpi "a" ta $ \a ->
   vpi "P" (vpi "b" ta $ \b -> vfun (vheq l ta ta a b) (VU (l + k))) $ \tp ->
-  vfun (vapp (vapp tp ta) (vhrefl l ta a)) $
+  vfun (vapp (vapp tp ta) VRefl) $
   vpi "b" ta $ \b ->
   vpi "p" (vheq l ta ta a b) $ \p ->
   vapp (vapp tp b) p

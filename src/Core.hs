@@ -6,7 +6,7 @@ data PrimName
   = PVoid
   | PUnitType | PUnit
   | PBool | PTrue | PFalse
-  | PHEq | PHRefl
+  | PHEq
   | PData
   deriving (Eq)
 
@@ -29,7 +29,6 @@ instance Show PrimName where
   show PTrue = "True"
   show PFalse = "False"
   show PHEq = "HEq"
-  show PHRefl = "HRefl"
   show PData = "Data"
 
 instance Show PrimElimName where
@@ -50,7 +49,6 @@ toPrimName "Bool" = Just PBool
 toPrimName "True" = Just PTrue
 toPrimName "False" = Just PFalse
 toPrimName "HEq" = Just PHEq
-toPrimName "HRefl" = Just PHRefl
 toPrimName "Data" = Just PData
 toPrimName _ = Nothing
 
@@ -89,6 +87,7 @@ data Core
   | LiftTerm Core
   | Lower Core
   | Con Core
+  | Refl
 
 showProjType :: ProjType -> String
 showProjType Fst = ".1"
@@ -118,6 +117,7 @@ instance Show Core where
   show (LiftTerm t) = "(lift " ++ show t ++ ")"
   show (Lower t) = "(lower " ++ show t ++ ")"
   show (Con t) = "(Con " ++ show t ++ ")"
+  show Refl = "Refl"
 
 liftUniv :: ULvl -> Core -> Core
 liftUniv l (U l') = U (l + l')
@@ -136,3 +136,4 @@ liftUniv l (Lift t) = Lift (liftUniv l t)
 liftUniv l (LiftTerm t) = LiftTerm (liftUniv l t)
 liftUniv l (Lower t) = Lower (liftUniv l t)
 liftUniv l (Con t) = Con (liftUniv l t)
+liftUniv _ Refl = Refl

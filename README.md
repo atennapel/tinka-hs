@@ -61,7 +61,7 @@ TODO:
 - [x] clean up GlobalCtx mess
 - [x] get rid of ConD
 - [x] add some cumulativity in elaboration
-- [ ] add primitive Refl
+- [x] add primitive Refl
 - [ ] REPL
 - [ ] parser for post-fix projections
 - [ ] parser for unit type () and nested units []

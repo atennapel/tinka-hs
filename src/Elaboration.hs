@@ -58,7 +58,6 @@ check ctx tm ty = do
     --
     -- Unit^l : UnitType^k ~> Unit^k (if l <= k)
     -- True/False^l : Bool^k ~> True/False^k (if l <= k)
-    -- TODO: HEq, HRefl, Data cumulativity
     (SVar x l, VU k) | toPrimName x == Just PVoid && l <= k -> return $ Prim PVoid k
     (SVar x l, VU k) | toPrimName x == Just PUnitType && l <= k -> return $ Prim PUnitType k
     (SVar x l, VU k) | toPrimName x == Just PBool && l <= k -> return $ Prim PBool k
@@ -66,6 +65,11 @@ check ctx tm ty = do
     (SVar x l, VNe (HPrim PUnitType k) []) | toPrimName x == Just PUnit && l <= k -> return $ Prim PUnit k
     (SVar x l, VNe (HPrim PBool k) []) | toPrimName x == Just PTrue && l <= k -> return $ Prim PTrue k
     (SVar x l, VNe (HPrim PBool k) []) | toPrimName x == Just PFalse && l <= k -> return $ Prim PFalse k
+
+    (SRefl, VNe (HPrim PHEq _) [EApp y, EApp x, EApp b, EApp a]) -> do
+      test (conv (lvl ctx) a b) $ "type mismatch in Refl: " ++ showV ctx ty
+      test (conv (lvl ctx) x y) $ "value mismatch in Refl: " ++ showV ctx ty
+      return Refl
 
     -- infer fallback
     (s, _) -> do
