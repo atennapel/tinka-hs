@@ -27,6 +27,9 @@ getGlobals = readIORef globals
 addGlobal :: GlobalEntry -> IO ()
 addGlobal e = modifyIORef globals (e :)
 
+resetGlobals :: IO ()
+resetGlobals = writeIORef globals []
+
 getGlobal :: Name -> Maybe GlobalEntry
 getGlobal x = unsafeDupablePerformIO $ go <$> getGlobals
   where

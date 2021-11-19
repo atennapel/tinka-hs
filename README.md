@@ -3,6 +3,11 @@
 Dependently typed programming language written in Haskell.
 Code is based on https://github.com/AndrasKovacs/elaboration-zoo .
 
+Start REPL
+```
+stack run repl
+```
+
 Elaborate an expression
 ```
 stack run < expr.txt
@@ -62,7 +67,8 @@ TODO:
 - [x] get rid of ConD
 - [x] add some cumulativity in elaboration
 - [x] add primitive Refl
-- [ ] REPL
+- [x] REPL
+- [ ] imports
 - [ ] parser for post-fix projections
 - [ ] parser for unit type () and nested units []
 - [ ] named sigma projection

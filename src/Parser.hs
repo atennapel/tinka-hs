@@ -1,4 +1,4 @@
-module Parser (parseStr, parseStdin, parseStrDefs, parseStdinDefs) where
+module Parser (parseStr, parseStrEither, parseStdin, parseStrDefs, parseStdinDefs, parseStrDefsEither) where
 
 import Control.Applicative hiding (many, some)
 import Control.Monad
@@ -35,10 +35,13 @@ parens :: Parser a -> Parser a
 parens p = char '(' *> p <* char ')'
 
 pArrow :: Parser String
-pArrow   = symbol "→" <|> symbol "->"
+pArrow = symbol "→" <|> symbol "->"
 
 pCross :: Parser String
-pCross   = symbol "×" <|> symbol "**"
+pCross = symbol "⨯" <|> symbol "**"
+
+pLambda :: Parser Char
+pLambda = char 'λ' <|> char '\\'
 
 keyword :: String -> Bool
 keyword x = x == "let" || x == "λ" || x == "Type" || x == "fst" || x == "snd" || x == "Lift" || x == "lift" || x == "lower" || x == "elim" || x == "Con" || x == "Refl"
@@ -142,7 +145,7 @@ pSpine = foldl1 SApp <$> some pAtom
 
 pLam :: Parser Surface
 pLam = do
-  char 'λ' <|> char '\\'
+  pLambda
   xs <- some pBinder
   char '.'
   t <- pSurface
@@ -193,6 +196,11 @@ parseStr src =
     Right t ->
       pure t
 
+parseStrEither :: String -> Either String Surface
+parseStrEither src = case parse pSrc "(stdin)" src of
+  Left e -> Left (errorBundlePretty e)
+  Right t -> return t
+
 parseStdin :: IO (Surface, String)
 parseStdin = do
   src <- getContents
@@ -226,6 +234,11 @@ parseStrDefs src =
       exitFailure
     Right t ->
       pure t
+
+parseStrDefsEither :: String -> Either String Defs
+parseStrDefsEither src = case parse pDefs "(stdin)" src of
+  Left e -> Left (errorBundlePretty e)
+  Right t -> return t
 
 parseStdinDefs :: IO (Defs, String)
 parseStdinDefs = do
