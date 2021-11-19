@@ -1,0 +1,38 @@
+Desc = Data^ (
+  Con (False, True, Bool, \x. (elim BoolDesc^) (Con (True, Unit)) (
+  Con (False, True, Bool, \x. (elim BoolDesc^) (Con (False, True, Type, \x. Con (False, False, False, Lift (lower x), Con (True, Unit), Unit), Unit)) (
+  Con (False, True, Bool, \x. (elim BoolDesc^) (Con (False, False, True, Con (True, Unit), Unit)) (
+  Con (False, True, Type, \x. Con (False, False, True, Con (True, Unit), Unit), Unit)) (lower x), Unit)) (lower x), Unit)) (lower x), Unit));
+
+End : Desc = Con (True, Unit);
+Arg : (A : Type) -> (A -> Desc) -> Desc = \A K. Con (False, True, A, \x. K (lower x), Unit);
+Ind : Desc -> Desc = \K. Con (False, False, True, K, Unit);
+HInd : Type -> Desc -> Desc = \A K. Con (False, False, False, A, K, Unit);
+
+El : Desc -> Type -> Type
+  = \D X. (elim El) X D;
+
+All : (D : Desc) -> (X : Type) -> (X -> Type) -> El D X -> Type
+  = \D X P d. (elim All) D X P d;
+
+SumDBody : Desc -> Desc -> Bool -> Desc
+  = \A B. (elim Bool 1) (\_. Desc) A B;
+SumD : Desc -> Desc -> Desc
+  = \A B. Arg Bool (SumDBody A B);
+
+DescD : Desc^ = SumD^ End^ (SumD^ (Arg^ Type (\A. HInd^ (Lift A) End^)) (SumD^ (Ind^ End^) (Arg^ Type (\_. Ind^ End^))));
+
+indSumD :
+  (A : Desc)
+  (B : Desc)
+  (P : Data (SumD A B) -> Type)
+  (a : (d : El A (Data (SumD A B))) -> All A (Data (SumD A B)) P d -> P (Con (True, d)))
+  (b : (d : El B (Data (SumD A B))) -> All B (Data (SumD A B)) P d -> P (Con (False, d)))
+  (x : Data (SumD A B))
+  -> P x
+  = \A B P a b x. (elim Data) (SumD A B) P
+      (\d hs. (elim Bool)
+        (\b. (xs : El (SumDBody A B b) (Data (SumD A B))) -> All (SumD A B) (Data (SumD A B)) P (b, xs) -> P (Con (b, xs)))
+        (\xs h. a xs h)
+        (\xs h. b xs h)
+        (fst d) (snd d) hs) x;
