@@ -1,4 +1,4 @@
-module Surface (Surface(..), fromCore, Def(..), Defs, showDefs) where
+module Surface (Surface(..), fromCore, Def(..), Defs, showDefs, defNames, countNames, imports) where
 
 import GHC.Exts(IsString(..))
 import Data.List (intercalate)
@@ -155,3 +155,16 @@ type Defs = [Def]
 showDefs :: Defs -> String
 showDefs [] = ""
 showDefs (hd : tl) = show hd ++ "\n" ++ showDefs tl
+
+defNames :: Defs -> [String]
+defNames [] = []
+defNames (Def x _ _ : t) = x : defNames t
+defNames (_ : t) = defNames t
+
+countNames :: Defs -> Int
+countNames = length . defNames
+
+imports :: Defs -> [String]
+imports [] = []
+imports (Import x : t) = x : imports t
+imports (_ : t) = imports t

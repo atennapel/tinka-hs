@@ -6,6 +6,7 @@ import Val
 import Common
 import Evaluation
 import Globals
+import TC
 
 check :: Ctx -> Core -> Val -> TC ()
 check ctx c ty =

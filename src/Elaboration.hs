@@ -1,4 +1,4 @@
-module Elaboration (elaborate, elaborateDef, elaborateDefs, parseAndElabDefs) where
+module Elaboration (elaborate, elaborateDef, elaborateDefs) where
 
 import Ctx
 import Surface
@@ -8,10 +8,7 @@ import Common
 import Verification (verify)
 import Evaluation
 import Globals
-import Parser
-
-import Control.Exception (try)
-import Data.Bifunctor (first)
+import TC
 
 -- import Debug.Trace (trace)
 
@@ -165,12 +162,12 @@ reduceExpectedLet tm = tm
 elaborateDefDef :: Name -> Maybe Surface -> Surface -> TC GlobalEntry
 elaborateDefDef x ty tm =
   case getGlobal x of
-    -- Just _ | x /= "_" -> err $ "cannot redefine global " ++ x
+    Just _ | x /= "_" -> err $ "cannot redefine global " ++ x
     _ -> do
       (etm', ety) <- elaborate empty (SLet x ty tm (SVar x 0))
       verify etm'
       let etm = reduceExpectedLet etm'
-      return $ GlobalEntry x etm ety (eval [] etm) (eval [] ety)
+      return $ GlobalEntry x etm ety (eval [] etm) (eval [] ety) Nothing
 
 elaborateDef :: Def -> IO (TC Defs)
 elaborateDef d@(Def x ty tm) =
@@ -179,18 +176,7 @@ elaborateDef d@(Def x ty tm) =
     Right entry -> do
       addGlobal entry
       return $ Right [d]
-elaborateDef (Import x) = do
-  src <- first showIOError <$> try (readFile $ handleFilename x)
-  case src of
-    Left err -> return $ Left err
-    Right inp -> do
-      res <- parseAndElabDefs inp
-      case res of
-        Left err -> return $ Left err
-        Right ds -> return $ Right ds
-
-showIOError :: IOError -> String
-showIOError = show
+elaborateDef (Import x) = return $ return []
 
 elaborateDefs :: Defs -> IO (TC Defs)
 elaborateDefs [] = return $ return []
@@ -203,14 +189,3 @@ elaborateDefs (hd : tl) = do
       case next of
         Left msg -> return $ Left msg
         Right nextds -> return $ Right (ds ++ nextds)
-
-parseAndElabDefs :: String -> IO (Either String Defs)
-parseAndElabDefs src = fraggle (return $ parseStrDefsEither src) elaborateDefs
-  where
-    fraggle :: IO (Either e a) -> (a -> IO (Either e b)) -> IO (Either e b)
-    fraggle x k = do
-      e1 <- x
-      let e2 = k <$> e1
-      e3 <- sequence e2
-      let e4 = (>>= id) e3
-      return e4

@@ -69,8 +69,9 @@ TODO:
 - [x] add primitive Refl
 - [x] REPL
 - [x] simple imports
-- [ ] store what file globals come from
-- [ ] handle double imports (topological sort of imports)
+- [x] handle double imports (topological sort of imports)
+- [ ] do not exit REPL on module cycles
+- [ ] store what file globals come from, improve duplicate global error message
 - [ ] metas, unification and _ solving
 - [ ] parser for post-fix projections
 - [ ] parser for unit type () and nested units []

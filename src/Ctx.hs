@@ -9,15 +9,7 @@ import Surface
 import Val
 import Evaluation
 import Globals
-
-type TC t = Either String t
-
-err :: String -> TC t
-err = Left
-
-test :: Bool -> String -> TC ()
-test True _ = return ()
-test False msg = err msg
+import TC
 
 data Ctx = Ctx {
   lvl :: Lvl,

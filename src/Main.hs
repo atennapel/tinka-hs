@@ -6,6 +6,8 @@ import Text.Megaparsec (initialPos)
 import System.IO
 import GHC.IO.Encoding
 import Data.List (isPrefixOf)
+import Control.Exception (try)
+import Data.Bifunctor (first)
 
 import Surface
 import Ctx
@@ -15,6 +17,8 @@ import Parser
 import Core
 import Evaluation
 import Globals
+import ModuleElaboration
+import TC
 
 main :: IO ()
 main = do
@@ -64,15 +68,23 @@ repl = do
   case inp of
     defs | ":let " `isPrefixOf` defs || ":import " `isPrefixOf` defs -> do
       let prefixN = if ":let " `isPrefixOf` defs then 5 else 1
-      ds <- parseAndElabDefs (drop prefixN defs)
-      showError ds $ \ds -> do
-        gs <- getGlobals
-        putStrLn $ showElabDefs $ take (length ds) gs
+      showError (parseStrDefsEither (drop prefixN defs)) $ \ds -> do
+        let xs = imports ds
+        tryIO (loadModules xs) $ \ids -> do
+          showErrorIO (elaborateDefs ds) $ \nds -> do
+            gs <- getGlobals
+            putStrLn $ showElabDefs $ take (countNames nds + countNames ids) gs
     ":globals" -> do
       gs <- getGlobals
       putStrLn $ showElabDefs gs
     ":resetglobals" -> do
       resetGlobals
+      putStrLn "done"
+    ":modules" -> do
+      ms <- getModules
+      print ms
+    ":resetmodules" -> do
+      resetModules 
       putStrLn "done"
     inp -> showError (parseAndElabSurface "(repl)" inp) $ \(c, ty) -> do
       putStrLn $ showC empty ty
@@ -86,6 +98,12 @@ showIOError = show
 showError :: Either String t -> (t -> IO ()) -> IO ()
 showError (Left msg) k = putStrLn msg
 showError (Right x) k = k x
+
+showErrorIO :: IO (Either String t) -> (t -> IO ()) -> IO ()
+showErrorIO x k = x >>= flip showError k
+
+tryIO :: IO t -> (t -> IO ()) -> IO ()
+tryIO a = showErrorIO (first showIOError <$> try a)
 
 elabSurface :: String -> Surface -> TC (Core, Core)
 elabSurface file t = do
@@ -108,13 +126,13 @@ elab getSurface = do
 elabDefs :: IO (Defs, String) -> IO ()
 elabDefs getDefs = do
   (ds, file) <- getDefs
-  res <- elaborateDefs ds
-  case res of
-    Left msg -> putStrLn msg >> exitSuccess
-    Right gs -> return ()
+  let xs = imports ds
+  tryIO (loadModules xs) $ \ids -> do
+    showErrorIO (elaborateDefs ds) $ \nds -> return ()
 
 showElabDef :: GlobalEntry -> String
-showElabDef (GlobalEntry x etm ety _ _) = x ++ " : " ++ showC empty ety ++ " = " ++ showC empty etm
+showElabDef (GlobalEntry x etm ety _ _ file) =
+  maybe "" (++ ".") file ++ x ++ " : " ++ showC empty ety ++ " = " ++ showC empty etm
 
 showElabDefs :: GlobalCtx -> String
 showElabDefs [] = ""
