@@ -71,7 +71,7 @@ repl = do
       showError (parseStrDefsEither (drop prefixN defs)) $ \ds -> do
         let xs = imports ds
         tryIO (loadModules xs) $ \ids -> do
-          showErrorIO (elaborateDefs ds) $ \nds -> do
+          showErrorIO (elaborateDefs Nothing ds) $ \nds -> do
             gs <- getGlobals
             putStrLn $ showElabDefs $ take (countNames nds + countNames ids) gs
     ":globals" -> do
@@ -128,7 +128,7 @@ elabDefs getDefs = do
   (ds, file) <- getDefs
   let xs = imports ds
   tryIO (loadModules xs) $ \ids -> do
-    showErrorIO (elaborateDefs ds) $ \nds -> return ()
+    showErrorIO (elaborateDefs Nothing ds) $ \nds -> return ()
 
 showElabDef :: GlobalEntry -> String
 showElabDef (GlobalEntry x etm ety _ _ file) =

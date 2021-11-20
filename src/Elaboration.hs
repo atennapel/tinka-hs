@@ -159,33 +159,34 @@ reduceExpectedLet :: Core -> Core
 reduceExpectedLet (Let _ _ tm _) = tm
 reduceExpectedLet tm = tm
 
-elaborateDefDef :: Name -> Maybe Surface -> Surface -> TC GlobalEntry
-elaborateDefDef x ty tm =
+elaborateDefDef :: Maybe String -> Name -> Maybe Surface -> Surface -> TC GlobalEntry
+elaborateDefDef mod x ty tm =
   case getGlobal x of
-    Just _ | x /= "_" -> err $ "cannot redefine global " ++ x
+    Just e | x /= "_" ->
+      err $ "cannot redefine global " ++ maybe "" (++ ".") (gmodule e) ++ x ++ " as " ++ maybe "" (++ ".") mod ++ x
     _ -> do
       (etm', ety) <- elaborate empty (SLet x ty tm (SVar x 0))
       verify etm'
       let etm = reduceExpectedLet etm'
-      return $ GlobalEntry x etm ety (eval [] etm) (eval [] ety) Nothing
+      return $ GlobalEntry x etm ety (eval [] etm) (eval [] ety) mod
 
-elaborateDef :: Def -> IO (TC Defs)
-elaborateDef d@(Def x ty tm) =
-  case elaborateDefDef x ty tm of
+elaborateDef :: Maybe String -> Def -> IO (TC Defs)
+elaborateDef mod d@(Def x ty tm) =
+  case elaborateDefDef mod x ty tm of
     Left err -> return $ Left err
     Right entry -> do
       addGlobal entry
       return $ Right [d]
-elaborateDef (Import x) = return $ return []
+elaborateDef _ (Import x) = return $ return []
 
-elaborateDefs :: Defs -> IO (TC Defs)
-elaborateDefs [] = return $ return []
-elaborateDefs (hd : tl) = do
-  res <- elaborateDef hd
+elaborateDefs :: Maybe String -> Defs -> IO (TC Defs)
+elaborateDefs mod [] = return $ return []
+elaborateDefs mod (hd : tl) = do
+  res <- elaborateDef mod hd
   case res of
     Left msg -> return $ Left msg
     Right ds -> do
-      next <- elaborateDefs tl
+      next <- elaborateDefs mod tl
       case next of
         Left msg -> return $ Left msg
         Right nextds -> return $ Right (ds ++ nextds)

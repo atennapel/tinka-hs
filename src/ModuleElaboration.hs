@@ -15,7 +15,7 @@ throwTC (Right x) = return x
 
 elaborateModuleEntry :: ModuleEntry -> IO Defs
 elaborateModuleEntry (ModuleEntry x _ ds) = do
-  res <- elaborateDefs ds
+  res <- elaborateDefs (Just x) ds
   throwTC res
 
 elaborateModules :: [String] -> IO Defs
