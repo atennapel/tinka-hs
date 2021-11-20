@@ -6,8 +6,8 @@ import Text.Megaparsec (initialPos)
 import System.IO
 import GHC.IO.Encoding
 import Data.List (isPrefixOf)
-import Control.Exception (try)
 import Data.Bifunctor (first)
+import Control.Exception (try, SomeException)
 
 import Surface
 import Ctx
@@ -92,7 +92,7 @@ repl = do
       putStrLn $ showC empty $ nfWith Full c
   repl
 
-showIOError :: IOError -> String
+showIOError :: SomeException -> String
 showIOError = show
 
 showError :: Either String t -> (t -> IO ()) -> IO ()

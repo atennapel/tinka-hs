@@ -70,7 +70,7 @@ TODO:
 - [x] REPL
 - [x] simple imports
 - [x] handle double imports (topological sort of imports)
-- [ ] do not exit REPL on module cycles
+- [x] do not exit REPL on module cycles
 - [ ] store what file globals come from, improve duplicate global error message
 - [ ] metas, unification and _ solving
 - [ ] parser for post-fix projections

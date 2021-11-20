@@ -12,6 +12,7 @@ import Data.List (isSuffixOf, delete)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Control.Monad (foldM)
+import Errors (throw)
 
 -- import Debug.Trace (trace)
 
@@ -74,7 +75,7 @@ allDependents :: ModuleMap -> String -> [ModuleEntry]
 allDependents m x = filter (elem x . mdeps) $ Map.elems m
 
 eitherToIO :: Either String a -> IO a
-eitherToIO (Left msg) = error msg
+eitherToIO (Left msg) = throw msg
 eitherToIO (Right x) = return x
 
 depsFromDefs :: Defs -> [String]

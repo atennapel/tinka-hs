@@ -7,9 +7,10 @@ import Elaboration
 
 import Control.Monad (foldM)
 import qualified Data.Map as Map
+import Errors (throw)
 
 throwTC :: TC t -> IO t
-throwTC (Left msg) = error msg
+throwTC (Left msg) = throw msg
 throwTC (Right x) = return x
 
 elaborateModuleEntry :: ModuleEntry -> IO Defs
@@ -29,7 +30,7 @@ loadModules xs = do
   new <- fetchModulesIO xs
   ms <- getModules
   case toposort ms of
-    Left ms -> error $ "module cycle: " ++ show ms
+    Left ms -> throw $ "module cycle: " ++ show ms
     Right xs -> do
       let order = filter (`elem` new) xs
       elaborateModules order
