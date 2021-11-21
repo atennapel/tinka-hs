@@ -4,6 +4,7 @@ import Common
 import Core
 import Val
 import Globals
+import Metas
 
 -- import Debug.Trace (trace)
 
@@ -16,6 +17,16 @@ vapp (VAbs _ b) v = vinst b v
 vapp (VNe h sp) v = VNe h (EApp v : sp)
 vapp (VGlobal x l sp w) v = VGlobal x l (EApp v : sp) (vapp w v)
 vapp _ _ = undefined
+
+velim :: Val -> Elim -> Val
+velim v (EApp a) = vapp v a
+velim v ELower = vlower v
+velim v (EProj p) = vproj v p
+velim v (EPrimElim x l k as) = vprimelim  x l k as v
+
+vappSp :: Val -> Spine -> Val
+vappSp v [] = v
+vappSp v (a : as) = velim (vappSp v as) a
 
 vproj :: Val -> ProjType -> Val
 vproj (VPair a b) Fst = a
@@ -105,15 +116,19 @@ vall :: ULvl -> ULvl -> Val -> Val -> Val -> Val -> Val -> Val
 vall l k d x p pp xs = vprimelim PEall l k [x, p, pp, xs] d
 
 force :: Val -> Val
+force m@(VNe (HMeta x) sp) =
+  case lookupMeta x of
+    Solved v -> force (vappSp v sp)
+    Unsolved -> m
 force (VGlobal _ _ _ v) = force v
 force v = v
 
 vAppBDs :: Env -> Val -> [BD] -> Val
-vAppBDs env ~v bds = case (env, bds) of
-  ([]       , []            ) -> v
-  (env :> t , bds :> Bound  ) -> vAppBDs env v bds `vApp` t
-  (env :> t , bds :> Defined) -> vAppBDs env v bds
-  _                           -> error "impossible"
+vAppBDs env v bds = case (env, bds) of
+  ([], []) -> v
+  (t : env, Bound : bds) -> vAppBDs env v bds `vapp` t
+  (t : env, Defined : bds) -> vAppBDs env v bds
+  _ -> error "impossible"
 
 eval :: Env -> Core -> Val
 eval e (Var i) = e !! i
@@ -138,7 +153,7 @@ eval e (Lower t) = vlower (eval e t)
 eval e (Con t) = VCon (eval e t)
 eval e Refl = VRefl
 eval e (Meta x) = VMeta x
-eval e (InsertedMeta x bds) = vAppBDs env (VMeta x) bds
+eval e (InsertedMeta x bds) = vAppBDs e (VMeta x) bds
 
 evalprimelim :: PrimElimName -> ULvl -> ULvl -> Val
 evalprimelim PEBool l k =
@@ -192,7 +207,8 @@ data QuoteLevel = KeepGlobals | Full
 
 quoteHead :: Lvl -> Head -> Core
 quoteHead k (HVar l) = Var (k - l - 1)
-quoteHead k (HPrim x l) = Prim x l 
+quoteHead k (HPrim x l) = Prim x l
+quoteHead k (HMeta x) = Meta x
 
 quoteElim :: QuoteLevel -> Lvl -> Elim -> Core -> Core
 quoteElim ql k (EApp v) t = App t (quoteWith ql k v)

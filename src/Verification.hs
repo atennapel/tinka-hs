@@ -6,9 +6,8 @@ import Val
 import Common
 import Evaluation
 import Globals
-import TC
 
-check :: Ctx -> Core -> Val -> TC ()
+check :: Ctx -> Core -> Val -> IO ()
 check ctx c ty =
   let fty = force ty in
   case (c, fty) of
@@ -32,14 +31,14 @@ check ctx c ty =
       ty' <- infer ctx c
       test (conv (lvl ctx) ty' ty) $ "verify: check failed " ++ show c ++ " : " ++ showV ctx ty ++ ", got " ++ showV ctx ty'
 
-inferUniv :: Ctx -> Core -> TC ULvl
+inferUniv :: Ctx -> Core -> IO ULvl
 inferUniv ctx tm = do
   ty <- infer ctx tm
   case force ty of
     VU l -> return l
-    _ -> err $ "verify: expected a universe but got " ++ showV ctx ty ++ ", while checking " ++ show tm 
+    _ -> error $ "verify: expected a universe but got " ++ showV ctx ty ++ ", while checking " ++ show tm 
 
-infer :: Ctx -> Core -> TC Val
+infer :: Ctx -> Core -> IO Val
 infer ctx (U l) = return $ VU (l + 1)
 infer ctx c@(Var i) = indexCtx ctx i
 infer ctx (Global x l) = do
@@ -62,13 +61,13 @@ infer ctx c@(App f a) = do
     VPi x t b -> do
       check ctx a t
       return $ vinst b (eval (vs ctx) a)
-    _ -> err $ "not a pi type in " ++ show c ++ ", got " ++ showV ctx fty
+    _ -> error $ "not a pi type in " ++ show c ++ ", got " ++ showV ctx fty
 infer ctx c@(Proj t p) = do
   vt <- infer ctx t
   case (force vt, p) of
     (VSigma x ty c, Fst) -> return ty
     (VSigma x ty c, Snd) -> return $ vinst c (vproj (eval (vs ctx) t) Fst)
-    _ -> err $ "not a sigma type in " ++ show c ++ ", got " ++ showV ctx vt
+    _ -> error $ "not a sigma type in " ++ show c ++ ", got " ++ showV ctx vt
 infer ctx (Let x t v b) = do
   inferUniv ctx t
   let ty = eval (vs ctx) t
@@ -84,10 +83,10 @@ infer ctx tm@(Lower t) = do
   ty <- infer ctx t
   case force ty of
     VLift ty' -> return ty'
-    _ -> err $ "expected lift type in " ++ show tm ++ " but got " ++ showV ctx ty
-infer ctx tm = err $ "verify: cannot infer: " ++ show tm
+    _ -> error $ "expected lift type in " ++ show tm ++ " but got " ++ showV ctx ty
+infer ctx tm = error $ "verify: cannot infer: " ++ show tm
 
-verify :: Core -> TC Core
+verify :: Core -> IO Core
 verify c = do
   ty <- infer empty c
   return $ quote 0 ty

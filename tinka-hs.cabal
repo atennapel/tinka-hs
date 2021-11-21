@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: fa9cc1e15ee71e83b68056e64c39bd6ccd5b43a374ec5262680440d14f3fb027
+-- hash: 3b3bd189b14ee2233114131fc6935e6d22d775eb6f51e995ae0222dbcbab4050
 
 name:           tinka-hs
 version:        0.1.0.0
@@ -38,7 +38,7 @@ executable tinka-hs
       ModuleElaboration
       Parser
       Surface
-      TC
+      Unification
       Val
       Verification
       Paths_tinka_hs
@@ -62,6 +62,7 @@ executable tinka-hs
       ViewPatterns
       BlockArguments
       GADTs
+      ScopedTypeVariables
   ghc-options: -Wall -Wno-name-shadowing -Wno-missing-signatures -Wno-unused-do-bind -Wno-unused-matches -Wno-missing-pattern-synonym-signatures -threaded -rtsopts -with-rtsopts=-N -O
   build-depends:
       base >=4.7 && <5

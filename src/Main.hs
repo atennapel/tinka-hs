@@ -1,13 +1,11 @@
 module Main where
 
 import System.Environment
-import System.Exit
 import Text.Megaparsec (initialPos)
 import System.IO
 import GHC.IO.Encoding
 import Data.List (isPrefixOf)
-import Data.Bifunctor (first)
-import Control.Exception (try, SomeException)
+import Control.Exception (catch, SomeException)
 
 import Surface
 import Ctx
@@ -18,7 +16,6 @@ import Core
 import Evaluation
 import Globals
 import ModuleElaboration
-import TC
 
 main :: IO ()
 main = do
@@ -43,7 +40,7 @@ mainWith getOpt getSurface = do
     ["parse-defs"] -> do
       (t, file) <- parseStdinDefs
       print t
-    ["elab-defs"] -> do
+    ["elab-defs"] -> try $ do
       elabDefs parseStdinDefs
       gs <- getGlobals
       putStrLn $ showElabDefs gs
@@ -66,14 +63,14 @@ repl = do
   hFlush stdout
   inp <- getLine
   case inp of
-    defs | ":let " `isPrefixOf` defs || ":import " `isPrefixOf` defs -> do
+    defs | ":let " `isPrefixOf` defs || ":import " `isPrefixOf` defs -> try $ do
       let prefixN = if ":let " `isPrefixOf` defs then 5 else 1
-      showError (parseStrDefsEither (drop prefixN defs)) $ \ds -> do
-        let xs = imports ds
-        tryIO (loadModules xs) $ \ids -> do
-          showErrorIO (elaborateDefs Nothing ds) $ \nds -> do
-            gs <- getGlobals
-            putStrLn $ showElabDefs $ take (countNames nds + countNames ids) gs
+      ds <- parseStrDefsIO (drop prefixN defs)
+      let xs = imports ds
+      ids <- loadModules xs
+      nds <- elaborateDefs Nothing ds
+      gs <- getGlobals
+      putStrLn $ showElabDefs $ take (countNames nds + countNames ids) gs
     ":globals" -> do
       gs <- getGlobals
       putStrLn $ showElabDefs gs
@@ -86,49 +83,46 @@ repl = do
     ":resetmodules" -> do
       resetModules 
       putStrLn "done"
-    inp -> showError (parseAndElabSurface "(repl)" inp) $ \(c, ty) -> do
+    inp -> try $ do
+      (c, ty) <- parseAndElabSurface "(repl)" inp
       putStrLn $ showC empty ty
       putStrLn $ showC empty c
       putStrLn $ showC empty $ nfWith Full c
   repl
 
-showIOError :: SomeException -> String
-showIOError = show
-
-showError :: Either String t -> (t -> IO ()) -> IO ()
-showError (Left msg) k = putStrLn msg
-showError (Right x) k = k x
-
-showErrorIO :: IO (Either String t) -> (t -> IO ()) -> IO ()
-showErrorIO x k = x >>= flip showError k
-
 tryIO :: IO t -> (t -> IO ()) -> IO ()
-tryIO a = showErrorIO (first showIOError <$> try a)
+tryIO a k = do
+  res <- catch (Right <$> a) $ \(e :: SomeException) -> return $ Left (show e)
+  case res of
+    Left msg -> putStrLn msg
+    Right x -> k x
 
-elabSurface :: String -> Surface -> TC (Core, Core)
+try :: IO () -> IO ()
+try a = tryIO a $ \_ -> return ()
+
+elabSurface :: String -> Surface -> IO (Core, Core)
 elabSurface file t = do
   (tm, ty) <- elaborate (enter (initialPos file) empty) t
   verify tm
   return (tm, ty)
 
-parseAndElabSurface :: String -> String -> Either String (Core, Core)
+parseAndElabSurface :: String -> String -> IO (Core, Core)
 parseAndElabSurface file src = do
-  t <- parseStrEither src
+  t <- parseStrIO src
   elabSurface file t
 
 elab :: IO (Surface, String) -> IO (Core, Core)
 elab getSurface = do
   (t, file) <- getSurface
-  case elabSurface file t of
-    Left msg -> putStrLn msg >> exitSuccess
-    Right res -> return res
+  elabSurface file t
 
 elabDefs :: IO (Defs, String) -> IO ()
 elabDefs getDefs = do
   (ds, file) <- getDefs
   let xs = imports ds
-  tryIO (loadModules xs) $ \ids -> do
-    showErrorIO (elaborateDefs Nothing ds) $ \nds -> return ()
+  ids <- loadModules xs
+  elaborateDefs Nothing ds
+  return ()
 
 showElabDef :: GlobalEntry -> String
 showElabDef (GlobalEntry x etm ety _ _ file) =

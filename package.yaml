@@ -50,6 +50,7 @@ default-extensions:
 - ViewPatterns
 - BlockArguments
 - GADTs
+- ScopedTypeVariables
 
 source-dirs: src
 

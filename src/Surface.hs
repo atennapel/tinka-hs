@@ -140,6 +140,8 @@ fromCore ns (LiftTerm t) = SLiftTerm (fromCore ns t)
 fromCore ns (Lower t) = SLower (fromCore ns t)
 fromCore ns (Con t) = SCon (fromCore ns t)
 fromCore _ Refl = SRefl
+fromCore _ (Meta x) = SVar ("?" ++ show x) 0
+fromCore _ (InsertedMeta x _) = SVar ("?*" ++ show x) 0
 
 data Def
   = Def Name (Maybe Surface) Surface -- name type term

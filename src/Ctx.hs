@@ -9,24 +9,24 @@ import Surface
 import Val
 import Evaluation
 import Globals
-import TC
 
 data Ctx = Ctx {
   lvl :: Lvl,
   ns :: [Name],
   ts :: [Val],
   vs :: Env,
-  pos :: Maybe SourcePos
+  pos :: Maybe SourcePos,
+  bds :: [BD]
 }
 
 empty :: Ctx
-empty = Ctx 0 [] [] [] Nothing
+empty = Ctx 0 [] [] [] Nothing []
 
 define :: Name -> Val -> Val -> Ctx -> Ctx
-define x t v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (v : vs ctx) (pos ctx)
+define x t v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (v : vs ctx) (pos ctx) (Defined : bds ctx)
 
 bind :: Name -> Val -> Ctx -> Ctx
-bind x t ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (pos ctx)
+bind x t ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (pos ctx) (Bound : bds ctx)
 
 enter :: SourcePos -> Ctx -> Ctx
 enter p ctx = ctx { pos = Just p }
@@ -51,31 +51,31 @@ showLocal ctx = let zipped = zip3 (ns ctx) (ts ctx) (vs ctx) in
         y | x == y -> x ++ " : " ++ showV ctx t
         sv -> x ++ " : " ++ showV ctx t ++ " = " ++ sv
 
-lookupVarMaybe :: Ctx -> Name -> TC (Maybe (Ix, Val))
+lookupVarMaybe :: Ctx -> Name -> IO (Maybe (Ix, Val))
 lookupVarMaybe ctx x = go (ns ctx) (ts ctx) 0
   where
-    go :: [Name] -> [Val] -> Ix -> TC (Maybe (Ix, Val))
+    go :: [Name] -> [Val] -> Ix -> IO (Maybe (Ix, Val))
     go [] [] _ = return Nothing
     go (y : _) (ty : _) i | x == y = return $ Just (i, ty)
     go (_ : ns) (_ : ts) i = go ns ts (i + 1)
-    go _ _ _ = undefined
+    go _ _ _ = error "impossible"
 
-lookupVar :: Ctx -> Name -> TC (Ix, Val)
+lookupVar :: Ctx -> Name -> IO (Ix, Val)
 lookupVar ctx x = do
   res <- lookupVarMaybe ctx x
   case res of
     Just e -> return e
-    Nothing -> err $ "undefined variable " ++ x
+    Nothing -> error $ "undefined variable " ++ x
 
-indexCtx :: Ctx -> Ix -> TC Val
+indexCtx :: Ctx -> Ix -> IO Val
 indexCtx ctx = go (ts ctx)
   where
-    go [] i = err $ "undefined var " ++ show i
+    go [] i = error $ "undefined var " ++ show i
     go (ty : _) 0 = return ty
     go (_ : tl) n = go tl (n - 1)
 
-lookupGlobal :: Name -> TC GlobalEntry
+lookupGlobal :: Name -> IO GlobalEntry
 lookupGlobal x = do
   case getGlobal x of
     Just e -> return e
-    Nothing -> err $ "undefined global " ++ x
+    Nothing -> error $ "undefined global " ++ x

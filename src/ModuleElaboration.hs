@@ -2,21 +2,14 @@ module ModuleElaboration (loadModules, loadModule) where
 
 import Globals
 import Surface
-import TC
 import Elaboration
 
 import Control.Monad (foldM)
 import qualified Data.Map as Map
 import Errors (throw)
 
-throwTC :: TC t -> IO t
-throwTC (Left msg) = throw msg
-throwTC (Right x) = return x
-
 elaborateModuleEntry :: ModuleEntry -> IO Defs
-elaborateModuleEntry (ModuleEntry x _ ds) = do
-  res <- elaborateDefs (Just x) ds
-  throwTC res
+elaborateModuleEntry (ModuleEntry x _ ds) = elaborateDefs (Just x) ds
 
 elaborateModules :: [String] -> IO Defs
 elaborateModules order = do

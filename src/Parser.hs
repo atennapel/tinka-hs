@@ -1,4 +1,4 @@
-module Parser (parseStr, parseStrEither, parseStdin, parseStrDefs, parseStdinDefs, parseStrDefsEither) where
+module Parser (parseStr, parseStrIO, parseStdin, parseStrDefs, parseStdinDefs, parseStrDefsIO) where
 
 import Control.Applicative hiding (many, some)
 import Control.Monad
@@ -201,6 +201,11 @@ parseStrEither src = case parse pSrc "(stdin)" src of
   Left e -> Left (errorBundlePretty e)
   Right t -> return t
 
+parseStrIO :: String -> IO Surface
+parseStrIO src = case parseStrEither src of
+  Left e -> error e
+  Right t -> return t
+
 parseStdin :: IO (Surface, String)
 parseStdin = do
   src <- getContents
@@ -248,6 +253,11 @@ parseStrDefs src =
 parseStrDefsEither :: String -> Either String Defs
 parseStrDefsEither src = case parse pDefs "(stdin)" src of
   Left e -> Left (errorBundlePretty e)
+  Right t -> return t
+
+parseStrDefsIO :: String -> IO Defs
+parseStrDefsIO src = case parseStrDefsEither src of
+  Left e -> error e
   Right t -> return t
 
 parseStdinDefs :: IO (Defs, String)

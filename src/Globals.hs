@@ -87,7 +87,7 @@ fetchModule :: String -> IO ModuleEntry
 fetchModule s = do
   inp <- readFile (handleFilename s)
   let name = normalizeModuleName s
-  ds <- eitherToIO $ parseStrDefsEither inp
+  ds <- parseStrDefsIO inp
   return $ ModuleEntry name (depsFromDefs ds) ds
 
 fetchModules :: String -> ModuleMap -> IO ([String], ModuleMap)
