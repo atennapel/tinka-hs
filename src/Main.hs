@@ -103,7 +103,7 @@ try a = tryIO a $ \_ -> return ()
 elabSurface :: String -> Surface -> IO (Core, Core)
 elabSurface file t = do
   (tm, ty) <- elaborate (enter (initialPos file) empty) t
-  verify tm
+  -- verify tm
   return (tm, ty)
 
 parseAndElabSurface :: String -> String -> IO (Core, Core)

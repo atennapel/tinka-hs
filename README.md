@@ -73,7 +73,9 @@ TODO:
   - [x] handle double imports (topological sort of imports)
   - [x] do not exit REPL on module cycles
   - [x] store what file globals come from, improve duplicate global error message
-- [ ] metas, unification and _ solving
+- [x] metas, unification and _ solving
+  - [ ] typed metas
+  - [ ] expand elaboration to use more metas
   - [ ] named holes
   - [ ] implicit function types
 - [ ] parser for post-fix projections

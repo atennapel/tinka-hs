@@ -1,0 +1,2 @@
+id : (A : Type) -> A -> A = \A x. x;
+the = id;

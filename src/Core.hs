@@ -1,6 +1,11 @@
-module Core (Core(..), BD(..), liftUniv, PrimName(..), PrimElimName(..), toPrimName, toPrimElimName, PrimElimPosition(..), primElimPosition) where
+module Core (Core(..), BD(..), liftUniv, PrimName(..), PrimElimName(..), toPrimName, toPrimElimName, PrimElimPosition(..), primElimPosition, allMetas, expandMetas) where
 
 import Common
+
+import qualified Data.Set as S
+import Data.Set (Set)
+import Data.List (elemIndex)
+import Data.Maybe (fromJust)
 
 data PrimName
   = PVoid
@@ -71,7 +76,7 @@ primElimPosition PEall = PEPFirst
 primElimPosition _ = PEPLast
 
 data BD = Bound | Defined
-  deriving Show
+  deriving (Show, Eq)
 
 data Core
   = Var Ix
@@ -146,3 +151,48 @@ liftUniv l (Con t) = Con (liftUniv l t)
 liftUniv _ Refl = Refl
 liftUniv _ c@(Meta _) = c
 liftUniv _ c@(InsertedMeta _ _) = c
+
+allMetas :: Core -> Set MetaVar
+allMetas (Meta x) = S.singleton x
+allMetas (InsertedMeta x _) = S.singleton x
+allMetas (App a b) = S.union (allMetas a) (allMetas b)
+allMetas (Abs _ b) = allMetas b
+allMetas (Pi x t b) = S.union (allMetas t) (allMetas b)
+allMetas (Sigma x t b) = S.union (allMetas t) (allMetas b)
+allMetas (Pair t b) = S.union (allMetas t) (allMetas b)
+allMetas (Proj t _) = allMetas t
+allMetas (Let _ t v b) = S.union (allMetas t) $ S.union (allMetas v) (allMetas b)
+allMetas (Lift t) = allMetas t
+allMetas (LiftTerm t) = allMetas t
+allMetas (Lower t) = allMetas t
+allMetas (Con t) = allMetas t
+allMetas _ = S.empty
+
+expandMetas :: [MetaVar] -> Core -> Core
+expandMetas ms c = go 0 c
+  where
+    go :: Lvl -> Core -> Core
+    go l (Meta x) = goMeta l x
+    go l (InsertedMeta x bds) =
+      let as = concatMap (\(i, bd) -> [Var i | bd == Bound]) $ zip [0..] bds in
+      foldr (flip App) (goMeta l x) as
+    go l (U l') = U l'
+    go l c@(Var _) = c
+    go l (Global x l') = Global x l'
+    go l (Prim x l') = Prim x l'
+    go l (PrimElim x l' k) = PrimElim x l' k
+    go l (App a b) = App (go l a) (go l b)
+    go l (Abs x b) = Abs x (go (l + 1) b)
+    go l (Pi x t b) = Pi x (go l t) (go (l + 1) b)
+    go l (Sigma x t b) = Sigma x (go l t) (go (l + 1) b)
+    go l (Pair a b) = Pair (go l a) (go l b)
+    go l (Proj t p) = Proj (go l t) p
+    go l (Let x t v b) = Let x (go l t) (go l v) (go (l + 1) b)
+    go l (Lift t) = Lift (go l t)
+    go l (LiftTerm t) = LiftTerm (go l t)
+    go l (Lower t) = Lower (go l t)
+    go l (Con t) = Con (go l t)
+    go _ Refl = Refl
+
+    goMeta :: Lvl -> MetaVar -> Core
+    goMeta l x = let i = fromJust (elemIndex x ms) in Var (l + length ms - i - 1)

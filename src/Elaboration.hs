@@ -38,7 +38,7 @@ check ctx tm ty = do
   let fty = force ty
   case (tm, {-trace ("check (" ++ show tm ++ ") : " ++ showV ctx ty ++ " ~> " ++ showV ctx fty) $ -}fty) of
     (SPos p s, _) -> check (enter p ctx) s ty
-    (SHole, _) -> error $ "hole encountered: " ++ showV ctx ty ++ "\n\n" ++ showLocal ctx
+    (SHole, _) -> freshMeta ctx
     (SAbs x b, VPi x' ty b') -> do
       cb <- check (bind x ty ctx) b (vinst b' $ vvar (lvl ctx))
       return $ Abs x cb
@@ -159,16 +159,27 @@ infer ctx tm@(SLower t) = do
   case force ty of
     VLift ty' -> return (Lower c, ty')
     _ -> error $ "expected lift type in " ++ show tm ++ " but got " ++ showV ctx ty
+infer ctx SHole = do
+  a <- eval (vs ctx) <$> freshMeta ctx
+  t <- freshMeta ctx
+  return (t, a)
 infer ctx s = error $ "unable to infer " ++ show s
+
+includeMetas :: Core -> [MetaVar] -> Core
+includeMetas t [] = t
+includeMetas t (m : ms) =
+  case lookupMeta m of
+    Unsolved -> error $ "unsolved meta: ?" ++ show m
+    Solved _ c _ -> Let ("?" ++ show m) (U 0) c (includeMetas t ms) -- TODO: typed metas
 
 elaborate :: Ctx -> Surface -> IO (Core, Core)
 elaborate ctx s = do
+  reset
   (c, ty) <- infer ctx s
-  return (c, quote 0 ty)
-
-reduceExpectedLet :: Core -> Core
-reduceExpectedLet (Let _ _ tm _) = tm
-reduceExpectedLet tm = tm
+  order <- orderMetas
+  let c' = includeMetas (expandMetas order c) order
+  let ty' = nf $ includeMetas (expandMetas order (quote 0 ty)) order
+  return (c', ty')
 
 elaborateDefDef :: Maybe String -> Name -> Maybe Surface -> Surface -> IO GlobalEntry
 elaborateDefDef mod x ty tm =
@@ -176,9 +187,8 @@ elaborateDefDef mod x ty tm =
     Just e | x /= "_" ->
       error $ "cannot redefine global " ++ maybe "" (++ ".") (gmodule e) ++ x ++ " as " ++ maybe "" (++ ".") mod ++ x
     _ -> do
-      (etm', ety) <- elaborate empty (SLet x ty tm (SVar x 0))
-      verify etm'
-      let etm = reduceExpectedLet etm'
+      (etm, ety) <- elaborate empty (SLet x ty tm (SVar x 0))
+      -- verify etm
       return $ GlobalEntry x etm ety (eval [] etm) (eval [] ety) mod
 
 elaborateDef :: Maybe String -> Def -> IO Defs

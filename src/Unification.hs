@@ -78,8 +78,10 @@ solve :: Lvl -> MetaVar -> Spine -> Val -> IO ()
 solve gamma m sp rhs = do
   pren <- invert gamma sp
   rhs <- rename m pren rhs
-  let solution = eval [] $ lams (dom pren) rhs
-  modifyIORef' mcxt $ IM.insert (unMetaVar m) (Solved solution)
+  let core = lams (dom pren) rhs
+  let deps = allMetas core
+  let solution = eval [] core
+  modifyIORef' mcxt $ IM.insert (unMetaVar m) (Solved deps core solution)
 
 unifyLift :: Lvl -> Clos -> Clos -> IO ()
 unifyLift k c c' = let v = vvar k in unify (k + 1) (vinst c v) (vinst c' v)

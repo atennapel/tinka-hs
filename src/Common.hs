@@ -10,7 +10,7 @@ type ULvl = Int
 data ProjType = Fst | Snd
   deriving (Eq)
 
-newtype MetaVar = MetaVar { unMetaVar :: Int } deriving (Eq, Show, Num) via Int
+newtype MetaVar = MetaVar { unMetaVar :: Int } deriving (Eq, Show, Num, Ord) via Int
 
 test :: Bool -> String -> IO ()
 test False msg = error msg
