@@ -7,6 +7,7 @@ import Evaluation
 import Metas
 
 import qualified Data.IntMap as IM
+import qualified Data.Set as S
 import Data.IORef
 import Control.Exception (catch, SomeException)
 
@@ -79,9 +80,12 @@ solve gamma m sp rhs = do
   pren <- invert gamma sp
   rhs <- rename m pren rhs
   let core = lams (dom pren) rhs
-  let deps = allMetas core
   let solution = eval [] core
-  modifyIORef' mcxt $ IM.insert (unMetaVar m) (Solved deps core solution)
+  case lookupMeta m of
+    Solved {} -> error $ "meta is already solved: ?" ++ show m
+    Unsolved c t -> do
+      let deps = S.union (allMetas core) (allMetas c)  
+      modifyIORef' mcxt $ IM.insert (unMetaVar m) (Solved deps c t core solution)
 
 unifyLift :: Lvl -> Clos -> Clos -> IO ()
 unifyLift k c c' = let v = vvar k in unify (k + 1) (vinst c v) (vinst c' v)

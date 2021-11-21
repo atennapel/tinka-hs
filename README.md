@@ -74,7 +74,7 @@ TODO:
   - [x] do not exit REPL on module cycles
   - [x] store what file globals come from, improve duplicate global error message
 - [x] metas, unification and _ solving
-  - [ ] typed metas
+  - [x] typed metas
   - [ ] expand elaboration to use more metas
   - [ ] named holes
   - [ ] implicit function types

@@ -19,7 +19,7 @@ check ctx c ty =
       _ <- inferUniv ctx t
       let pty = eval (vs ctx) t
       _ <- check ctx v ty
-      check (define x pty (eval (vs ctx) v) ctx) b ty
+      check (define x t pty v (eval (vs ctx) v) ctx) b ty
     (Lift t, VU l) | l > 0 -> check ctx t (VU (l - 1))
     (LiftTerm t, VLift ty) -> check ctx t ty
     (Lower t, ty) -> check ctx t (VLift ty)
@@ -72,7 +72,7 @@ infer ctx (Let x t v b) = do
   inferUniv ctx t
   let ty = eval (vs ctx) t
   check ctx v ty
-  infer (define x ty (eval (vs ctx) v) ctx) b
+  infer (define x t ty v (eval (vs ctx) v) ctx) b
 infer ctx (Lift t) = do
   l <- inferUniv ctx t
   return $ VU (l + 1)

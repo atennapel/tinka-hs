@@ -11,7 +11,7 @@ import qualified Data.Set as S
 import Data.Set (Set)
 import Data.Bifunctor (first, second)
 
-data MetaEntry = Solved (Set MetaVar) Core Val | Unsolved
+data MetaEntry = Solved (Set MetaVar) Core Val Core Val | Unsolved Core Val
 
 type MetaMap = IM.IntMap MetaEntry
 
@@ -36,11 +36,11 @@ reset = do
   writeIORef mcxt mempty
 
 metadeps :: MetaEntry -> Set MetaVar
-metadeps (Solved deps _ _) = deps
-metadeps Unsolved = S.empty
+metadeps (Solved deps _ _ _ _) = deps
+metadeps (Unsolved _ _) = S.empty
 
 removeDep :: MetaVar -> MetaEntry -> MetaEntry
-removeDep y (Solved deps core sol) = Solved (y `S.delete` deps) core sol
+removeDep y (Solved deps ct cv core sol) = Solved (y `S.delete` deps) ct cv core sol
 removeDep _ e = e
 
 allNoDeps :: MetaMap -> [(MetaVar, MetaEntry)]

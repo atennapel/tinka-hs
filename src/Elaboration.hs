@@ -16,11 +16,13 @@ import Data.IORef
 
 -- import Debug.Trace (trace)
 
-freshMeta :: Ctx -> IO Core
-freshMeta ctx = do
+freshMeta :: Ctx -> Val -> IO Core
+freshMeta ctx a = do
   m <- readIORef nextMeta
   writeIORef nextMeta (m + 1)
-  modifyIORef' mcxt $ IM.insert m Unsolved
+  let closed = closeType (path ctx) (quote (lvl ctx) a)
+  let closedv = eval [] closed
+  modifyIORef' mcxt $ IM.insert m (Unsolved closed closedv)
   pure $ InsertedMeta (MetaVar m) (bds ctx)
 
 checkOrInfer :: Ctx -> Surface -> Maybe Surface -> IO (Core, Core, Val)
@@ -38,7 +40,7 @@ check ctx tm ty = do
   let fty = force ty
   case (tm, {-trace ("check (" ++ show tm ++ ") : " ++ showV ctx ty ++ " ~> " ++ showV ctx fty) $ -}fty) of
     (SPos p s, _) -> check (enter p ctx) s ty
-    (SHole, _) -> freshMeta ctx
+    (SHole, _) -> freshMeta ctx ty
     (SAbs x b, VPi x' ty b') -> do
       cb <- check (bind x ty ctx) b (vinst b' $ vvar (lvl ctx))
       return $ Abs x cb
@@ -48,7 +50,7 @@ check ctx tm ty = do
       return $ Pair ta tb
     (SLet x t v b, _) -> do
       (cv, ct, pty) <- checkOrInfer ctx v t
-      cb <- check (define x pty (eval (vs ctx) cv) ctx) b ty
+      cb <- check (define x ct pty cv (eval (vs ctx) cv) ctx) b ty
       return $ Let x ct cv cb
     (SLift t, VU l) | l > 0 -> do
       c <- check ctx t (VU (l - 1))
@@ -146,7 +148,7 @@ infer ctx c@(SProj t p) = do
     _ -> error $ "not a sigma type in " ++ show c ++ ", got " ++ showV ctx vt
 infer ctx (SLet x t v b) = do
   (cv, ct, ty) <- checkOrInfer ctx v t
-  (cb, rty) <- infer (define x ty (eval (vs ctx) cv) ctx) b
+  (cb, rty) <- infer (define x ct ty cv (eval (vs ctx) cv) ctx) b
   return (Let x ct cv cb, rty)
 infer ctx (SLift t) = do
   (c, l) <- inferUniv ctx t
@@ -160,25 +162,32 @@ infer ctx tm@(SLower t) = do
     VLift ty' -> return (Lower c, ty')
     _ -> error $ "expected lift type in " ++ show tm ++ " but got " ++ showV ctx ty
 infer ctx SHole = do
-  a <- eval (vs ctx) <$> freshMeta ctx
-  t <- freshMeta ctx
+  a <- eval (vs ctx) <$> freshMeta ctx (VU 0) -- TODO: universe metas
+  t <- freshMeta ctx a
   return (t, a)
 infer ctx s = error $ "unable to infer " ++ show s
 
-includeMetas :: Core -> [MetaVar] -> Core
-includeMetas t [] = t
-includeMetas t (m : ms) =
-  case lookupMeta m of
-    Unsolved -> error $ "unsolved meta: ?" ++ show m
-    Solved _ c _ -> Let ("?" ++ show m) (U 0) c (includeMetas t ms) -- TODO: typed metas
+includeMetas :: [MetaVar] -> Core -> Core
+includeMetas order t = go [] order
+  where
+    go :: [MetaVar] -> [MetaVar] -> Core
+    go partial [] = expandMetas order t
+    go partial (m : ms) =
+      case lookupMeta m of
+        Unsolved _ _ -> error $ "unsolved meta: ?" ++ show m
+        Solved _ ct _ c _ ->
+          let expandedType = expandMetas partial ct in
+          let expandedValue = expandMetas partial c in
+          Let ("?" ++ show m) expandedType expandedValue (go (partial ++ [m]) ms)
 
 elaborate :: Ctx -> Surface -> IO (Core, Core)
 elaborate ctx s = do
   reset
   (c, ty) <- infer ctx s
   order <- orderMetas
-  let c' = includeMetas (expandMetas order c) order
-  let ty' = nf $ includeMetas (expandMetas order (quote 0 ty)) order
+  let c' = includeMetas order c
+  let ty' = nf $ includeMetas order (quote 0 ty)
+  verify c'
   return (c', ty')
 
 elaborateDefDef :: Maybe String -> Name -> Maybe Surface -> Surface -> IO GlobalEntry
@@ -188,7 +197,6 @@ elaborateDefDef mod x ty tm =
       error $ "cannot redefine global " ++ maybe "" (++ ".") (gmodule e) ++ x ++ " as " ++ maybe "" (++ ".") mod ++ x
     _ -> do
       (etm, ety) <- elaborate empty (SLet x ty tm (SVar x 0))
-      -- verify etm
       return $ GlobalEntry x etm ety (eval [] etm) (eval [] ety) mod
 
 elaborateDef :: Maybe String -> Def -> IO Defs

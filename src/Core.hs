@@ -1,4 +1,4 @@
-module Core (Core(..), BD(..), liftUniv, PrimName(..), PrimElimName(..), toPrimName, toPrimElimName, PrimElimPosition(..), primElimPosition, allMetas, expandMetas) where
+module Core (Core(..), BD(..), liftUniv, PrimName(..), PrimElimName(..), toPrimName, toPrimElimName, PrimElimPosition(..), primElimPosition, allMetas, expandMetas, Path(..), closeType) where
 
 import Common
 
@@ -196,3 +196,15 @@ expandMetas ms c = go 0 c
 
     goMeta :: Lvl -> MetaVar -> Core
     goMeta l x = let i = fromJust (elemIndex x ms) in Var (l + length ms - i - 1)
+
+data Path
+  = Here
+  | Define Path Name Core Core
+  | Bind Path Name Core
+  deriving Show
+
+closeType :: Path -> Core -> Core
+closeType mcl b = case mcl of
+  Here -> b
+  Bind mcl x a -> closeType mcl (Pi x a b)
+  Define mcl x a t -> closeType mcl (Let x a t b)

@@ -16,17 +16,18 @@ data Ctx = Ctx {
   ts :: [Val],
   vs :: Env,
   pos :: Maybe SourcePos,
-  bds :: [BD]
+  bds :: [BD],
+  path :: Path
 }
 
 empty :: Ctx
-empty = Ctx 0 [] [] [] Nothing []
+empty = Ctx 0 [] [] [] Nothing [] Here
 
-define :: Name -> Val -> Val -> Ctx -> Ctx
-define x t v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (v : vs ctx) (pos ctx) (Defined : bds ctx)
+define :: Name -> Core -> Val -> Core -> Val -> Ctx -> Ctx
+define x a t c v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (v : vs ctx) (pos ctx) (Defined : bds ctx) (Define (path ctx) x a c)
 
 bind :: Name -> Val -> Ctx -> Ctx
-bind x t ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (pos ctx) (Bound : bds ctx)
+bind x t ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (pos ctx) (Bound : bds ctx) (Bind (path ctx) x (quote (lvl ctx) t))
 
 enter :: SourcePos -> Ctx -> Ctx
 enter p ctx = ctx { pos = Just p }

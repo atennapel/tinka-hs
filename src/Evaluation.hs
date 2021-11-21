@@ -118,8 +118,8 @@ vall l k d x p pp xs = vprimelim PEall l k [x, p, pp, xs] d
 force :: Val -> Val
 force m@(VNe (HMeta x) sp) =
   case lookupMeta x of
-    Solved _ _ v -> force (vappSp v sp)
-    Unsolved -> m
+    Solved _ _ _ _ v -> force (vappSp v sp)
+    Unsolved _ _ -> m
 force (VGlobal _ _ _ v) = force v
 force v = v
 
