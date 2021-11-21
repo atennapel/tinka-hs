@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0400a4cc5614504da7ef31d9945a4538f0d16d359697c891a598da32e177772b
+-- hash: fa9cc1e15ee71e83b68056e64c39bd6ccd5b43a374ec5262680440d14f3fb027
 
 name:           tinka-hs
 version:        0.1.0.0
@@ -34,6 +34,7 @@ executable tinka-hs
       Errors
       Evaluation
       Globals
+      Metas
       ModuleElaboration
       Parser
       Surface

@@ -108,6 +108,13 @@ force :: Val -> Val
 force (VGlobal _ _ _ v) = force v
 force v = v
 
+vAppBDs :: Env -> Val -> [BD] -> Val
+vAppBDs env ~v bds = case (env, bds) of
+  ([]       , []            ) -> v
+  (env :> t , bds :> Bound  ) -> vAppBDs env v bds `vApp` t
+  (env :> t , bds :> Defined) -> vAppBDs env v bds
+  _                           -> error "impossible"
+
 eval :: Env -> Core -> Val
 eval e (Var i) = e !! i
 eval e (Global x l) =
@@ -130,6 +137,8 @@ eval e (LiftTerm t) = vliftterm (eval e t)
 eval e (Lower t) = vlower (eval e t)
 eval e (Con t) = VCon (eval e t)
 eval e Refl = VRefl
+eval e (Meta x) = VMeta x
+eval e (InsertedMeta x bds) = vAppBDs env (VMeta x) bds
 
 evalprimelim :: PrimElimName -> ULvl -> ULvl -> Val
 evalprimelim PEBool l k =

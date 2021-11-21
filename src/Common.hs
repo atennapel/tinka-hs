@@ -7,3 +7,5 @@ type ULvl = Int
 
 data ProjType = Fst | Snd
   deriving (Eq)
+
+newtype MetaVar = MetaVar { unMetaVar :: Int } deriving (Eq, Show, Num) via Int

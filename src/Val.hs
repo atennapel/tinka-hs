@@ -10,7 +10,7 @@ data Clos
   = Clos Env Core
   | Fun (Val -> Val)
 
-data Head = HVar Lvl | HPrim PrimName ULvl
+data Head = HVar Lvl | HPrim PrimName ULvl | HMeta MetaVar
   deriving (Eq)
 
 data Elim
@@ -31,6 +31,9 @@ data Val
   | VLiftTerm Val
   | VCon Val
   | VRefl
+
+pattern VVar x = VNe (HVar x) []
+pattern VMeta x = VNe (HMeta x) []
 
 vpi :: Name -> Val -> (Val -> Val) -> Val
 vpi x a b = VPi x a (Fun b)

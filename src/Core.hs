@@ -1,4 +1,4 @@
-module Core (Core(..), liftUniv, PrimName(..), PrimElimName(..), toPrimName, toPrimElimName, PrimElimPosition(..), primElimPosition) where
+module Core (Core(..), BD(..), liftUniv, PrimName(..), PrimElimName(..), toPrimName, toPrimElimName, PrimElimPosition(..), primElimPosition) where
 
 import Common
 
@@ -70,6 +70,9 @@ primElimPosition PEAll = PEPFirst
 primElimPosition PEall = PEPFirst
 primElimPosition _ = PEPLast
 
+data BD = Bound | Defined
+  deriving Show
+
 data Core
   = Var Ix
   | Global Name ULvl
@@ -88,6 +91,8 @@ data Core
   | Lower Core
   | Con Core
   | Refl
+  | Meta MetaVar
+  | InsertedMeta MetaVar [BD]
 
 showProjType :: ProjType -> String
 showProjType Fst = ".1"
@@ -118,6 +123,8 @@ instance Show Core where
   show (Lower t) = "(lower " ++ show t ++ ")"
   show (Con t) = "(Con " ++ show t ++ ")"
   show Refl = "Refl"
+  show (Meta x) = "?" ++ show x
+  show (InsertedMeta x _) = "?*" ++ show x
 
 liftUniv :: ULvl -> Core -> Core
 liftUniv l (U l') = U (l + l')
@@ -137,3 +144,5 @@ liftUniv l (LiftTerm t) = LiftTerm (liftUniv l t)
 liftUniv l (Lower t) = Lower (liftUniv l t)
 liftUniv l (Con t) = Con (liftUniv l t)
 liftUniv _ Refl = Refl
+liftUniv _ c@(Meta _) = c
+liftUniv _ c@(InsertedMeta _ _) = c
