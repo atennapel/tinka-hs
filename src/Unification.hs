@@ -11,6 +11,8 @@ import qualified Data.Set as S
 import Data.IORef
 import Control.Exception (catch, SomeException)
 
+-- import Debug.Trace (trace)
+
 data PR = PR {
   dom :: Lvl,
   cod :: Lvl,

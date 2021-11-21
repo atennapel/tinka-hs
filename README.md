@@ -75,8 +75,9 @@ TODO:
   - [x] store what file globals come from, improve duplicate global error message
 - [x] metas, unification and _ solving
   - [x] typed metas
-  - [ ] expand elaboration to use more metas
+  - [x] expand elaboration to use more metas
   - [ ] named holes
+  - [ ] universe metas
   - [ ] implicit function types
 - [ ] parser for post-fix projections
 - [ ] parser for unit type () and nested units []

@@ -120,11 +120,15 @@ infer ctx (SPrimElim x l k) = do
     Nothing -> error $ "undefined primitive " ++ x
 infer ctx c@(SApp f a) = do
   (cf, fty) <- infer ctx f
-  case force fty of
-    VPi x t b -> do
-      ca <- check ctx a t
-      return (App cf ca, vinst b (eval (vs ctx) ca))
-    _ -> error $ "not a pi type in " ++ show c ++ ", got " ++ showV ctx fty
+  (t, b) <- case force fty of
+    VPi x t b -> return (t, b)
+    tty -> do
+      a <- eval (vs ctx) <$> freshMeta ctx (VU 0) -- TODO: universe metas
+      b <- Clos (vs ctx) <$> freshMeta (bind "x" a ctx) (VU 0) -- TODO: universe metas
+      unify (lvl ctx) tty (VPi "x" a b)
+      return (a, b)
+  ca <- check ctx a t
+  return (App cf ca, vinst b (eval (vs ctx) ca))
 infer ctx (SPi x t b) = do
   (ct, l1) <- inferUniv ctx t
   let ty = eval (vs ctx) ct
@@ -165,6 +169,10 @@ infer ctx SHole = do
   a <- eval (vs ctx) <$> freshMeta ctx (VU 0) -- TODO: universe metas
   t <- freshMeta ctx a
   return (t, a)
+infer ctx (SAbs x b) = do
+  a <- eval (vs ctx) <$> freshMeta ctx (VU 0) -- TODO: universe metas
+  (cb, rty) <- infer (bind x a ctx) b
+  return (Abs x cb, VPi x a $ closeVal ctx rty)
 infer ctx s = error $ "unable to infer " ++ show s
 
 includeMetas :: [MetaVar] -> Core -> Core
