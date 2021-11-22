@@ -10,6 +10,7 @@ import Evaluation
 import Globals
 import Metas
 import Unification
+import Data.List (intercalate)
 
 import qualified Data.IntMap as IM
 import Data.IORef
@@ -213,13 +214,23 @@ includeMetas order t = go [] order
           let expandedValue = expandMetas partial c in
           Let ("?" ++ show m) expandedType expandedValue (go (partial ++ [m]) ms)
 
+showMetaEntry :: Int -> MetaEntry -> String
+showMetaEntry x (Unsolved ct vt) = "?" ++ show x ++ " : " ++ showC empty ct
+showMetaEntry x (Solved _ ct vt c v) = "?" ++ show x ++ " : " ++ showC empty ct ++ " = " ++ showC empty c
+
+showMetas :: IO ()
+showMetas = do
+  ms <- readIORef mcxt
+  putStrLn $ intercalate "\n" $ map (uncurry showMetaEntry) $ IM.assocs ms
+  return ()
+
 showHoles :: HoleMap -> IO ()
-showHoles [] = return ()
+showHoles [] = showMetas
 showHoles ((x, HoleEntry ctx tm ty) : t) = do
+  showHoles t
+  putStrLn ""
   putStrLn $ "hole _" ++ x ++ " : " ++ showV ctx ty ++ " = " ++ showC ctx tm
   putStrLn $ showLocal ctx
-  putStrLn ""
-  showHoles t
 
 elaborate :: Ctx -> Surface -> IO (Core, Core)
 elaborate ctx s = do
@@ -227,8 +238,8 @@ elaborate ctx s = do
   resetHoles
   (c, ty) <- infer ctx s
   hs <- readIORef holes
-  showHoles (reverse hs)
-  test (null hs) $ "holes found: " ++ show (map fst $ reverse hs)
+  showHoles hs
+  test (null hs) $ "\nholes found: " ++ show (map fst $ reverse hs)
   order <- orderMetas
   let c' = includeMetas order c
   let ty' = nf $ includeMetas order (quote 0 ty)

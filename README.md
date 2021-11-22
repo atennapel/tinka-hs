@@ -77,7 +77,8 @@ TODO:
   - [x] typed metas
   - [x] expand elaboration to use more metas
   - [x] named holes
-  - [ ] show meta context when printing holes
+  - [x] show meta context when printing holes
+  - [ ] metas-as-globals if a file is elaborated
   - [ ] pruning
   - [ ] universe metas
   - [ ] implicit function types
