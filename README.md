@@ -76,9 +76,12 @@ TODO:
 - [x] metas, unification and _ solving
   - [x] typed metas
   - [x] expand elaboration to use more metas
-  - [ ] named holes
+  - [x] named holes
+  - [ ] pruning
   - [ ] universe metas
   - [ ] implicit function types
+  - [ ] improve unification error messages
+  - [ ] avoid SomeException, use throw and throwIO
 - [ ] parser for post-fix projections
 - [ ] parser for unit type () and nested units []
 - [ ] named sigma projection

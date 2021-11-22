@@ -13,9 +13,30 @@ import Unification
 
 import qualified Data.IntMap as IM
 import Data.IORef
+import System.IO.Unsafe
 
 -- import Debug.Trace (trace)
 
+-- holes
+data HoleEntry = HoleEntry Ctx Core Val
+
+type HoleMap = [(Name, HoleEntry)]
+
+holes :: IORef HoleMap
+holes = unsafeDupablePerformIO $ newIORef mempty
+{-# noinline holes #-}
+
+resetHoles :: IO ()
+resetHoles = writeIORef holes mempty
+
+addHole :: Name -> Ctx -> Core -> Val -> IO ()
+addHole x ctx tm ty = do
+  hs <- readIORef holes
+  case lookup x hs of
+    Just _ -> error $ "duplicate hole _" ++ x
+    Nothing -> writeIORef holes ((x, HoleEntry ctx tm ty) : hs)
+
+-- elaboration
 freshMeta :: Ctx -> Val -> IO Core
 freshMeta ctx a = do
   m <- readIORef nextMeta
@@ -40,7 +61,10 @@ check ctx tm ty = do
   let fty = force ty
   case (tm, {-trace ("check (" ++ show tm ++ ") : " ++ showV ctx ty ++ " ~> " ++ showV ctx fty) $ -}fty) of
     (SPos p s, _) -> check (enter p ctx) s ty
-    (SHole, _) -> freshMeta ctx ty
+    (SHole x, _) -> do
+      tm <- freshMeta ctx ty
+      maybe (return ()) (\x -> addHole x ctx tm ty) x
+      return tm
     (SAbs x b, VPi x' ty b') -> do
       cb <- check (bind x ty ctx) b (vinst b' $ vvar (lvl ctx))
       return $ Abs x cb
@@ -165,9 +189,10 @@ infer ctx tm@(SLower t) = do
   case force ty of
     VLift ty' -> return (Lower c, ty')
     _ -> error $ "expected lift type in " ++ show tm ++ " but got " ++ showV ctx ty
-infer ctx SHole = do
+infer ctx (SHole x) = do
   a <- eval (vs ctx) <$> freshMeta ctx (VU 0) -- TODO: universe metas
   t <- freshMeta ctx a
+  maybe (return ()) (\x -> addHole x ctx t a) x
   return (t, a)
 infer ctx (SAbs x b) = do
   a <- eval (vs ctx) <$> freshMeta ctx (VU 0) -- TODO: universe metas
@@ -188,10 +213,22 @@ includeMetas order t = go [] order
           let expandedValue = expandMetas partial c in
           Let ("?" ++ show m) expandedType expandedValue (go (partial ++ [m]) ms)
 
+showHoles :: HoleMap -> IO ()
+showHoles [] = return ()
+showHoles ((x, HoleEntry ctx tm ty) : t) = do
+  putStrLn $ "hole _" ++ x ++ " : " ++ showV ctx ty ++ " = " ++ showC ctx tm
+  putStrLn $ showLocal ctx
+  putStrLn ""
+  showHoles t
+
 elaborate :: Ctx -> Surface -> IO (Core, Core)
 elaborate ctx s = do
   reset
+  resetHoles
   (c, ty) <- infer ctx s
+  hs <- readIORef holes
+  showHoles (reverse hs)
+  test (null hs) $ error "holes found"
   order <- orderMetas
   let c' = includeMetas order c
   let ty' = nf $ includeMetas order (quote 0 ty)

@@ -121,11 +121,18 @@ pCon = do
   symbol "Con"
   SCon <$> pSurface
 
+pHole :: Parser Surface
+pHole = do
+  C.char '_'
+  x <- optional (takeWhile1P Nothing isAlphaNum)
+  ws
+  return $ SHole x
+
 pAtom :: Parser Surface
 pAtom =
   withPos (
     (SU <$> pType) <|>
-    (SHole <$ symbol "_") <|>
+    pHole <|>
     (SRefl <$ symbol "Refl") <|>
     (uncurry SVar <$> pIdent))
   <|> pProj

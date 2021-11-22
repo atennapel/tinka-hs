@@ -19,7 +19,7 @@ data Surface
   | SU ULvl
   | SLet Name (Maybe Surface) Surface Surface
   | SPos SourcePos Surface
-  | SHole
+  | SHole (Maybe Name)
   | SLift Surface
   | SLiftTerm Surface
   | SLower Surface
@@ -29,7 +29,7 @@ data Surface
 isSimple :: Surface -> Bool
 isSimple (SVar _ _) = True
 isSimple (SU _) = True
-isSimple SHole = True
+isSimple (SHole _) = True
 isSimple (SPair _ _) = True
 isSimple SRefl = True
 isSimple (SPos _ s) = isSimple s
@@ -94,7 +94,7 @@ instance Show Surface where
   show (SPrimElim x l k) = "elim " ++ x ++ "^" ++ show l ++ (if k == 0 then "" else " " ++ show k)
   show (SU 0) = "Type"
   show (SU l) = "Type" ++ show l
-  show SHole = "_"
+  show (SHole x) = "_" ++ maybe "" id x
   show s@(SApp f a) =
     let (f', as) = flattenApp s in
     showS f' ++ " " ++ unwords (map showS as)
