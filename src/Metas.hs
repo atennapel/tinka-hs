@@ -23,6 +23,13 @@ mcxt :: IORef MetaMap
 mcxt = unsafeDupablePerformIO $ newIORef mempty
 {-# noinline mcxt #-}
 
+newMeta :: Core -> Val -> IO MetaVar
+newMeta c a = do
+  m <- readIORef nextMeta
+  writeIORef nextMeta $! m + 1
+  modifyIORef mcxt $ IM.insert m (Unsolved c a)
+  return $ MetaVar m
+
 lookupMeta :: MetaVar -> MetaEntry
 lookupMeta (MetaVar m) = unsafeDupablePerformIO $ do
   ms <- readIORef mcxt

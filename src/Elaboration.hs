@@ -40,12 +40,10 @@ addHole x ctx tm ty = do
 -- elaboration
 freshMeta :: Ctx -> Val -> IO Core
 freshMeta ctx a = do
-  m <- readIORef nextMeta
-  writeIORef nextMeta (m + 1)
   let closed = closeType (path ctx) (quote (lvl ctx) a)
   let closedv = eval [] closed
-  modifyIORef' mcxt $ IM.insert m (Unsolved closed closedv)
-  pure $ InsertedMeta (MetaVar m) (bds ctx)
+  m <- newMeta closed closedv
+  pure $ AppPruning (Meta m) (pruning ctx)
 
 checkOrInfer :: Ctx -> Surface -> Maybe Surface -> IO (Core, Core, Val)
 checkOrInfer ctx v Nothing = do

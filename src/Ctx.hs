@@ -10,24 +10,46 @@ import Val
 import Evaluation
 import Globals
 
+data Path
+  = Here
+  | Define Path Name Core Core
+  | Bind Path Name Core
+  deriving Show
+
+closeType :: Path -> Core -> Core
+closeType mcl b = case mcl of
+  Here -> b
+  Bind mcl x a -> closeType mcl (Pi x a b)
+  Define mcl x a t -> closeType mcl (Let x a t b)
+
 data Ctx = Ctx {
   lvl :: Lvl,
   ns :: [Name],
   ts :: [Val],
   vs :: Env,
   pos :: Maybe SourcePos,
-  bds :: [BD],
+  pruning :: Pruning,
   path :: Path
 }
+
+names :: Ctx -> [Name]
+names = reverse . go . path
+  where
+    go Here = []
+    go (Define p x _ _) = x : go p
+    go (Bind p x _) = x : go p
 
 empty :: Ctx
 empty = Ctx 0 [] [] [] Nothing [] Here
 
 define :: Name -> Core -> Val -> Core -> Val -> Ctx -> Ctx
-define x a t c v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (v : vs ctx) (pos ctx) (Defined : bds ctx) (Define (path ctx) x a c)
+define x a t c v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (v : vs ctx) (pos ctx) (Nothing : pruning ctx) (Define (path ctx) x a c)
 
 bind :: Name -> Val -> Ctx -> Ctx
-bind x t ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (pos ctx) (Bound : bds ctx) (Bind (path ctx) x (quote (lvl ctx) t))
+bind x t ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (pos ctx) (Just () : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t))
+
+insert :: Name -> Val -> Ctx -> Ctx
+insert x t ctx = Ctx (lvl ctx + 1) (ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (pos ctx) (Just () : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t))
 
 enter :: SourcePos -> Ctx -> Ctx
 enter p ctx = ctx { pos = Just p }

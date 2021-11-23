@@ -123,11 +123,11 @@ force m@(VNe (HMeta x) sp) =
 force (VGlobal _ _ _ v) = force v
 force v = v
 
-vAppBDs :: Env -> Val -> [BD] -> Val
-vAppBDs env v bds = case (env, bds) of
+vappPruning :: Env -> Val -> Pruning -> Val
+vappPruning e v p = case (e, p) of
   ([], []) -> v
-  (t : env, Bound : bds) -> vAppBDs env v bds `vapp` t
-  (t : env, Defined : bds) -> vAppBDs env v bds
+  (t : e, Just () : p) -> vapp (vappPruning e v p) t
+  (t : e, Nothing : p) -> vappPruning e v p
   _ -> error "impossible"
 
 eval :: Env -> Core -> Val
@@ -153,7 +153,7 @@ eval e (Lower t) = vlower (eval e t)
 eval e (Con t) = VCon (eval e t)
 eval e Refl = VRefl
 eval e (Meta x) = VMeta x
-eval e (InsertedMeta x bds) = vAppBDs e (VMeta x) bds
+eval e (AppPruning t p) = vappPruning e (eval e t) p
 
 evalprimelim :: PrimElimName -> ULvl -> ULvl -> Val
 evalprimelim PEBool l k =

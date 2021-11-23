@@ -78,12 +78,12 @@ TODO:
   - [x] expand elaboration to use more metas
   - [x] named holes
   - [x] show meta context when printing holes
-  - [ ] metas-as-globals if a file is elaborated
-  - [ ] pruning
-  - [ ] universe metas
+  - [x] pruning
   - [ ] implicit function types
   - [ ] improve unification error messages
   - [ ] avoid SomeException, use throw and throwIO
+  - [ ] universe metas
+  - [ ] metas-as-globals if a file is elaborated
 - [ ] parser for post-fix projections
 - [ ] parser for unit type () and nested units []
 - [ ] named sigma projection

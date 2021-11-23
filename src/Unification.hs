@@ -9,35 +9,103 @@ import Metas
 import qualified Data.IntMap as IM
 import qualified Data.Set as S
 import Data.IORef
-import Control.Exception (catch, SomeException)
+import Control.Exception (catch, try, SomeException)
+import Control.Monad (guard)
 
 -- import Debug.Trace (trace)
 
 data PR = PR {
+  occ :: Maybe MetaVar,
   dom :: Lvl,
   cod :: Lvl,
   ren :: IM.IntMap Lvl
 }
 
 lift :: PR -> PR
-lift (PR dom cod ren) = PR (dom + 1) (cod + 1) (IM.insert cod dom ren)
+lift (PR occ dom cod ren) = PR occ (dom + 1) (cod + 1) (IM.insert cod dom ren)
 
-invert :: Lvl -> Spine -> IO PR
+skip :: PR -> PR
+skip (PR occ dom cod ren) = PR occ dom (cod + 1) ren
+
+invert :: Lvl -> Spine -> IO (PR, Maybe Pruning)
 invert gamma sp = do
-  (dom, ren) <- go sp
-  return $ PR dom gamma ren
+  (dom, ren, pr, isLinear) <- go sp
+  return (PR Nothing dom gamma ren, pr <$ guard isLinear)
   where
-    go :: Spine -> IO (Lvl, IM.IntMap Lvl)
-    go [] = return (0, mempty)
+    go :: Spine -> IO (Lvl, IM.IntMap Lvl, Pruning, Bool)
+    go [] = return (0, mempty, [], True)
     go (EApp t : sp) = do
-      (dom, ren) <- go sp
+      (dom, ren, pr, isLinear) <- go sp
       case force t of
-        VVar x | IM.notMember x ren -> return (dom + 1, IM.insert x dom ren)
+        VVar x | IM.member x ren -> return (dom + 1, IM.delete x ren, Nothing : pr, False)
+        VVar x -> return (dom + 1, IM.insert x dom ren, Just () : pr, isLinear)
         _ -> error "failed to unify"
     go (_ : sp) = error "elim in spine"
 
-rename :: MetaVar -> PR -> Val -> IO Core
-rename m pren v = go pren v
+pruneTy :: RevPruning -> Val -> IO Core
+pruneTy (RevPruning pr) a = go pr (PR Nothing 0 0 mempty) a
+  where
+    go :: Pruning -> PR -> Val -> IO Core
+    go pr pren a = case (pr, force a) of
+      ([], a) -> rename pren a
+      (Just () : pr, VPi x a b) -> Pi x <$> rename pren a <*> go pr (lift pren) (vinst b (VVar (cod pren)))
+      (Nothing : pr, VPi x a b) -> go pr (skip pren) (vinst b (VVar (cod pren)))
+      _ -> error "impossible"
+
+getUnsolved :: MetaVar -> (Core, Val)
+getUnsolved m = case lookupMeta m of
+  Unsolved c a -> (c, a)
+  _ -> error "impossible"
+
+pruneMeta :: Pruning -> MetaVar -> IO MetaVar
+pruneMeta pr m = do
+  let (cty, mty) = getUnsolved m
+  prunedty <- pruneTy (revPruning pr) mty
+  let prunedtyv = eval [] prunedty
+  m' <- newMeta prunedty prunedtyv
+  let solution = lams (length pr) mty $ AppPruning (Meta m') pr
+  let solutionv = eval [] solution
+  let deps = S.union (allMetas solution) (allMetas prunedty)  
+  modifyIORef' mcxt $ IM.insert (unMetaVar m) (Solved deps cty mty solution solutionv)
+  return m'
+
+data SpineStatus
+  = OKRenaming
+  | OKNonRenaming
+  | NeedsPruning
+
+pruneFlex :: PR -> MetaVar -> Spine -> IO Core
+pruneFlex pren m sp = do
+  (sp, status) <- go sp
+  m' <- case status of
+    NeedsPruning -> pruneMeta (map (() <$) sp) m
+    OKRenaming -> case lookupMeta m of
+      Unsolved _ _ -> return m
+      _ -> error "impossible"
+    OKNonRenaming -> case lookupMeta m of
+      Unsolved _ _ -> return m
+      _ -> error "impossible"
+  return $ foldr (\mu t -> maybe t (App t) mu) (Meta m') sp
+  where
+    go :: Spine -> IO ([Maybe Core], SpineStatus)
+    go [] = return ([], OKRenaming)
+    go (EApp t : sp) = do
+      (sp, status) <- go sp
+      case force t of
+        VVar x -> case (IM.lookup x (ren pren), status) of
+          (Just x, _) ->
+            return (Just (Var $ dom pren - x - 1) : sp, status)
+          (Nothing, OKNonRenaming) -> error "pruneFlex failure"
+          (Nothing, _) -> return (Nothing : sp, NeedsPruning)
+        t -> case status of
+          NeedsPruning -> error "pruneFlex failure"
+          _ -> do
+            t <- rename pren t
+            return (Just t : sp, OKNonRenaming)
+    go _ = error "pruneFlex failure: eliminator in spine"
+
+rename :: PR -> Val -> IO Core
+rename pren v = go pren v
   where
     goSp :: PR -> Core -> Spine -> IO Core
     goSp pren t [] = return t
@@ -54,8 +122,9 @@ rename m pren v = go pren v
 
     go :: PR -> Val -> IO Core
     go pren t = case force t of
-      VNe (HMeta m') sp | m == m' -> error "occurs check failed"
-      VNe (HMeta m') sp -> goSp pren (Meta m') sp
+      VNe (HMeta m') sp | occ pren == Just m' ->
+        error "occurs check failed"
+      VNe (HMeta m') sp -> pruneFlex pren m' sp
       VNe (HVar x) sp -> case IM.lookup x (ren pren) of
         Nothing -> error "scope error"
         Just x' -> goSp pren (Var $ dom pren - x' - 1) sp
@@ -71,23 +140,33 @@ rename m pren v = go pren v
       VLiftTerm t -> LiftTerm <$> go pren t
       VCon t -> Con <$> go pren t
 
-lams :: Lvl -> Core -> Core
-lams l = go 0
+lams :: Lvl -> Val -> Core -> Core
+lams l a t = go a 0
   where
-    go x t | x == l = t
-    go x t = Abs ("x" ++ show x) $ go (x + 1) t
+    go a l' | l' == l = t
+    go a l' = case force a of
+      VPi "_" a b -> Abs ("x" ++ show l') $ go (vinst b (VVar l')) (l' + 1)
+      VPi x a b -> Abs x $ go (vinst b (VVar l')) (l' + 1)
+      _ -> error "impossible"
+
+solveWithPR :: MetaVar -> (PR, Maybe Pruning) -> Val -> IO ()
+solveWithPR m (pren, pruneNonLinear) rhs = do
+  let (cty, mty) = getUnsolved m
+  
+  case pruneNonLinear of
+    Nothing -> return ()
+    Just pr -> () <$ pruneTy (revPruning pr) mty
+  
+  rhs <- rename (pren {occ = Just m}) rhs
+  let solution = lams (dom pren) mty rhs
+  let solutionv = eval [] solution
+  let deps = S.union (allMetas solution) (allMetas cty) 
+  modifyIORef' mcxt $ IM.insert (unMetaVar m) (Solved deps cty mty solution solutionv)
 
 solve :: Lvl -> MetaVar -> Spine -> Val -> IO ()
 solve gamma m sp rhs = do
   pren <- invert gamma sp
-  rhs <- rename m pren rhs
-  let core = lams (dom pren) rhs
-  let solution = eval [] core
-  case lookupMeta m of
-    Solved {} -> error $ "meta is already solved: ?" ++ show m
-    Unsolved c t -> do
-      let deps = S.union (allMetas core) (allMetas c)  
-      modifyIORef' mcxt $ IM.insert (unMetaVar m) (Solved deps c t core solution)
+  solveWithPR m pren rhs
 
 unifyLift :: Lvl -> Clos -> Clos -> IO ()
 unifyLift k c c' = let v = vvar k in unify (k + 1) (vinst c v) (vinst c' v)
@@ -104,12 +183,33 @@ unifyElim k (EPrimElim x l1 l1' as) (EPrimElim x' l2 l2' as') | x == x' && l1 ==
     go (v : sp) (v' : sp') = unify k v v' >> go sp sp'
     go _ _ = error "prim elim args mismatch"
 unifyElim _ _ _ = error "elim mismatch"
-  
 
 unifySp :: Lvl -> Spine -> Spine -> IO ()
 unifySp k [] [] = return ()
 unifySp k (t : sp) (t' : sp') = unifySp k sp sp' >> unifyElim k t t'
 unifySp _ _ _ = error "spine mismatch"
+
+flexFlex :: Lvl -> MetaVar -> Spine -> MetaVar -> Spine -> IO ()
+flexFlex gamma m sp m' sp' = if length sp < length sp' then go m' sp' m sp else go m sp m' sp'
+  where
+    go :: MetaVar -> Spine -> MetaVar -> Spine -> IO ()
+    go m sp m' sp' = try (invert gamma sp) >>= \case
+      Left (e :: SomeException) -> solve gamma m' sp' (VNe (HMeta m) sp)
+      Right pren -> solveWithPR m pren (VNe (HMeta m') sp')
+
+intersect :: Lvl -> MetaVar -> Spine -> Spine -> IO ()
+intersect l m sp sp' = case go sp sp' of
+  Nothing -> unifySp l sp sp'
+  Just pr | Nothing `elem` pr -> () <$ pruneMeta pr m
+  Just _ -> return ()
+  where
+    go :: Spine -> Spine -> Maybe Pruning
+    go [] [] = Just []
+    go (EApp t : sp) (EApp t' : sp') =
+      case (force t, force t') of
+        (VVar x, VVar x') -> (guard (x == x') :) <$> go sp sp'
+        _ -> Nothing
+    go _ _ = error "impossible"
 
 unify :: Lvl -> Val -> Val -> IO ()
 unify k a b = -- trace ("unify " ++ show (quote k a) ++ " ~ " ++ show (quote k b)) $ do
@@ -126,6 +226,9 @@ unify k a b = -- trace ("unify " ++ show (quote k a) ++ " ~ " ++ show (quote k b
     (VPair a b, VPair c d) -> unify k a c >> unify k b d
     (VPair a b, x) -> unify k a (vfst x) >> unify k b (vsnd x)
     (x, VPair a b) -> unify k (vfst x) a >> unify k (vsnd x) b
+
+    (VNe (HMeta m) sp, VNe (HMeta m') sp') | m == m' -> intersect k m sp sp'
+    (VNe (HMeta m) sp, VNe (HMeta m') sp') -> flexFlex k m sp m' sp'
     (VNe h sp, VNe h' sp') | h == h' -> unifySp k sp sp'
     
     (VNe (HPrim PUnit _) [], v) -> return ()
