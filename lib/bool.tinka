@@ -1,16 +1,16 @@
 if : (A : Type) -> Bool -> A -> A -> A
   = \A b t f. (elim Bool) (\_. A) t f b;
 
-not : Bool -> Bool = \b. if Bool b False True;
+not : Bool -> Bool = \b. if _ b False True;
 
 and : Bool -> Bool -> Bool
-  = \a b. if Bool a b False;
+  = \a b. if _ a b False;
 
 or : Bool -> Bool -> Bool
-  = \a b. if Bool a True b;
+  = \a b. if _ a True b;
 
 xor : Bool -> Bool -> Bool
-  = \a b. if Bool a (not b) b;
+  = \a b. if _ a (not b) b;
 
 neqBool = xor;
 eqBool : Bool -> Bool -> Bool = \a b. not (neqBool a b);

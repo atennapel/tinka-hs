@@ -18,3 +18,9 @@ test True _ = return ()
 
 testIO :: IO a -> (SomeException -> String) -> IO a
 testIO a msg = catch a (error . msg)
+
+type Pruning = [Maybe ()]
+newtype RevPruning = RevPruning Pruning
+
+revPruning :: Pruning -> RevPruning
+revPruning = RevPruning . reverse

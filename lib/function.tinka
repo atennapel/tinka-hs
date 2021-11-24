@@ -1,2 +1,5 @@
 id : (A : Type) -> A -> A = \A x. x;
 the = id;
+
+const : (A : Type) -> (B : A -> Type) -> (x : A) -> B x -> A
+  = \A B x y. x;

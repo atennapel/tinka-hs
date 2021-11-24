@@ -101,7 +101,7 @@ try a = tryIO a $ \_ -> return ()
 
 elabSurface :: String -> Surface -> IO (Core, Core)
 elabSurface file t = do
-  (tm, ty) <- elaborate (enter (initialPos file) empty) t
+  (tm, ty, _) <- elaborate (enter (initialPos file) empty) t
   return (tm, ty)
 
 parseAndElabSurface :: String -> String -> IO (Core, Core)
@@ -123,7 +123,7 @@ elabDefs getDefs = do
   return ()
 
 showElabDef :: GlobalEntry -> String
-showElabDef (GlobalEntry x etm ety _ _ file) =
+showElabDef (GlobalEntry x etm ety _ _ _ file) =
   maybe "" (++ ".") file ++ x ++ " : " ++ showC empty ety ++ " = " ++ showC empty etm
 
 showElabDefs :: GlobalCtx -> String

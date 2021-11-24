@@ -1,4 +1,4 @@
 import lib/eq lib/bool;
 
-notnot : (b : Bool) -> Eq Bool b (not (not b))
-  = \b. (elim Bool) (\b. Eq Bool b (not (not b))) Refl Refl b;
+notnot : (b : Bool) -> Eq _ b (not (not b))
+  = \b. (elim Bool) (\b. Eq _ b (not (not b))) Refl Refl b;
