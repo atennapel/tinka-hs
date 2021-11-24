@@ -2,6 +2,7 @@ module Core (Core(..), liftUniv, PrimName(..), PrimElimName(..), toPrimName, toP
 
 import Common
 import Prims
+import Universes
 
 import qualified Data.Set as S
 import Data.Set (Set)
@@ -16,11 +17,11 @@ data Core
   | App Core Core
   | AppPruning Core Pruning
   | Abs Name Core
-  | Pi Name Core Core
-  | Sigma Name Core Core
+  | Pi Name Core Univ Core Univ
+  | Sigma Name Core Univ Core Univ
   | Pair Core Core
   | Proj Core ProjType
-  | U ULvl
+  | U Univ
   | Let Name Core Core Core
   | Lift Core
   | LiftTerm Core
@@ -46,12 +47,11 @@ instance Show Core where
   show (PrimElim x l k) = "elim " ++ show x ++ "^" ++ show l ++ (if k == 0 then "" else " " ++ show k)
   show (App f a) = "(" ++ show f ++ " " ++ show a ++ ")"
   show (Abs x b) = "(\\" ++ x ++ ". " ++ show b ++ ")"
-  show (Pi x t b) = "((" ++ x ++ " : " ++ show t ++ ") -> " ++ show b ++ ")"
-  show (Sigma x t b) = "((" ++ x ++ " : " ++ show t ++ ") ** " ++ show b ++ ")"
+  show (Pi x t _ b _) = "((" ++ x ++ " : " ++ show t ++ ") -> " ++ show b ++ ")"
+  show (Sigma x t _ b _) = "((" ++ x ++ " : " ++ show t ++ ") ** " ++ show b ++ ")"
   show (Pair a b) = "(" ++ show a ++ ", " ++ show b ++ ")"
   show (Proj s p) = show s ++ showProjType p
-  show (U 0) = "Type"
-  show (U l) = "Type" ++ show l
+  show (U l) = "Type " ++ show l
   show (Let x t v b) = "(let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b ++ ")"
   show (Lift t) = "(Lift " ++ show t ++ ")"
   show (LiftTerm t) = "(lift " ++ show t ++ ")"
@@ -62,7 +62,7 @@ instance Show Core where
   show (AppPruning x _) = show x ++ "*"
 
 liftUniv :: ULvl -> Core -> Core
-liftUniv l (U l') = U (l + l')
+liftUniv l (U l') = U (uAddConst l l')
 liftUniv l c@(Var _) = c
 liftUniv l (Global x l') = Global x (l + l')
 liftUniv l (Prim x l') = Prim x (l + l')
@@ -70,8 +70,8 @@ liftUniv l (PrimElim x l' k) = PrimElim x (l + l') k
 liftUniv l (App a b) = App (liftUniv l a) (liftUniv l b)
 liftUniv l (AppPruning t p) = AppPruning (liftUniv l t) p
 liftUniv l (Abs x b) = Abs x (liftUniv l b)
-liftUniv l (Pi x t b) = Pi x (liftUniv l t) (liftUniv l b)
-liftUniv l (Sigma x t b) = Sigma x (liftUniv l t) (liftUniv l b)
+liftUniv l (Pi x t u1 b u2) = Pi x (liftUniv l t) (us u1) (liftUniv l b) (us u2)
+liftUniv l (Sigma x t u1 b u2) = Sigma x (liftUniv l t) (us u1) (liftUniv l b) (us u2)
 liftUniv l (Pair a b) = Pair (liftUniv l a) (liftUniv l b)
 liftUniv l (Proj t p) = Proj (liftUniv l t) p
 liftUniv l (Let x t v b) = Let x (liftUniv l t) (liftUniv l v) (liftUniv l b)
@@ -87,8 +87,8 @@ allMetas (Meta x) = S.singleton x
 allMetas (App a b) = S.union (allMetas a) (allMetas b)
 allMetas (AppPruning t _) = allMetas t
 allMetas (Abs _ b) = allMetas b
-allMetas (Pi x t b) = S.union (allMetas t) (allMetas b)
-allMetas (Sigma x t b) = S.union (allMetas t) (allMetas b)
+allMetas (Pi x t _ b _) = S.union (allMetas t) (allMetas b)
+allMetas (Sigma x t _ b _) = S.union (allMetas t) (allMetas b)
 allMetas (Pair t b) = S.union (allMetas t) (allMetas b)
 allMetas (Proj t _) = allMetas t
 allMetas (Let _ t v b) = S.union (allMetas t) $ S.union (allMetas v) (allMetas b)
@@ -106,15 +106,15 @@ expandMetas ms c = go 0 c
     go l (AppPruning t bds) =
       let as = concatMap (\(i, bd) -> [Var i | bd == Just ()]) $ zip [0..] bds in
       foldr (flip App) (go l t) as
-    go l (U l') = U l'
+    go l (U l') = U (normalizeUniv l')
     go l c@(Var _) = c
     go l (Global x l') = Global x l'
     go l (Prim x l') = Prim x l'
     go l (PrimElim x l' k) = PrimElim x l' k
     go l (App a b) = App (go l a) (go l b)
     go l (Abs x b) = Abs x (go (l + 1) b)
-    go l (Pi x t b) = Pi x (go l t) (go (l + 1) b)
-    go l (Sigma x t b) = Sigma x (go l t) (go (l + 1) b)
+    go l (Pi x t u1 b u2) = Pi x (go l t) u1 (go (l + 1) b) u2
+    go l (Sigma x t u1 b u2) = Sigma x (go l t) u1 (go (l + 1) b) u2
     go l (Pair a b) = Pair (go l a) (go l b)
     go l (Proj t p) = Proj (go l t) p
     go l (Let x t v b) = Let x (go l t) (go l v) (go (l + 1) b)

@@ -2,6 +2,7 @@ module Val where
 
 import Common
 import Core
+import Universes
 
 type Spine = [Elim]
 type Env = [Val]
@@ -23,10 +24,10 @@ data Val
   = VNe Head Spine
   | VGlobal Name ULvl Spine Val
   | VAbs Name Clos
-  | VPi Name Val Clos
-  | VSigma Name Val Clos
+  | VPi Name Val Univ Clos Univ
+  | VSigma Name Val Univ Clos Univ
   | VPair Val Val
-  | VU ULvl
+  | VU Univ
   | VLift Val
   | VLiftTerm Val
   | VCon Val
@@ -34,18 +35,19 @@ data Val
 
 pattern VVar x = VNe (HVar x) []
 pattern VMeta x = VNe (HMeta x) []
+pattern VType l = VU (UConst l)
 
-vpi :: Name -> Val -> (Val -> Val) -> Val
-vpi x a b = VPi x a (Fun b)
+vpi :: Name -> Val -> Univ -> Univ -> (Val -> Val) -> Val
+vpi x a u1 u2 b = VPi x a u1 (Fun b) u2
 
-vsigma :: Name -> Val -> (Val -> Val) -> Val
-vsigma x a b = VSigma x a (Fun b)
+vsigma :: Name -> Val -> Univ -> Univ -> (Val -> Val) -> Val
+vsigma x a u1 u2 b = VSigma x a u1 (Fun b) u2
 
-vfun :: Val -> Val -> Val
-vfun a b = VPi "_" a (Fun $ const b)
+vfun :: Val -> Univ -> Univ -> Val -> Val
+vfun a u1 u2 b = VPi "_" a u1 (Fun $ const b) u2
 
-vpairty :: Val -> Val -> Val
-vpairty a b = VSigma "_" a (Fun $ const b)
+vpairty :: Val -> Univ -> Univ -> Val -> Val
+vpairty a u1 u2 b = VSigma "_" a u1 (Fun $ const b) u2
 
 vabs :: Name -> (Val -> Val) -> Val
 vabs x b = VAbs x (Fun b)

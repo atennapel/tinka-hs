@@ -79,11 +79,12 @@ TODO:
   - [x] named holes
   - [x] show meta context when printing holes
   - [x] pruning
+  - [x] universe metas
   - [ ] implicit function types
   - [ ] improve unification error messages
   - [ ] avoid SomeException, use throw and throwIO
-  - [ ] universe metas
   - [ ] metas-as-globals if a file is elaborated
+  - [ ] consider zonking again
 - [ ] parser for post-fix projections
 - [ ] parser for unit type () and nested units []
 - [ ] named sigma projection

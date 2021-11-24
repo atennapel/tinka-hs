@@ -9,24 +9,26 @@ import Surface
 import Val
 import Evaluation
 import Globals
+import Universes
 
 data Path
   = Here
   | Define Path Name Core Core
-  | Bind Path Name Core
+  | Bind Path Name Core Univ
   deriving Show
 
-closeType :: Path -> Core -> Core
-closeType mcl b = case mcl of
+closeType :: Path -> Core -> Univ -> Core
+closeType mcl b ub = case mcl of
   Here -> b
-  Bind mcl x a -> closeType mcl (Pi x a b)
-  Define mcl x a t -> closeType mcl (Let x a t b)
+  Bind mcl x a ua -> closeType mcl (Pi x a ua b ub) (umax ua ub)
+  Define mcl x a t -> closeType mcl (Let x a t b) ub
 
 data Ctx = Ctx {
   lvl :: Lvl,
   ns :: [Name],
   ts :: [Val],
   vs :: Env,
+  ctxus :: [Univ],
   pos :: Maybe SourcePos,
   pruning :: Pruning,
   path :: Path
@@ -37,19 +39,19 @@ names = reverse . go . path
   where
     go Here = []
     go (Define p x _ _) = x : go p
-    go (Bind p x _) = x : go p
+    go (Bind p x _ _) = x : go p
 
 empty :: Ctx
-empty = Ctx 0 [] [] [] Nothing [] Here
+empty = Ctx 0 [] [] [] [] Nothing [] Here
 
-define :: Name -> Core -> Val -> Core -> Val -> Ctx -> Ctx
-define x a t c v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (v : vs ctx) (pos ctx) (Nothing : pruning ctx) (Define (path ctx) x a c)
+define :: Name -> Core -> Val -> Univ -> Core -> Val -> Ctx -> Ctx
+define x a t u c v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (v : vs ctx) (u : ctxus ctx) (pos ctx) (Nothing : pruning ctx) (Define (path ctx) x a c)
 
-bind :: Name -> Val -> Ctx -> Ctx
-bind x t ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (pos ctx) (Just () : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t))
+bind :: Name -> Val -> Univ -> Ctx -> Ctx
+bind x t u ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just () : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t) u)
 
-insert :: Name -> Val -> Ctx -> Ctx
-insert x t ctx = Ctx (lvl ctx + 1) (ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (pos ctx) (Just () : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t))
+insert :: Name -> Val -> Univ -> Ctx -> Ctx
+insert x t u ctx = Ctx (lvl ctx + 1) (ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just () : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t) u)
 
 enter :: SourcePos -> Ctx -> Ctx
 enter p ctx = ctx { pos = Just p }
@@ -74,16 +76,16 @@ showLocal ctx = let zipped = zip3 (ns ctx) (ts ctx) (vs ctx) in
         y | x == y -> x ++ " : " ++ showV ctx t
         sv -> x ++ " : " ++ showV ctx t ++ " = " ++ sv
 
-lookupVarMaybe :: Ctx -> Name -> IO (Maybe (Ix, Val))
-lookupVarMaybe ctx x = go (ns ctx) (ts ctx) 0
+lookupVarMaybe :: Ctx -> Name -> IO (Maybe (Ix, Val, Univ))
+lookupVarMaybe ctx x = go (ns ctx) (ts ctx) (ctxus ctx) 0
   where
-    go :: [Name] -> [Val] -> Ix -> IO (Maybe (Ix, Val))
-    go [] [] _ = return Nothing
-    go (y : _) (ty : _) i | x == y = return $ Just (i, ty)
-    go (_ : ns) (_ : ts) i = go ns ts (i + 1)
-    go _ _ _ = error "impossible"
+    go :: [Name] -> [Val] -> [Univ] -> Ix -> IO (Maybe (Ix, Val, Univ))
+    go [] [] [] _ = return Nothing
+    go (y : _) (ty : _) (u : _) i | x == y = return $ Just (i, ty, u)
+    go (_ : ns) (_ : ts) (_ : us) i = go ns ts us (i + 1)
+    go _ _ _ _ = error "impossible"
 
-lookupVar :: Ctx -> Name -> IO (Ix, Val)
+lookupVar :: Ctx -> Name -> IO (Ix, Val, Univ)
 lookupVar ctx x = do
   res <- lookupVarMaybe ctx x
   case res of

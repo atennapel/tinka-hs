@@ -6,6 +6,7 @@ import Text.Megaparsec (SourcePos)
 
 import Common
 import Core
+import Universes
 
 data Surface
   = SVar Name ULvl
@@ -129,11 +130,12 @@ fromCore ns (Prim x l) = SVar (show x) l
 fromCore ns (PrimElim x l k) = SPrimElim (show x) l k
 fromCore ns (App f a) = SApp (fromCore ns f) (fromCore ns a)
 fromCore ns (Abs x b) = SAbs x (fromCore (x : ns) b)
-fromCore ns (Pi x t b) = SPi x (fromCore ns t) (fromCore (x : ns) b)
-fromCore ns (Sigma x t b) = SSigma x (fromCore ns t) (fromCore (x : ns) b)
+fromCore ns (Pi x t _ b _) = SPi x (fromCore ns t) (fromCore (x : ns) b)
+fromCore ns (Sigma x t _ b _) = SSigma x (fromCore ns t) (fromCore (x : ns) b)
 fromCore ns (Pair a b) = SPair (fromCore ns a) (fromCore ns b)
 fromCore ns (Proj s p) = SProj (fromCore ns s) p 
-fromCore ns (U l) = SU l
+fromCore ns (U (UConst l)) = SU l
+fromCore ns (U u) = SVar ("Type " ++ show u) 0
 fromCore ns (Let x t v b) = SLet x (Just $ fromCore ns t) (fromCore ns v) (fromCore (x : ns) b)
 fromCore ns (Lift t) = SLift (fromCore ns t)
 fromCore ns (LiftTerm t) = SLiftTerm (fromCore ns t)

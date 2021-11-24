@@ -5,6 +5,7 @@ import Core
 import Val
 import Evaluation
 import Metas
+import Universes
 
 import qualified Data.IntMap as IM
 import qualified Data.Set as S
@@ -48,8 +49,8 @@ pruneTy (RevPruning pr) a = go pr (PR Nothing 0 0 mempty) a
     go :: Pruning -> PR -> Val -> IO Core
     go pr pren a = case (pr, force a) of
       ([], a) -> rename pren a
-      (Just () : pr, VPi x a b) -> Pi x <$> rename pren a <*> go pr (lift pren) (vinst b (VVar (cod pren)))
-      (Nothing : pr, VPi x a b) -> go pr (skip pren) (vinst b (VVar (cod pren)))
+      (Just () : pr, VPi x a u1 b u2) -> Pi x <$> rename pren a <*> return u1 <*> go pr (lift pren) (vinst b (VVar (cod pren))) <*> return u2
+      (Nothing : pr, VPi x a u1 b u2) -> go pr (skip pren) (vinst b (VVar (cod pren)))
       _ -> error "impossible"
 
 getUnsolved :: MetaVar -> (Core, Val)
@@ -131,8 +132,8 @@ rename pren v = go pren v
       VNe (HPrim x l) sp -> goSp pren (Prim x l) sp
       VGlobal x l sp _ -> goSp pren (Global x l) sp
       VAbs x t -> Abs x <$> go (lift pren) (vinst t (VVar (cod pren)))
-      VPi x a b -> Pi x <$> go pren a <*> go (lift pren) (vinst b (VVar (cod pren)))
-      VSigma x a b -> Sigma x <$> go pren a <*> go (lift pren) (vinst b (VVar (cod pren)))
+      VPi x a u1 b u2 -> Pi x <$> go pren a <*> return u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> return u2
+      VSigma x a u1 b u2 -> Sigma x <$> go pren a <*> return u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> return u2
       VPair a b -> Pair <$> go pren a <*> go pren b
       VU i -> return $ U i
       VRefl -> return Refl
@@ -145,8 +146,8 @@ lams l a t = go a 0
   where
     go a l' | l' == l = t
     go a l' = case force a of
-      VPi "_" a b -> Abs ("x" ++ show l') $ go (vinst b (VVar l')) (l' + 1)
-      VPi x a b -> Abs x $ go (vinst b (VVar l')) (l' + 1)
+      VPi "_" _ _ b _ -> Abs ("x" ++ show l') $ go (vinst b (VVar l')) (l' + 1)
+      VPi x a _ b _ -> Abs x $ go (vinst b (VVar l')) (l' + 1)
       _ -> error "impossible"
 
 solveWithPR :: MetaVar -> (PR, Maybe Pruning) -> Val -> IO ()
@@ -214,12 +215,14 @@ intersect l m sp sp' = case go sp sp' of
 unify :: Lvl -> Val -> Val -> IO ()
 unify k a b = -- trace ("unify " ++ show (quote k a) ++ " ~ " ++ show (quote k b)) $ do
   case (force a, force b) of
-    (VU l1, VU l2) | l1 == l2 -> return ()
+    (VU l1, VU l2) -> unifyUniv l1 l2
     (VLift t1, VLift t2) -> unify k t1 t2
     (VLiftTerm t1, VLiftTerm t2) -> unify k t1 t2
     (VCon t1, VCon t2) -> unify k t1 t2
-    (VPi _ t b, VPi _ t' b') -> unify k t t' >> unifyLift k b b'
-    (VSigma _ t b, VSigma _ t' b') -> unify k t t' >> unifyLift k b b'
+    (VPi _ t u1 b u2, VPi _ t' u3 b' u4) ->
+      unify k t t' >> unifyUniv u1 u3 >> unifyLift k b b' >> unifyUniv u2 u4
+    (VSigma _ t u1 b u2, VSigma _ t' u3 b' u4) ->
+      unify k t t' >> unifyUniv u1 u3 >> unifyLift k b b' >> unifyUniv u2 u4
     (VAbs _ b, VAbs _ b') -> unifyLift k b b'
     (VAbs _ b, x) -> let v = vvar k in unify (k + 1) (vinst b v) (vapp x v)
     (x, VAbs _ b) -> let v = vvar k in unify (k + 1) (vapp x v) (vinst b v)
