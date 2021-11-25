@@ -8,6 +8,8 @@ import Evaluation
 import Globals
 import Universes
 
+-- import Debug.Trace (trace)
+
 check :: Ctx -> Core -> Val -> IO ()
 check ctx c ty =
   let fty = force ty in
@@ -90,5 +92,6 @@ infer ctx tm = error $ "verify: cannot infer: " ++ show tm
 
 verify :: Core -> IO Core
 verify c = do
+  print c
   ty <- infer empty c
   return $ quote 0 ty

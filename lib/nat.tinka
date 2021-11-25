@@ -16,14 +16,14 @@ indNat :
         (\_ _. z)
         n;
 
-paraNat : (A : Type) -> Nat -> A -> (Nat -> A -> A) -> A
-  = \A n z s. indNat (\_. A) z s n;
+paraNat : {A : Type} -> Nat -> A -> (Nat -> A -> A) -> A
+  = \{A} n z s. indNat (\_. A) z s n;
 
-caseNat : (A : Type) -> Nat -> A -> (Nat -> A) -> A
-  = \A n z s. paraNat A n z (\m _. s m);
+caseNat : {A : Type} -> Nat -> A -> (Nat -> A) -> A
+  = \n z s. paraNat n z (\m _. s m);
 
-cataNat : (A : Type) -> Nat -> A -> (A -> A) -> A
-  = \A n z s. paraNat A n z (\_. s);
+cataNat : {A : Type} -> Nat -> A -> (A -> A) -> A
+  = \n z s. paraNat n z (\_. s);
 
-pred : Nat -> Nat = \n. caseNat Nat n Z (\x. x);
-add : Nat -> Nat -> Nat = \a b. cataNat Nat a b S;
+pred : Nat -> Nat = \n. caseNat n Z (\x. x);
+add : Nat -> Nat -> Nat = \a b. cataNat a b S;

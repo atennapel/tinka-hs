@@ -80,10 +80,10 @@ TODO:
   - [x] show meta context when printing holes
   - [x] pruning
   - [x] universe metas
-  - [ ] implicit function types
+  - [x] implicit function types
     - [x] add syntax
     - [x] expand elaboration
-    - [ ] add parser
+    - [x] add parser
   - [ ] improve unification error messages
   - [ ] avoid SomeException, use throw and throwIO
   - [ ] metas-as-globals if a file is elaborated
@@ -92,3 +92,5 @@ TODO:
 - [ ] parser for unit type () and nested units []
 - [ ] named sigma projection
 - [ ] QTT
+- [ ] internal fixpoints
+- [ ] coinductive types

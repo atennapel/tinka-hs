@@ -34,6 +34,9 @@ char c = lexeme (C.char c)
 parens :: Parser a -> Parser a
 parens p = char '(' *> p <* char ')'
 
+braces :: Parser a -> Parser a
+braces p = char '{' *> p <* char '}'
+
 pArrow :: Parser String
 pArrow = symbol "→" <|> symbol "->"
 
@@ -147,34 +150,78 @@ pAtom =
 pBinder :: Parser Name
 pBinder = (fst <$> pIdent) <|> symbol "_"
 
+pArg :: Parser (Either Name Icit, Surface)
+pArg =  (try $ braces $ do {x <- fst <$> pIdent; char '='; t <- pSurface; pure (Left x, t)})
+    <|> ((Right Impl,) <$> (char '{' *> pSurface <* char '}'))
+    <|> ((Right Expl,) <$> pAtom)
+
 pSpine :: Parser Surface
-pSpine = foldl1 (\a b -> SApp a b (Right Expl)) <$> some pAtom
+pSpine = do
+  h <- pAtom
+  args <- many pArg
+  pure $ foldl (\t (i, u) -> SApp t u i) h args
+
+pLamBinder :: Parser ([Name], Either Name Icit, Maybe Surface)
+pLamBinder = implBinder <|> binderWithType <|> justBinder
+  where
+    -- \x
+    justBinder = (\x -> ([x], Right Expl, Nothing)) <$> pBinder
+
+    -- \(x y z : A)
+    binderWithType = parens $ do
+      xs <- some pBinder
+      symbol ":"
+      ty <- pSurface
+      return (xs, Right Expl, Just ty)
+    
+    -- \{x y z} | \{x y z : A} | \{x y z = b} | \{x y z : A = b}
+    implBinder = braces $ do
+      xs <- some pBinder
+      ty <- optional (symbol ":" >> pSurface)
+      b <- optional (symbol "=" >> pBinder)
+      return $ maybe (xs, Right Impl, ty) (\b -> (xs, Left b, ty)) b
 
 pLam :: Parser Surface
 pLam = do
   pLambda
-  xs <- some pBinder
+  xs <- some pLamBinder
   char '.'
   t <- pSurface
-  pure (foldr (\x t -> SAbs x (Right Expl) Nothing t) t xs)
+  pure (foldr (\(xs, i, a) t -> foldr (\x t -> SAbs x i a t) t xs) t xs)
 
 pArrowOrCross :: Parser Bool
 pArrowOrCross = (True <$ pArrow) <|> (False <$ pCross)
 
+pPiSigmaBinder :: Parser ([Name], Icit, Surface)
+pPiSigmaBinder = implBinder <|> binderWithType
+  where
+    -- (x y z : A)
+    binderWithType = parens $ do
+      xs <- some pBinder
+      symbol ":"
+      ty <- pSurface
+      return (xs, Expl, ty)
+    
+    -- {x y z} | {x y z : A}
+    implBinder = braces $ do
+      xs <- some pBinder
+      ty <- optional (symbol ":" >> pSurface)
+      return (xs, Impl, fromMaybe (SHole Nothing) ty)
+
 pPiOrSigma :: Parser Surface
 pPiOrSigma = do
-  dom <- some (parens ((,) <$> some pBinder <*> (char ':' *> pSurface)))
+  dom <- some pPiSigmaBinder
   ty <- pArrowOrCross
   cod <- pSurface
   let tyfun x i a b = if ty then SPi x i a b else SSigma x a b
-  pure $ foldr (\(xs, a) t -> foldr (\x t -> tyfun x Expl a t) t xs) cod dom
+  pure $ foldr (\(xs, i, a) t -> foldr (\x t -> tyfun x i a t) t xs) cod dom
 
 funOrSpine :: Parser Surface
 funOrSpine = do
   sp <- pSpine
   optional pArrowOrCross >>= \case
     Nothing -> pure sp
-    Just b  -> (if b then SPi "_" Expl else SSigma "_") sp <$> pSurface
+    Just b -> (if b then SPi "_" Expl else SSigma "_") sp <$> pSurface
 
 pLet :: Parser Surface
 pLet = do

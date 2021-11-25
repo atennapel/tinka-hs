@@ -3,15 +3,15 @@ import lib/desc;
 ListD : Type -> Desc = \A. SumD (Arg A (\_. Ind End)) End;
 List : Type -> Type = \A. Data (ListD A);
 
-Nil : (A : Type) -> List A = \A. Con (False, Unit);
-Cons : (A : Type) -> A -> List A -> List A
-  = \A hd tl. Con (True, hd, tl, Unit);
+Nil : {A : Type} -> List A = Con (False, Unit);
+Cons : {A : Type} -> A -> List A -> List A
+  = \hd tl. Con (True, hd, tl, Unit);
 
 indList :
   (A : Type)
   (P : List A -> Type)
-  -> P (Nil A)
-  -> ((hd : A) (tl : List A) -> P tl -> P (Cons A hd tl))
+  -> P Nil
+  -> ((hd : A) (tl : List A) -> P tl -> P (Cons hd tl))
   -> (l : List A)
   -> P l
   = \A P nil cons l. indSumD (Arg A (\_. Ind End)) End P
@@ -19,17 +19,17 @@ indList :
         (\_ _. nil)
         l;
 
-paraList : (A R : Type) -> List A -> R -> (A -> List A -> R -> R) -> R
-  = \A R l nil cons. indList A (\_. R) nil cons l;
+paraList : {A R : Type} -> List A -> R -> (A -> List A -> R -> R) -> R
+  = \{A} {R} l nil cons. indList A (\_. R) nil cons l;
 
-caseList : (A R : Type) -> List A -> R -> (A -> List A -> R) -> R
-  = \A R l nil cons. paraList A R l nil (\hd tl _. cons hd tl);
+caseList : {A R : Type} -> List A -> R -> (A -> List A -> R) -> R
+  = \l nil cons. paraList l nil (\hd tl _. cons hd tl);
 
-cataList : (A R : Type) -> List A -> R -> (A -> R -> R) -> R
-  = \A R l nil cons. paraList A R l nil (\hd _ tl. cons hd tl);
+cataList : {A R : Type} -> List A -> R -> (A -> R -> R) -> R
+  = \l nil cons. paraList l nil (\hd _ tl. cons hd tl);
 
-mapList : (A B : Type) -> (A -> B) -> List A -> List B
-  = \A B fn l. cataList A (List B) l (Nil B) (\hd tl. Cons B (fn hd) tl);
+mapList : {A B : Type} -> (A -> B) -> List A -> List B
+  = \fn l. cataList l Nil (\hd tl. Cons (fn hd) tl);
 
-appendList : (A : Type) -> List A -> List A -> List A
-  = \A l1 l2. cataList A (List A) l1 l2 (\hd tl. Cons A hd tl);
+appendList : {A : Type} -> List A -> List A -> List A
+  = \l1 l2. cataList l1 l2 Cons;

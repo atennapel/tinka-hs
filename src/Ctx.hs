@@ -14,18 +14,19 @@ import Universes
 data Path
   = Here
   | Define Path Name Core Core
-  | Bind Path Name Core Univ
+  | Bind Path Name Icit Core Univ
   deriving Show
 
 closeType :: Path -> Core -> Univ -> Core
 closeType mcl b ub = case mcl of
   Here -> b
-  Bind mcl x a ua -> closeType mcl (Pi x Expl a ua b ub) (umax ua ub)
+  Bind mcl x i a ua -> closeType mcl (Pi x i a ua b ub) (umax ua ub)
   Define mcl x a t -> closeType mcl (Let x a t b) ub
 
 data Ctx = Ctx {
   lvl :: Lvl,
   ns :: [Name],
+  allns :: [Either Name Name],
   ts :: [Val],
   vs :: Env,
   ctxus :: [Univ],
@@ -39,19 +40,19 @@ names = reverse . go . path
   where
     go Here = []
     go (Define p x _ _) = x : go p
-    go (Bind p x _ _) = x : go p
+    go (Bind p x _ _ _) = x : go p
 
 empty :: Ctx
-empty = Ctx 0 [] [] [] [] Nothing [] Here
+empty = Ctx 0 [] [] [] [] [] Nothing [] Here
 
 define :: Name -> Core -> Val -> Univ -> Core -> Val -> Ctx -> Ctx
-define x a t u c v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (v : vs ctx) (u : ctxus ctx) (pos ctx) (Nothing : pruning ctx) (Define (path ctx) x a c)
+define x a t u c v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (Right x : allns ctx) (t : ts ctx) (v : vs ctx) (u : ctxus ctx) (pos ctx) (Nothing : pruning ctx) (Define (path ctx) x a c)
 
 bind :: Name -> Icit -> Val -> Univ -> Ctx -> Ctx
-bind x i t u ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just i : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t) u)
+bind x i t u ctx = Ctx (lvl ctx + 1) (x : ns ctx) (Right x : allns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just i : pruning ctx) (Bind (path ctx) x i (quote (lvl ctx) t) u)
 
 bindInsert :: Name -> Icit -> Val -> Univ -> Ctx -> Ctx
-bindInsert x i t u ctx = Ctx (lvl ctx + 1) (ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just i : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t) u)
+bindInsert x i t u ctx = Ctx (lvl ctx + 1) (ns ctx) (Left x : allns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just i : pruning ctx) (Bind (path ctx) x i (quote (lvl ctx) t) u)
 
 enter :: SourcePos -> Ctx -> Ctx
 enter p ctx = ctx { pos = Just p }
@@ -59,17 +60,20 @@ enter p ctx = ctx { pos = Just p }
 closeVal :: Ctx -> Val -> Clos
 closeVal ctx v = Clos (vs ctx) (quote (lvl ctx + 1) v)
 
+allNames :: Ctx -> [Name]
+allNames ctx = map (either id id) $ allns ctx
+
 showC :: Ctx -> Core -> String
-showC ctx c = show $ fromCore (ns ctx) c
+showC ctx c = show $ fromCore (allNames ctx) c
 
 showVWith :: QuoteLevel -> Ctx -> Val -> String
-showVWith ql ctx v = show $ fromCore (ns ctx) (quoteWith ql (lvl ctx) v)
+showVWith ql ctx v = show $ fromCore (allNames ctx) (quoteWith ql (lvl ctx) v)
 
 showV :: Ctx -> Val -> String
-showV ctx v = show $ fromCore (ns ctx) (quote (lvl ctx) v)
+showV ctx v = show $ fromCore (allNames ctx) (quote (lvl ctx) v)
 
 showLocal :: Ctx -> String
-showLocal ctx = let zipped = zip3 (ns ctx) (ts ctx) (vs ctx) in
+showLocal ctx = let zipped = zip3 (allNames ctx) (ts ctx) (vs ctx) in
   intercalate "\n" $ map format zipped
     where
       format (x, t, v) = case showV ctx v of
@@ -77,13 +81,14 @@ showLocal ctx = let zipped = zip3 (ns ctx) (ts ctx) (vs ctx) in
         sv -> x ++ " : " ++ showV ctx t ++ " = " ++ sv
 
 lookupVarMaybe :: Ctx -> Name -> IO (Maybe (Ix, Val, Univ))
-lookupVarMaybe ctx x = go (ns ctx) (ts ctx) (ctxus ctx) 0
+lookupVarMaybe ctx x = go (allns ctx) (ts ctx) (ctxus ctx) 0
   where
-    go :: [Name] -> [Val] -> [Univ] -> Ix -> IO (Maybe (Ix, Val, Univ))
+    go :: [Either Name Name] -> [Val] -> [Univ] -> Ix -> IO (Maybe (Ix, Val, Univ))
     go [] [] [] _ = return Nothing
-    go (y : _) (ty : _) (u : _) i | x == y = return $ Just (i, ty, u)
+    go (Right y : _) (ty : _) (u : _) i | x == y = return $ Just (i, ty, u)
     go (_ : ns) (_ : ts) (_ : us) i = go ns ts us (i + 1)
-    go _ _ _ _ = error "impossible"
+    go ns ts us i =
+      error $ "impossible (" ++ show (length ns) ++ ", " ++ show (length ts) ++ ", " ++ show (length us) ++ ", " ++ show i ++ ")"
 
 lookupVar :: Ctx -> Name -> IO (Ix, Val, Univ)
 lookupVar ctx x = do

@@ -18,7 +18,7 @@ import Data.IORef
 import System.IO.Unsafe
 import Data.Bifunctor (first)
 
--- import Debug.Trace (trace)
+--import Debug.Trace (trace)
 
 -- holes
 data HoleEntry = HoleEntry Ctx Core Val
@@ -87,7 +87,7 @@ check :: Ctx -> Surface -> Val -> Univ -> IO Core
 check ctx tm ty u = do
   let fty = force ty
   let fu = normalizeUniv u
-  case (tm, {-trace ("check (" ++ show tm ++ ") : " ++ showV ctx ty ++ " : " ++ show fu ++ " ~> " ++ showV ctx fty) $ -}fty, fu) of
+  case (tm, {-trace ("check (" ++ show tm ++ ") : " ++ showV ctx ty ++ " : " ++ show fu ++ " ~> " ++ showV ctx fty) $-} fty, fu) of
     (SPos p s, _, _) -> check (enter p ctx) s ty u
     (SHole x, _, _) -> do
       tm <- freshMeta ctx ty u
