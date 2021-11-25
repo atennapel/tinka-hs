@@ -148,7 +148,7 @@ pBinder :: Parser Name
 pBinder = (fst <$> pIdent) <|> symbol "_"
 
 pSpine :: Parser Surface
-pSpine = foldl1 SApp <$> some pAtom
+pSpine = foldl1 (\a b -> SApp a b (Right Expl)) <$> some pAtom
 
 pLam :: Parser Surface
 pLam = do
@@ -156,7 +156,7 @@ pLam = do
   xs <- some pBinder
   char '.'
   t <- pSurface
-  pure (foldr SAbs t xs)
+  pure (foldr (\x t -> SAbs x (Right Expl) t) t xs)
 
 pArrowOrCross :: Parser Bool
 pArrowOrCross = (True <$ pArrow) <|> (False <$ pCross)
@@ -166,15 +166,15 @@ pPiOrSigma = do
   dom <- some (parens ((,) <$> some pBinder <*> (char ':' *> pSurface)))
   ty <- pArrowOrCross
   cod <- pSurface
-  let tyfun a = if ty then (`SPi` a) else (`SSigma` a)
-  pure $ foldr (\(xs, a) t -> foldr (tyfun a) t xs) cod dom
+  let tyfun x i a b = if ty then SPi x i a b else SSigma x a b
+  pure $ foldr (\(xs, a) t -> foldr (\x t -> tyfun x Expl a t) t xs) cod dom
 
 funOrSpine :: Parser Surface
 funOrSpine = do
   sp <- pSpine
   optional pArrowOrCross >>= \case
     Nothing -> pure sp
-    Just b  -> (if b then SPi else SSigma) "_" sp <$> pSurface
+    Just b  -> (if b then SPi "_" Expl else SSigma "_") sp <$> pSurface
 
 pLet :: Parser Surface
 pLet = do

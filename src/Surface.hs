@@ -3,6 +3,7 @@ module Surface (Surface(..), fromCore, Def(..), Defs, showDefs, defNames, countN
 import GHC.Exts(IsString(..))
 import Data.List (intercalate)
 import Text.Megaparsec (SourcePos)
+import Data.Maybe (fromMaybe)
 
 import Common
 import Core
@@ -11,9 +12,9 @@ import Universes
 data Surface
   = SVar Name ULvl
   | SPrimElim Name ULvl ULvl
-  | SApp Surface Surface
-  | SAbs Name Surface
-  | SPi Name Surface Surface
+  | SApp Surface Surface (Either Name Icit)
+  | SAbs Name (Either Name Icit) Surface
+  | SPi Name Icit Surface Surface
   | SSigma Name Surface Surface
   | SPair Surface Surface
   | SProj Surface ProjType
@@ -39,20 +40,20 @@ isSimple _ = False
 showS :: Surface -> String
 showS s = if isSimple s then show s else "(" ++ show s ++ ")"
 
-flattenApp :: Surface -> (Surface, [Surface])
+flattenApp :: Surface -> (Surface, [(Surface, Either Name Icit)])
 flattenApp s = go s []
   where
-    go (SApp f a) as = go f (a : as)
+    go (SApp f a i) as = go f ((a, i) : as)
     go (SPos _ s) as = go s as
     go s as = (s, as)
 
-flattenAbs :: Surface -> ([Name], Surface)
-flattenAbs (SAbs x b) = let (as, s') = flattenAbs b in (x : as, s')
+flattenAbs :: Surface -> ([(Name, Either Name Icit)], Surface)
+flattenAbs (SAbs x i b) = let (as, s') = flattenAbs b in ((x, i) : as, s')
 flattenAbs (SPos _ s) = flattenAbs s
 flattenAbs s = ([], s)
 
-flattenPi :: Surface -> ([(Name, Surface)], Surface)
-flattenPi (SPi x t b) = let (as, s') = flattenPi b in ((x, t) : as, s')
+flattenPi :: Surface -> ([(Name, Icit, Surface)], Surface)
+flattenPi (SPi x i t b) = let (as, s') = flattenPi b in ((x, i, t) : as, s')
 flattenPi (SPos _ s) = flattenPi s
 flattenPi s = ([], s)
 
@@ -73,18 +74,28 @@ flattenProj s = go s []
     go (SPos _ s) ps = go s ps
     go s ps = (s, ps)
 
-showTelescope :: [(Name, Surface)] -> Surface -> String -> String
+showTelescope :: [(Name, Icit, Surface)] -> Surface -> String -> String
 showTelescope ps rt delim = go ps
   where
     go [] = show rt
-    go (("_", s@(SApp _ _)) : tl) = show s ++ delim ++ go tl
-    go (("_", SPos _ s@(SApp _ _)) : tl) = show s ++ delim ++ go tl
-    go (("_", s) : tl) = showS s ++ delim ++ go tl
-    go ((x, s) : tl) = "(" ++ x ++ " : " ++ show s ++ ")" ++ delim ++ go tl
+    go (("_", Expl, s@SApp {}) : tl) = show s ++ delim ++ go tl
+    go (("_", Expl, SPos _ s@SApp {}) : tl) = show s ++ delim ++ go tl
+    go (("_", Expl, s) : tl) = showS s ++ delim ++ go tl
+    go ((x, i, s) : tl) = icit i "{" "(" ++ x ++ " : " ++ show s ++ icit i "}" ")" ++ delim ++ go tl
 
 showProjType :: ProjType -> String
 showProjType Fst = ".1"
 showProjType Snd = ".2"
+
+showAbsParameter :: (Name, Either Name Icit) -> String
+showAbsParameter (x, Right Expl) = x
+showAbsParameter (x, Right Impl) = "{" ++ x ++ "}"
+showAbsParameter (x, Left y) = "{" ++ x ++ " = " ++ y ++ "}"
+
+showAppArgument :: (Surface, Either Name Icit) -> String
+showAppArgument (a, Right Expl) = showS a
+showAppArgument (a, Right Impl) = "{" ++ show a ++ "}"
+showAppArgument (a, Left x) = "{" ++ x ++ " = " ++ show a ++ "}"
 
 instance Show Surface where
   show (SVar x 0) = x
@@ -95,19 +106,19 @@ instance Show Surface where
   show (SPrimElim x l k) = "elim " ++ x ++ "^" ++ show l ++ (if k == 0 then "" else " " ++ show k)
   show (SU 0) = "Type"
   show (SU l) = "Type" ++ show l
-  show (SHole x) = "_" ++ maybe "" id x
-  show s@(SApp f a) =
+  show (SHole x) = "_" ++ fromMaybe "" x
+  show s@SApp {} =
     let (f', as) = flattenApp s in
-    showS f' ++ " " ++ unwords (map showS as)
-  show s@(SAbs x b) =
+    showS f' ++ " " ++ unwords (map showAppArgument as)
+  show s@SAbs {} =
     let (as, s') = flattenAbs s in
-    "\\" ++ unwords as ++ ". " ++ show s'
-  show s@(SPi x t b) =
+    "\\" ++ unwords (map showAbsParameter as) ++ ". " ++ show s'
+  show s@SPi {} =
     let (as, s') = flattenPi s in
     showTelescope as s' " -> "
   show s@(SSigma x t b) =
     let (as, s') = flattenSigma s in
-    showTelescope as s' " ** "
+    showTelescope (map (\(x, t) -> (x, Expl, t)) as) s' " ** "
   show s@(SPair _ _) = "(" ++ intercalate ", " (map show $ flattenPair s) ++ ")"
   show s@(SProj _ _) = let (s', ps) = flattenProj s in showS s' ++ intercalate "" (map showProjType ps)
   show (SLet x Nothing v b) = "let " ++ x ++ " = " ++ show v ++ "; " ++ show b
@@ -128,9 +139,9 @@ fromCore ns (Var i) = SVar (ns !! i) 0
 fromCore ns (Global x l) = SVar x l
 fromCore ns (Prim x l) = SVar (show x) l
 fromCore ns (PrimElim x l k) = SPrimElim (show x) l k
-fromCore ns (App f a) = SApp (fromCore ns f) (fromCore ns a)
-fromCore ns (Abs x b) = SAbs x (fromCore (x : ns) b)
-fromCore ns (Pi x t _ b _) = SPi x (fromCore ns t) (fromCore (x : ns) b)
+fromCore ns (App f a i) = SApp (fromCore ns f) (fromCore ns a) (Right i)
+fromCore ns (Abs x i b) = SAbs x (Right i) (fromCore (x : ns) b)
+fromCore ns (Pi x i t _ b _) = SPi x i (fromCore ns t) (fromCore (x : ns) b)
 fromCore ns (Sigma x t _ b _) = SSigma x (fromCore ns t) (fromCore (x : ns) b)
 fromCore ns (Pair a b) = SPair (fromCore ns a) (fromCore ns b)
 fromCore ns (Proj s p) = SProj (fromCore ns s) p 
@@ -143,7 +154,7 @@ fromCore ns (Lower t) = SLower (fromCore ns t)
 fromCore ns (Con t) = SCon (fromCore ns t)
 fromCore _ Refl = SRefl
 fromCore _ (Meta x) = SVar ("?" ++ show x) 0
-fromCore ns (AppPruning t _) = SApp (fromCore ns t) (SVar "*" 0)
+fromCore ns (AppPruning t _) = SApp (fromCore ns t) (SVar "*" 0) (Right Expl)
 
 data Def
   = Def Name (Maybe Surface) Surface -- name type term

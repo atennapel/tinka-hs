@@ -66,9 +66,9 @@ check ctx tm ty u = do
       tm <- freshMeta ctx ty u
       maybe (return ()) (\x -> addHole x ctx tm ty) x
       return tm
-    (SAbs x b, VPi x' ty u1 b' u2, _) -> do
-      cb <- check (bind x ty u1 ctx) b (vinst b' $ vvar (lvl ctx)) u2
-      return $ Abs x cb
+    (SAbs x (Right i) b, VPi x' i' ty u1 b' u2, _) | i == i' -> do
+      cb <- check (bind x i ty u1 ctx) b (vinst b' $ vvar (lvl ctx)) u2
+      return $ Abs x i cb
     (SPair a b, VSigma x ty u1 b' u2, _) -> do
       ta <- check ctx a ty u1
       tb <- check ctx b (vinst b' $ eval (vs ctx) ta) u2
@@ -137,7 +137,7 @@ check ctx tm ty u = do
       unify (lvl ctx) ty (VNe (HPrim PBool k) [])
       return $ Prim PFalse k
 
-    (SRefl, VNe (HPrim PHEq _) [EApp y, EApp x, EApp b, EApp a], _) -> do
+    (SRefl, VNe (HPrim PHEq _) [EApp y Expl, EApp x Expl, EApp b Expl, EApp a Expl], _) -> do
       testIO (unify (lvl ctx) a b) $ \e -> "type mismatch in Refl: " ++ showV ctx ty ++ ": " ++ show e
       testIO (unify (lvl ctx) x y) $ \e -> "value mismatch in Refl: " ++ showV ctx ty ++ ": " ++ show e
       return Refl
@@ -180,29 +180,31 @@ infer ctx (SPrimElim x l k) = do
       let (t, u) = primElimType prim l k
       return (PrimElim prim l k, t, u)
     Nothing -> error $ "undefined primitive " ++ x
-infer ctx c@(SApp f a) = do
+infer ctx c@(SApp f a (Right i)) = do
   (cf, fty, fu) <- infer ctx f
   (t, u1, b, u2) <- case force fty of
-    VPi x t u1 b u2 -> return (t, u1, b, u2)
+    VPi x i' t u1 b u2 -> do
+      test (i == i') $ "plicity mismatch in " ++ show c ++ ", got " ++ showV ctx fty
+      return (t, u1, b, u2)
     tty -> do
       u1 <- UMeta <$> newUMeta
       u2 <- UMeta <$> newUMeta
       a <- eval (vs ctx) <$> freshMeta ctx (VU u1) (us u1)
-      b <- Clos (vs ctx) <$> freshMeta (bind "x" a u1 ctx) (VU u2) (us u2)
-      unify (lvl ctx) tty (VPi "x" a u1 b u2)
+      b <- Clos (vs ctx) <$> freshMeta (bind "x" i a u1 ctx) (VU u2) (us u2)
+      unify (lvl ctx) tty (VPi "x" i a u1 b u2)
       return (a, u1, b, u2)
   ca <- check ctx a t u1
-  return (App cf ca, vinst b (eval (vs ctx) ca), u2)
-infer ctx (SPi x t b) = do
+  return (App cf ca i, vinst b (eval (vs ctx) ca), u2)
+infer ctx (SPi x i t b) = do
   (ct, u1) <- inferUniv ctx t
   let ty = eval (vs ctx) ct
-  (cb, u2) <- inferUniv (bind x ty u1 ctx) b
+  (cb, u2) <- inferUniv (bind x i ty u1 ctx) b
   let lmax = umax u1 u2
-  return (Pi x ct u1 cb u2, VU lmax, us lmax)
+  return (Pi x i ct u1 cb u2, VU lmax, us lmax)
 infer ctx (SSigma x t b) = do
   (ct, u1) <- inferUniv ctx t
   let ty = eval (vs ctx) ct
-  (cb, u2) <- inferUniv (bind x ty u1 ctx) b
+  (cb, u2) <- inferUniv (bind x Expl ty u1 ctx) b
   let lmax = umax u1 u2
   return (Sigma x ct u1 cb u2, VU lmax, us lmax)
 infer ctx (SPair a b) = do
@@ -237,11 +239,11 @@ infer ctx (SHole x) = do
   t <- freshMeta ctx a u
   maybe (return ()) (\x -> addHole x ctx t a) x
   return (t, a, u)
-infer ctx (SAbs x b) = do
+infer ctx (SAbs x (Right i) b) = do
   u1 <- UMeta <$> newUMeta
   a <- eval (vs ctx) <$> freshMeta ctx (VU u1) (us u1)
-  (cb, rty, u2) <- infer (bind x a u1 ctx) b
-  return (Abs x cb, VPi x a u1 (closeVal ctx rty) u2, umax u1 u2)
+  (cb, rty, u2) <- infer (bind x i a u1 ctx) b
+  return (Abs x i cb, VPi x i a u1 (closeVal ctx rty) u2, umax u1 u2)
 infer ctx s = error $ "unable to infer " ++ show s
 
 includeMetas :: [MetaVar] -> Core -> Core

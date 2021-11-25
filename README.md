@@ -73,7 +73,7 @@ TODO:
   - [x] handle double imports (topological sort of imports)
   - [x] do not exit REPL on module cycles
   - [x] store what file globals come from, improve duplicate global error message
-- [x] metas, unification and _ solving
+- [ ] metas, unification and _ solving
   - [x] typed metas
   - [x] expand elaboration to use more metas
   - [x] named holes
@@ -81,6 +81,9 @@ TODO:
   - [x] pruning
   - [x] universe metas
   - [ ] implicit function types
+    - [x] add syntax
+    - [ ] expand elaboration
+    - [ ] add parser
   - [ ] improve unification error messages
   - [ ] avoid SomeException, use throw and throwIO
   - [ ] metas-as-globals if a file is elaborated

@@ -12,7 +12,7 @@ check :: Ctx -> Core -> Val -> IO ()
 check ctx c ty =
   let fty = force ty in
   case (c, fty) of
-    (Abs x b, VPi x' ty u b' _) -> check (bind x ty u ctx) b (vinst b' $ vvar (lvl ctx))
+    (Abs x i b, VPi x' i' ty u b' _) | i == i' -> check (bind x i ty u ctx) b (vinst b' $ vvar (lvl ctx))
     (Pair a b, VSigma x ty _ b' _) -> do
       _ <- check ctx a ty
       check ctx b (vinst b' $ eval (vs ctx) a)
@@ -25,7 +25,7 @@ check ctx c ty =
     (LiftTerm t, VLift ty) -> check ctx t ty
     (Lower t, ty) -> check ctx t (VLift ty)
     (Con t, x@(VData l d)) -> check ctx t (vel l 0 d x)
-    (Refl, VNe (HPrim PHEq _) [EApp y, EApp x, EApp b, EApp a]) -> do
+    (Refl, VNe (HPrim PHEq _) [EApp y Expl, EApp x Expl, EApp b Expl, EApp a Expl]) -> do
       test (conv (lvl ctx) a b) $ "verify: type mismatch in Refl: " ++ showV ctx ty
       test (conv (lvl ctx) x y) $ "verify: value mismatch in Refl: " ++ showV ctx ty
     (c, _) -> do
@@ -48,18 +48,19 @@ infer ctx (Global x l) = do
   return vt
 infer ctx c@(Prim x l) = return $ fst $ primType x l
 infer ctx (PrimElim x l k) = return $ fst $ primElimType x l k
-infer ctx (Pi x t _ b _) = do
+infer ctx (Pi x i t _ b _) = do
   l1 <- inferUniv ctx t
-  l2 <- inferUniv (bind x (eval (vs ctx) t) (UConst l1) ctx) b
+  l2 <- inferUniv (bind x i (eval (vs ctx) t) (UConst l1) ctx) b
   return $ VU (UConst $ max l1 l2)
 infer ctx (Sigma x t _ b _) = do
   l1 <- inferUniv ctx t
-  l2 <- inferUniv (bind x (eval (vs ctx) t) (UConst l1) ctx) b
+  l2 <- inferUniv (bind x Expl (eval (vs ctx) t) (UConst l1) ctx) b
   return $ VU (UConst $ max l1 l2)
-infer ctx c@(App f a) = do
+infer ctx c@(App f a i) = do
   fty <- infer ctx f
   case force fty of
-    VPi x t _ b _ -> do
+    VPi x i' t _ b _ -> do
+      test (i == i') $ "verify: plicity mismatch in " ++ show c ++ ", got " ++ showV ctx fty
       check ctx a t
       return $ vinst b (eval (vs ctx) a)
     _ -> error $ "verify: not a pi type in " ++ show c ++ ", got " ++ showV ctx fty

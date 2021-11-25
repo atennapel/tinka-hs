@@ -20,7 +20,7 @@ data Path
 closeType :: Path -> Core -> Univ -> Core
 closeType mcl b ub = case mcl of
   Here -> b
-  Bind mcl x a ua -> closeType mcl (Pi x a ua b ub) (umax ua ub)
+  Bind mcl x a ua -> closeType mcl (Pi x Expl a ua b ub) (umax ua ub)
   Define mcl x a t -> closeType mcl (Let x a t b) ub
 
 data Ctx = Ctx {
@@ -47,11 +47,11 @@ empty = Ctx 0 [] [] [] [] Nothing [] Here
 define :: Name -> Core -> Val -> Univ -> Core -> Val -> Ctx -> Ctx
 define x a t u c v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (v : vs ctx) (u : ctxus ctx) (pos ctx) (Nothing : pruning ctx) (Define (path ctx) x a c)
 
-bind :: Name -> Val -> Univ -> Ctx -> Ctx
-bind x t u ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just () : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t) u)
+bind :: Name -> Icit -> Val -> Univ -> Ctx -> Ctx
+bind x i t u ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just i : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t) u)
 
-insert :: Name -> Val -> Univ -> Ctx -> Ctx
-insert x t u ctx = Ctx (lvl ctx + 1) (ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just () : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t) u)
+insert :: Name -> Icit -> Val -> Univ -> Ctx -> Ctx
+insert x i t u ctx = Ctx (lvl ctx + 1) (ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just i : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t) u)
 
 enter :: SourcePos -> Ctx -> Ctx
 enter p ctx = ctx { pos = Just p }
