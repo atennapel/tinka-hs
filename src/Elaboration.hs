@@ -16,6 +16,7 @@ import Data.List (intercalate)
 import qualified Data.IntMap as IM
 import Data.IORef
 import System.IO.Unsafe
+import Data.Bifunctor (first)
 
 -- import Debug.Trace (trace)
 
@@ -46,6 +47,32 @@ freshMeta ctx a u = do
   m <- newMeta closed closedv
   pure $ AppPruning (Meta m) (pruning ctx)
 
+insert' :: Ctx -> IO (Core, Val, Univ) -> IO (Core, Val, Univ)
+insert' ctx act = go =<< act where
+  go (t, va, u) = case force va of
+    VPi x Impl a u1 b u2 -> do
+      m <- freshMeta ctx a u1
+      let mv = eval (vs ctx) m
+      go (App t m Impl, vinst b mv, u2)
+    va -> pure (t, va, u)
+
+insert :: Ctx -> IO (Core, Val, Univ) -> IO (Core, Val, Univ)
+insert ctx act = act >>= \case
+  (t@(Abs _ Impl _), va, u) -> return (t, va, u)
+  (t, va, u) -> insert' ctx (return (t, va, u))
+
+insertUntilName :: Ctx -> Name -> IO (Core, Val, Univ) -> IO (Core, Val, Univ)
+insertUntilName ctx name act = go =<< act where
+  go (t, va, u) = case force va of
+    va@(VPi x Impl a u1 b u2) -> do
+      if x == name then
+        return (t, va, u)
+      else do
+        m <- freshMeta ctx a u1
+        let mv = eval (vs ctx) m
+        go (App t m Impl, vinst b mv, u2)
+    _ -> error $ "name " ++ name ++ " not found in pi"
+
 checkOrInfer :: Ctx -> Surface -> Maybe Surface -> IO (Core, Core, Val, Univ)
 checkOrInfer ctx v Nothing = do
   (cv, ty, u) <- infer ctx v
@@ -66,9 +93,18 @@ check ctx tm ty u = do
       tm <- freshMeta ctx ty u
       maybe (return ()) (\x -> addHole x ctx tm ty) x
       return tm
-    (SAbs x (Right i) b, VPi x' i' ty u1 b' u2, _) | i == i' -> do
-      cb <- check (bind x i ty u1 ctx) b (vinst b' $ vvar (lvl ctx)) u2
-      return $ Abs x i cb
+    (SAbs x i ma b, VPi x' i' ty u1 b' u2, _) | either (\x -> x == x' && i' == Impl) (== i') i -> do
+      case ma of
+        Nothing -> return ()
+        Just a -> do
+          (ca, u') <- inferUniv ctx a
+          unifyUniv u' u1
+          unify (lvl ctx) (eval (vs ctx ) ca) ty
+      cb <- check (bind x i' ty u1 ctx) b (vinst b' $ vvar (lvl ctx)) u2
+      return $ Abs x i' cb
+    (t, VPi x Impl a u1 b u2, _) -> do
+      cb <- check (bindInsert x Impl a u1 ctx) t (vinst b (VVar (lvl ctx))) u2
+      return $ Abs x Impl cb
     (SPair a b, VSigma x ty u1 b' u2, _) -> do
       ta <- check ctx a ty u1
       tb <- check ctx b (vinst b' $ eval (vs ctx) ta) u2
@@ -144,17 +180,16 @@ check ctx tm ty u = do
 
     -- infer fallback
     (s, _, _) -> do
-      (c, ty', u') <- infer ctx s
+      (c, ty', u') <- insert ctx $ infer ctx s
       testIO (unifyUniv u' u) $ \e -> "universe check failed " ++ show s ++ " : " ++ showV ctx ty ++ " : " ++ show u ++ " ~ " ++ show u' ++ ": " ++ show e
       testIO (unify (lvl ctx) ty' ty) $ \e -> "check failed " ++ show s ++ " : " ++ showV ctx ty ++ ", got " ++ showV ctx ty' ++ ": " ++ show e
       return c
 
 inferUniv :: Ctx -> Surface -> IO (Core, Univ)
 inferUniv ctx tm = do
-  (c, ty, _) <- infer ctx tm
-  case force ty of
-    VU l -> return (c, normalizeUniv l)
-    _ -> error $ "expected a universe but got " ++ showV ctx ty ++ ", while checking " ++ show tm 
+  u <- UMeta <$> newUMeta
+  ctm <- check ctx tm (VU u) (us u)
+  return (ctm, normalizeUniv u)
 
 infer :: Ctx -> Surface -> IO (Core, Val, Univ)
 infer ctx (SPos p s) = infer (enter p ctx) s
@@ -180,12 +215,21 @@ infer ctx (SPrimElim x l k) = do
       let (t, u) = primElimType prim l k
       return (PrimElim prim l k, t, u)
     Nothing -> error $ "undefined primitive " ++ x
-infer ctx c@(SApp f a (Right i)) = do
-  (cf, fty, fu) <- infer ctx f
-  (t, u1, b, u2) <- case force fty of
-    VPi x i' t u1 b u2 -> do
-      test (i == i') $ "plicity mismatch in " ++ show c ++ ", got " ++ showV ctx fty
-      return (t, u1, b, u2)
+infer ctx c@(SApp f a i) = do
+  (i, cf, tty, u) <- case i of
+    Left name -> do
+      (t, tty, u) <- insertUntilName ctx name $ infer ctx f
+      return (Impl, t, tty, u)
+    Right Impl -> do
+      (t, tty, u) <- infer ctx f
+      return (Impl, t, tty, u)
+    Right Expl -> do
+      (t, tty, u) <- insert' ctx $ infer ctx f
+      return (Expl, t, tty, u)
+  (pt, u1, rt, u2) <- case force tty of
+    VPi x i' a u1 b u2 -> do
+      test (i == i') $ "app icit mismatch in " ++ show c ++ ": " ++ showV ctx tty
+      return (a, u1, b, u2)
     tty -> do
       u1 <- UMeta <$> newUMeta
       u2 <- UMeta <$> newUMeta
@@ -193,8 +237,8 @@ infer ctx c@(SApp f a (Right i)) = do
       b <- Clos (vs ctx) <$> freshMeta (bind "x" i a u1 ctx) (VU u2) (us u2)
       unify (lvl ctx) tty (VPi "x" i a u1 b u2)
       return (a, u1, b, u2)
-  ca <- check ctx a t u1
-  return (App cf ca i, vinst b (eval (vs ctx) ca), u2)
+  ca <- check ctx a pt u1
+  return (App cf ca i, vinst rt (eval (vs ctx) ca), u2)
 infer ctx (SPi x i t b) = do
   (ct, u1) <- inferUniv ctx t
   let ty = eval (vs ctx) ct
@@ -239,10 +283,14 @@ infer ctx (SHole x) = do
   t <- freshMeta ctx a u
   maybe (return ()) (\x -> addHole x ctx t a) x
   return (t, a, u)
-infer ctx (SAbs x (Right i) b) = do
-  u1 <- UMeta <$> newUMeta
-  a <- eval (vs ctx) <$> freshMeta ctx (VU u1) (us u1)
-  (cb, rty, u2) <- infer (bind x i a u1 ctx) b
+infer ctx (SAbs x (Right i) ma b) = do
+  (a, u1) <- first (eval (vs ctx)) <$> case ma of
+    Just a -> inferUniv ctx a
+    Nothing -> do
+      u1 <- UMeta <$> newUMeta
+      a <- freshMeta ctx (VU u1) (us u1)
+      return (a, u1)
+  (cb, rty, u2) <- insert ctx $ infer (bind x i a u1 ctx) b
   return (Abs x i cb, VPi x i a u1 (closeVal ctx rty) u2, umax u1 u2)
 infer ctx s = error $ "unable to infer " ++ show s
 
@@ -287,8 +335,7 @@ elaborate ctx s = do
   showHoles hs
   test (null hs) $ "\nholes found: " ++ show (map fst $ reverse hs)
   ums <- getUMetas
-  solved <- allUMetasSolved
-  test solved $ "\nunsolved universe metas:\n" ++ showUMetaMap ums
+  test (allUMetasSolved ums) $ "\nunsolved universe metas:\n" ++ showUMetaMap ums
   order <- orderMetas
   let c' = includeMetas order c
   let ty' = nf $ includeMetas order (quote 0 ty)

@@ -13,7 +13,7 @@ data Surface
   = SVar Name ULvl
   | SPrimElim Name ULvl ULvl
   | SApp Surface Surface (Either Name Icit)
-  | SAbs Name (Either Name Icit) Surface
+  | SAbs Name (Either Name Icit) (Maybe Surface) Surface
   | SPi Name Icit Surface Surface
   | SSigma Name Surface Surface
   | SPair Surface Surface
@@ -47,8 +47,8 @@ flattenApp s = go s []
     go (SPos _ s) as = go s as
     go s as = (s, as)
 
-flattenAbs :: Surface -> ([(Name, Either Name Icit)], Surface)
-flattenAbs (SAbs x i b) = let (as, s') = flattenAbs b in ((x, i) : as, s')
+flattenAbs :: Surface -> ([(Name, Either Name Icit, Maybe Surface)], Surface)
+flattenAbs (SAbs x i t b) = let (as, s') = flattenAbs b in ((x, i, t) : as, s')
 flattenAbs (SPos _ s) = flattenAbs s
 flattenAbs s = ([], s)
 
@@ -87,10 +87,13 @@ showProjType :: ProjType -> String
 showProjType Fst = ".1"
 showProjType Snd = ".2"
 
-showAbsParameter :: (Name, Either Name Icit) -> String
-showAbsParameter (x, Right Expl) = x
-showAbsParameter (x, Right Impl) = "{" ++ x ++ "}"
-showAbsParameter (x, Left y) = "{" ++ x ++ " = " ++ y ++ "}"
+showAbsParameter :: (Name, Either Name Icit, Maybe Surface) -> String
+showAbsParameter (x, Right Expl, Nothing) = x
+showAbsParameter (x, Right Expl, Just t) = "(" ++ x ++ " : " ++ show t ++ ")"
+showAbsParameter (x, Right Impl, Nothing) = "{" ++ x ++ "}"
+showAbsParameter (x, Right Impl, Just t) = "{" ++ x ++ " : " ++ show t ++ "}"
+showAbsParameter (x, Left y, Nothing) = "{" ++ x ++ " = " ++ y ++ "}"
+showAbsParameter (x, Left y, Just t) = "{" ++ x ++ " : " ++ show t ++ " = " ++ y ++ "}"
 
 showAppArgument :: (Surface, Either Name Icit) -> String
 showAppArgument (a, Right Expl) = showS a
@@ -140,7 +143,7 @@ fromCore ns (Global x l) = SVar x l
 fromCore ns (Prim x l) = SVar (show x) l
 fromCore ns (PrimElim x l k) = SPrimElim (show x) l k
 fromCore ns (App f a i) = SApp (fromCore ns f) (fromCore ns a) (Right i)
-fromCore ns (Abs x i b) = SAbs x (Right i) (fromCore (x : ns) b)
+fromCore ns (Abs x i b) = SAbs x (Right i) Nothing (fromCore (x : ns) b)
 fromCore ns (Pi x i t _ b _) = SPi x i (fromCore ns t) (fromCore (x : ns) b)
 fromCore ns (Sigma x t _ b _) = SSigma x (fromCore ns t) (fromCore (x : ns) b)
 fromCore ns (Pair a b) = SPair (fromCore ns a) (fromCore ns b)

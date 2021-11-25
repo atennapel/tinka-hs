@@ -82,7 +82,7 @@ TODO:
   - [x] universe metas
   - [ ] implicit function types
     - [x] add syntax
-    - [ ] expand elaboration
+    - [x] expand elaboration
     - [ ] add parser
   - [ ] improve unification error messages
   - [ ] avoid SomeException, use throw and throwIO

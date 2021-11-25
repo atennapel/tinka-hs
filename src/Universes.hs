@@ -5,7 +5,6 @@ import Common
 import qualified Data.IntMap as IM
 import Data.IORef
 import System.IO.Unsafe
-import Control.Exception (catch, SomeException)
 import Data.List (intercalate)
 
 -- umetas
@@ -33,13 +32,8 @@ showUMetaMap m = intercalate "\n" $ map go $ IM.assocs m
     go (k, UUnsolved) = "?" ++ show k
     go (k, USolved u) = "?" ++ show k ++ " = " ++ show u
 
-allUMetasSolved :: IO Bool
-allUMetasSolved = do
-  ms <- getUMetas
-  if IM.null ms then
-    return True
-  else
-    return $ any (== UUnsolved) $ IM.elems ms
+allUMetasSolved :: UMetaMap -> Bool
+allUMetasSolved ms = notElem UUnsolved $ IM.elems ms
 
 newUMeta :: IO UMetaVar
 newUMeta = do
@@ -113,9 +107,9 @@ unifyUniv u1 u2 =
   case (normalizeUniv u1, normalizeUniv u2) of
     (UConst l1, UConst l2) | l1 == l2 -> return ()
     (US u1, US u2) -> unifyUniv u1 u2
-    (UMax u1 u2, UMax u3 u4) ->
-      catch (unifyUniv u1 u3 >> unifyUniv u2 u4) $ \(_ :: SomeException) ->
-        unifyUniv u1 u4 >> unifyUniv u2 u3
+    (US u, UConst l) -> unifyUniv u (UConst (l - 1))
+    (UConst l, US u) -> unifyUniv (UConst (l - 1)) u
+    (UMax u1 u2, UMax u3 u4) -> unifyUniv u1 u3 >> unifyUniv u2 u4
     (UMeta m, u) -> solveUniv m u
     (u, UMeta m) -> solveUniv m u
     (u1, u2) -> error $ "failed to unify universes: " ++ show u1 ++ " ~ " ++ show u2

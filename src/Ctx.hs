@@ -50,8 +50,8 @@ define x a t u c v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (v : vs ctx
 bind :: Name -> Icit -> Val -> Univ -> Ctx -> Ctx
 bind x i t u ctx = Ctx (lvl ctx + 1) (x : ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just i : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t) u)
 
-insert :: Name -> Icit -> Val -> Univ -> Ctx -> Ctx
-insert x i t u ctx = Ctx (lvl ctx + 1) (ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just i : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t) u)
+bindInsert :: Name -> Icit -> Val -> Univ -> Ctx -> Ctx
+bindInsert x i t u ctx = Ctx (lvl ctx + 1) (ns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just i : pruning ctx) (Bind (path ctx) x (quote (lvl ctx) t) u)
 
 enter :: SourcePos -> Ctx -> Ctx
 enter p ctx = ctx { pos = Just p }
