@@ -151,9 +151,19 @@ pBinder :: Parser Name
 pBinder = (fst <$> pIdent) <|> symbol "_"
 
 pArg :: Parser (Either Name Icit, Surface)
-pArg =  (try $ braces $ do {x <- fst <$> pIdent; char '='; t <- pSurface; pure (Left x, t)})
-    <|> ((Right Impl,) <$> (char '{' *> pSurface <* char '}'))
-    <|> ((Right Expl,) <$> pAtom)
+pArg = try abs <|> try implByName <|> impl <|> arg
+  where
+    impl = (Right Impl,) <$> (char '{' *> pSurface <* char '}')
+
+    arg = (Right Expl,) <$> pAtom
+
+    abs = (Right Expl,) <$> pLam
+
+    implByName = braces $ do
+      x <- fst <$> pIdent
+      char '='
+      t <- pSurface
+      return (Left x, t)
 
 pSpine :: Parser Surface
 pSpine = do

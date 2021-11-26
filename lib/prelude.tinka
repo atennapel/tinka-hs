@@ -1,0 +1,7 @@
+import lib/function.tinka;
+import lib/eq.tinka;
+import lib/bool.tinka;
+import lib/bool.proofs.tinka;
+import lib/desc.tinka;
+import lib/nat.tinka;
+import lib/list.tinka;
