@@ -1,0 +1,27 @@
+Sum : Type -> Type -> Type
+  = \A B. (b : Bool) ** (elim Bool 1) (\_. Type) A B b;
+
+Left : {A B : Type} -> A -> Sum A B = \x. (True, x);
+Right : {A B : Type} -> B -> Sum A B = \x. (False, x);
+
+indSum :
+  {A B : Type}
+  (P : Sum A B -> Type)
+  (left : (x : A) -> P (Left x))
+  (right : (x : B) -> P (Right x))
+  (sum : Sum A B)
+  -> P sum
+  = \{A} {B} P left right sum. (elim Bool) (\b. (x : (elim Bool 1) (\_. Type) A B b) -> P (b, x)) left right (fst sum) (snd sum);
+
+sum :
+  {A B R : Type}
+  -> (A -> R)
+  -> (B -> R)
+  -> Sum A B
+  -> R
+  = \{R = R} left right x. indSum (\_. R) left right x;
+
+swapSum : {A B : Type} -> Sum A B -> Sum B A = sum Right Left;
+
+mapSum : {X A B : Type} -> (A -> B) -> Sum X A -> Sum X B
+  = \fn. sum Left (\x. Right (fn x));
