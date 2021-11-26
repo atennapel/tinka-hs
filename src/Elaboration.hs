@@ -18,7 +18,7 @@ import Data.IORef
 import System.IO.Unsafe
 import Data.Bifunctor (first)
 
---import Debug.Trace (trace)
+-- import Debug.Trace (trace)
 
 -- holes
 data HoleEntry = HoleEntry Ctx Core Val
@@ -116,8 +116,8 @@ check ctx tm ty u = do
     (SLift t, VU (UConst l), _) | l > 0 -> do
       c <- check ctx t (VU (UConst $ l - 1)) (UConst l)
       return $ Lift c
-    (SLiftTerm t, VLift ty, _) -> do
-      c <- check ctx t ty u
+    (SLiftTerm t, VLift ty, UConst l) -> do
+      c <- check ctx t ty (UConst (l - 1))
       return $ LiftTerm c
     (SLower t, ty, _) -> do
       c <- check ctx t (VLift ty) (us u)

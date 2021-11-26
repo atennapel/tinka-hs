@@ -88,6 +88,7 @@ TODO:
   - [ ] avoid SomeException, use throw and throwIO
   - [ ] metas-as-globals if a file is elaborated
   - [ ] consider zonking again
+- [ ] parser for `f \x. ...`
 - [ ] parser for post-fix projections
 - [ ] parser for unit type () and nested units []
 - [ ] named sigma projection
