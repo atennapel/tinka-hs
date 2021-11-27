@@ -7,9 +7,6 @@ type Ix = Int
 type Lvl = Int
 type ULvl = Int
 
-data ProjType = Fst | Snd
-  deriving (Eq)
-
 newtype MetaVar = MetaVar { unMetaVar :: Int } deriving (Eq, Show, Num, Ord) via Int
 
 test :: Bool -> String -> IO ()

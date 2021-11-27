@@ -88,8 +88,8 @@ pCommaSeparated = do
 pPair :: Parser Surface
 pPair = parens (foldr1 SPair <$> pCommaSeparated)
 
-pProjType :: Parser ProjType
-pProjType = Fst <$ symbol "fst" <|> Snd <$ symbol "snd"
+pProjType :: Parser SProjType
+pProjType = SFst <$ symbol "fst" <|> SSnd <$ symbol "snd"
 
 pProj :: Parser Surface
 pProj = do

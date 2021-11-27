@@ -175,7 +175,7 @@ unifyLift k c c' = let v = vvar k in unify (k + 1) (vinst c v) (vinst c' v)
 unifyElim :: Lvl -> Elim -> Elim -> IO ()
 unifyElim k (EApp v i) (EApp v' i') = unify k v v'
 unifyElim k ELower ELower = return ()
-unifyElim k (EProj p) (EProj p') | p == p' = return ()
+unifyElim k (EProj p) (EProj p') | eqvProj p p' = return ()
 unifyElim k (EPrimElim x l1 l1' as) (EPrimElim x' l2 l2' as') | x == x' && l1 == l2 && l1' == l2' =
   go as as'
   where

@@ -259,8 +259,8 @@ infer ctx (SPair a b) = do
 infer ctx c@(SProj t p) = do
   (tm, vt, _) <- infer ctx t
   case (force vt, p) of
-    (VSigma x ty u c _, Fst) -> return (Proj tm p, ty, u)
-    (VSigma x ty _ c u, Snd) -> return (Proj tm p, vinst c $ vproj (eval (vs ctx) tm) Fst, u)
+    (VSigma x ty u c _, SFst) -> return (Proj tm Fst, ty, u)
+    (VSigma x ty _ c u, SSnd) -> return (Proj tm Snd, vinst c $ vproj (eval (vs ctx) tm) Fst, u)
     _ -> error $ "not a sigma type in " ++ show c ++ ", got " ++ showV ctx vt
 infer ctx (SLet x t v b) = do
   (cv, ct, ty, ut) <- checkOrInfer ctx v t

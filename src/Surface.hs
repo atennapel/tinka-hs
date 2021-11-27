@@ -1,4 +1,4 @@
-module Surface (Surface(..), fromCore, Def(..), Defs, showDefs, defNames, countNames, imports) where
+module Surface (SProjType(..), Surface(..), fromCore, Def(..), Defs, showDefs, defNames, countNames, imports) where
 
 import GHC.Exts(IsString(..))
 import Data.List (intercalate)
@@ -9,6 +9,9 @@ import Common
 import Core
 import Universes
 
+data SProjType = SFst | SSnd | SIndex Ix | SNamed Name
+  deriving (Eq)
+
 data Surface
   = SVar Name ULvl
   | SPrimElim Name ULvl ULvl
@@ -17,7 +20,7 @@ data Surface
   | SPi Name Icit Surface Surface
   | SSigma Name Surface Surface
   | SPair Surface Surface
-  | SProj Surface ProjType
+  | SProj Surface SProjType
   | SU ULvl
   | SLet Name (Maybe Surface) Surface Surface
   | SPos SourcePos Surface
@@ -67,7 +70,7 @@ flattenPair (SPair a b) = a : flattenPair b
 flattenPair (SPos _ s) = flattenPair s
 flattenPair s = [s]
 
-flattenProj :: Surface -> (Surface, [ProjType])
+flattenProj :: Surface -> (Surface, [SProjType])
 flattenProj s = go s []
   where
     go (SProj b p) ps = go b (p : ps)
@@ -83,9 +86,11 @@ showTelescope ps rt delim = go ps
     go (("_", Expl, s) : tl) = showS s ++ delim ++ go tl
     go ((x, i, s) : tl) = icit i "{" "(" ++ x ++ " : " ++ show s ++ icit i "}" ")" ++ delim ++ go tl
 
-showProjType :: ProjType -> String
-showProjType Fst = ".1"
-showProjType Snd = ".2"
+showSProjType :: SProjType -> String
+showSProjType SFst = "._1"
+showSProjType SSnd = "._2"
+showSProjType (SIndex i) = "." ++ show i
+showSProjType (SNamed x) = "." ++ x
 
 showAbsParameter :: (Name, Either Name Icit, Maybe Surface) -> String
 showAbsParameter (x, Right Expl, Nothing) = x
@@ -123,7 +128,7 @@ instance Show Surface where
     let (as, s') = flattenSigma s in
     showTelescope (map (\(x, t) -> (x, Expl, t)) as) s' " ** "
   show s@(SPair _ _) = "(" ++ intercalate ", " (map show $ flattenPair s) ++ ")"
-  show s@(SProj _ _) = let (s', ps) = flattenProj s in showS s' ++ intercalate "" (map showProjType ps)
+  show s@(SProj _ _) = let (s', ps) = flattenProj s in showS s' ++ intercalate "" (map showSProjType ps)
   show (SLet x Nothing v b) = "let " ++ x ++ " = " ++ show v ++ "; " ++ show b
   show (SLet x (Just t) v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (SPos _ s) = show s
@@ -147,7 +152,12 @@ fromCore ns (Abs x i b) = SAbs x (Right i) Nothing (fromCore (x : ns) b)
 fromCore ns (Pi x i t _ b _) = SPi x i (fromCore ns t) (fromCore (x : ns) b)
 fromCore ns (Sigma x t _ b _) = SSigma x (fromCore ns t) (fromCore (x : ns) b)
 fromCore ns (Pair a b) = SPair (fromCore ns a) (fromCore ns b)
-fromCore ns (Proj s p) = SProj (fromCore ns s) p 
+fromCore ns (Proj s p) = SProj (fromCore ns s) (go p)
+  where
+    go Fst = SFst
+    go Snd = SSnd
+    go (PNamed (Just x) _) = SNamed x
+    go (PNamed Nothing i) = SIndex i
 fromCore ns (U (UConst l)) = SU l
 fromCore ns (U u) = SVar ("Type " ++ show u) 0
 fromCore ns (Let x t v b) = SLet x (Just $ fromCore ns t) (fromCore ns v) (fromCore (x : ns) b)

@@ -89,9 +89,14 @@ TODO:
   - [ ] metas-as-globals if a file is elaborated
   - [ ] consider zonking again
 - [x] parser for `f \x. ...`
-- [ ] parser for post-fix projections
+- [x] named sigma projection
+  - [x] add syntax
+  - [ ] add conversion checking
+  - [ ] add unification
+  - [ ] add verification
+  - [ ] add elaboration
+  - [ ] add post-fix parser
 - [ ] parser for unit type () and nested units []
-- [ ] named sigma projection
 - [ ] QTT
 - [ ] internal fixpoints
 - [ ] coinductive types

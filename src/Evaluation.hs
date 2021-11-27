@@ -35,6 +35,8 @@ velimSp v (e : as) = velim (velimSp v as) e
 vproj :: Val -> ProjType -> Val
 vproj (VPair a b) Fst = a
 vproj (VPair a b) Snd = b
+vproj (VPair a b) (PNamed _ 0) = a
+vproj (VPair a b) (PNamed j n) = vproj b (PNamed j (n - 1))
 vproj (VNe h sp) p = VNe h (EProj p : sp)
 vproj (VGlobal x l sp v) p = VGlobal x l (EProj p : sp) (vproj v p)
 vproj _ _ = undefined
@@ -42,6 +44,12 @@ vproj _ _ = undefined
 vfst, vsnd :: Val -> Val
 vfst v = vproj v Fst
 vsnd v = vproj v Snd
+
+vindex :: Val -> Ix -> Val
+vindex v i = vproj v (PNamed Nothing i)
+
+vnamed :: Val -> Name -> Ix -> Val
+vnamed v x i = vproj v (PNamed (Just x) i)
 
 vlower :: Val -> Val
 vlower (VLiftTerm v) = v
@@ -255,10 +263,16 @@ nf = nfWith KeepGlobals
 convLift :: Lvl -> Clos -> Clos -> Bool
 convLift k c c' = let v = vvar k in conv (k + 1) (vinst c v) (vinst c' v)
 
+eqvProj :: ProjType -> ProjType -> Bool
+eqvProj (PNamed _ i) (PNamed _ i') = i == i'
+eqvProj Fst (PNamed _ 0) = True
+eqvProj (PNamed _ 0) Fst = True
+eqvProj p p' = p == p'
+
 convElim :: Lvl -> Elim -> Elim -> Bool
 convElim k ELower ELower = True
 convElim k (EApp v _) (EApp v' _) = conv k v v'
-convElim k (EProj p) (EProj p') = p == p'
+convElim k (EProj p) (EProj p') = eqvProj p p'
 convElim k (EPrimElim PEBoolDesc l1 k1 [t1, f1]) (EPrimElim PEBool l2 k2 [p, t2, f2]) =
   l1 == l2 && k1 + 1 == k2 && conv k (vabs "_" $ \_ -> vDesc l1) p && conv k t1 t2 && conv k f1 f2
 convElim k (EPrimElim PEBool l2 k2 [p, t2, f2]) (EPrimElim PEBoolDesc l1 k1 [t1, f1]) =
@@ -266,6 +280,13 @@ convElim k (EPrimElim PEBool l2 k2 [p, t2, f2]) (EPrimElim PEBoolDesc l1 k1 [t1,
 convElim k (EPrimElim x1 l1 k1 as1) (EPrimElim x2 l2 k2 as2) =
   x1 == x2 && l1 == l2 && k1 == k2 && and (zipWith (conv k) as1 as2)
 convElim k _ _ = False
+
+convSp :: Lvl -> Spine -> Spine -> Bool
+convSp k [] [] = True
+-- v sp ._2 ~ v sp' .n ~> v sp ~ v sp' .(n - 1)
+convSp k (EProj Snd : sp) (EProj (PNamed j n) : sp') | n > 0 = convSp k sp (EProj (PNamed j (n - 1)) : sp')
+convSp k (e : sp) (e' : sp') = convSp k sp sp' && convElim k e e'
+convSp k _ _ = undefined
 
 conv :: Lvl -> Val -> Val -> Bool
 conv k a b = -- trace ("conv " ++ show (quote k a) ++ " ~ " ++ show (quote k b)) $ do
@@ -284,7 +305,7 @@ conv k a b = -- trace ("conv " ++ show (quote k a) ++ " ~ " ++ show (quote k b))
     (VPair a b, VPair c d) -> conv k a c && conv k b d
     (VPair a b, x) -> conv k a (vfst x) && conv k b (vsnd x)
     (x, VPair a b) -> conv k (vfst x) a && conv k (vsnd x) b
-    (VNe h sp, VNe h' sp') | h == h' -> and $ zipWith (convElim k) sp sp'
+    (VNe h sp, VNe h' sp') | h == h' -> convSp k sp sp'
     
     (VNe (HPrim PUnit _) [], v) -> True
     (v, VNe (HPrim PUnit _) []) -> True
@@ -293,7 +314,7 @@ conv k a b = -- trace ("conv " ++ show (quote k a) ++ " ~ " ++ show (quote k b))
     (v, VRefl) -> True -- is this safe?
 
     (VGlobal x l sp v, VGlobal x' l' sp' v') | x == x' && l == l' ->
-      and (zipWith (convElim k) sp sp') || conv k v v'
+      convSp k sp sp' || conv k v v'
     (VGlobal _ _ _ v, VGlobal _ _ _ v') -> conv k v v'
     (VGlobal _ _ _ v, v') -> conv k v v'
     (v, VGlobal _ _ _ v') -> conv k v v'

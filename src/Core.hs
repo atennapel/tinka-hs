@@ -1,4 +1,4 @@
-module Core (Core(..), liftUniv, PrimName(..), PrimElimName(..), toPrimName, toPrimElimName, PrimElimPosition(..), primElimPosition, allMetas, expandMetas) where
+module Core (ProjType(..), Core(..), liftUniv, PrimName(..), PrimElimName(..), toPrimName, toPrimElimName, PrimElimPosition(..), primElimPosition, allMetas, expandMetas) where
 
 import Common
 import Prims
@@ -8,6 +8,9 @@ import qualified Data.Set as S
 import Data.Set (Set)
 import Data.List (elemIndex)
 import Data.Maybe (fromJust)
+
+data ProjType = Fst | Snd | PNamed (Maybe Name) Ix
+  deriving (Eq)
 
 data Core
   = Var Ix
@@ -33,6 +36,8 @@ data Core
 showProjType :: ProjType -> String
 showProjType Fst = ".1"
 showProjType Snd = ".2"
+showProjType (PNamed (Just x) _) = "." ++ x
+showProjType (PNamed Nothing i) = "." ++ show i
 
 instance Show Core where
   show (Var x) = show x
