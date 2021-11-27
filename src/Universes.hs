@@ -5,7 +5,6 @@ import Common
 import qualified Data.IntMap as IM
 import Data.IORef
 import System.IO.Unsafe
-import Control.Exception (catch, SomeException)
 import Data.List (intercalate)
 
 -- umetas
@@ -30,16 +29,11 @@ getUMetas = readIORef umcxt
 showUMetaMap :: UMetaMap -> String
 showUMetaMap m = intercalate "\n" $ map go $ IM.assocs m
   where
-    go (k, UUnsolved) = "?" ++ show k
-    go (k, USolved u) = "?" ++ show k ++ " = " ++ show u
+    go (k, UUnsolved) = "?u" ++ show k
+    go (k, USolved u) = "?u" ++ show k ++ " = " ++ show u
 
-allUMetasSolved :: IO Bool
-allUMetasSolved = do
-  ms <- getUMetas
-  if IM.null ms then
-    return True
-  else
-    return $ any (== UUnsolved) $ IM.elems ms
+allUMetasSolved :: UMetaMap -> Bool
+allUMetasSolved ms = notElem UUnsolved $ IM.elems ms
 
 newUMeta :: IO UMetaVar
 newUMeta = do
@@ -72,7 +66,19 @@ instance Show Univ where
   show (UConst l) = show l
   show (US u) = "(S" ++ " " ++ show u ++ ")"
   show (UMax u1 u2) = "(max " ++ show u1 ++ " " ++ show u2 ++ ")"
-  show (UMeta m) = "?" ++ show m
+  show (UMeta m) = "?u" ++ show m
+
+lteqUniv :: Univ -> Univ -> Maybe Bool
+lteqUniv u1 u2 | u1 == u2 = Just True
+lteqUniv (UConst l1) (UConst l2) = Just (l1 <= l2)
+lteqUniv u (UConst 0) = Just False
+lteqUniv (US u1) (US u2) = lteqUniv u1 u2
+lteqUniv u1 (US u2) =
+  case lteqUniv u1 u2 of
+    Just True -> Just True
+    Just False -> Nothing
+    Nothing -> Nothing
+lteqUniv _ _ = Nothing
 
 tryNormalizeUniv :: Univ -> Maybe Univ
 tryNormalizeUniv (US (UConst l)) = Just (UConst (l + 1))
@@ -84,6 +90,14 @@ tryNormalizeUniv u@(UMeta m) =
 tryNormalizeUniv (UMax u1 u2) | u1 == u2 = Just u1
 tryNormalizeUniv (UMax (UConst l1) (UConst l2)) = Just (UConst (max l1 l2))
 tryNormalizeUniv (UMax (US u1) (US u2)) = Just (US (UMax u1 u2))
+tryNormalizeUniv (UMax u1 u2) | lteqUniv u1 u2 == Just True = Just u2
+tryNormalizeUniv (UMax u1 u2) | lteqUniv u2 u1 == Just True = Just u1
+tryNormalizeUniv (UMax u1 u2) =
+  case (tryNormalizeUniv u1, tryNormalizeUniv u2) of
+    (Just u1', Just u2') -> Just (UMax u1' u2')
+    (Just u1', Nothing) -> Just (UMax u1' u2)
+    (Nothing, Just u2') -> Just (UMax u1 u2')
+    (Nothing, Nothing) -> Nothing
 tryNormalizeUniv _ = Nothing
 
 normalizeUniv :: Univ -> Univ
@@ -113,9 +127,9 @@ unifyUniv u1 u2 =
   case (normalizeUniv u1, normalizeUniv u2) of
     (UConst l1, UConst l2) | l1 == l2 -> return ()
     (US u1, US u2) -> unifyUniv u1 u2
-    (UMax u1 u2, UMax u3 u4) ->
-      catch (unifyUniv u1 u3 >> unifyUniv u2 u4) $ \(_ :: SomeException) ->
-        unifyUniv u1 u4 >> unifyUniv u2 u3
+    (US u, UConst l) -> unifyUniv u (UConst (l - 1))
+    (UConst l, US u) -> unifyUniv (UConst (l - 1)) u
+    (UMax u1 u2, UMax u3 u4) -> unifyUniv u1 u3 >> unifyUniv u2 u4
     (UMeta m, u) -> solveUniv m u
     (u, UMeta m) -> solveUniv m u
     (u1, u2) -> error $ "failed to unify universes: " ++ show u1 ++ " ~ " ++ show u2

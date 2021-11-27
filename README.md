@@ -73,19 +73,34 @@ TODO:
   - [x] handle double imports (topological sort of imports)
   - [x] do not exit REPL on module cycles
   - [x] store what file globals come from, improve duplicate global error message
-- [x] metas, unification and _ solving
+- [ ] metas, unification and _ solving
   - [x] typed metas
   - [x] expand elaboration to use more metas
   - [x] named holes
   - [x] show meta context when printing holes
   - [x] pruning
   - [x] universe metas
-  - [ ] implicit function types
+  - [x] implicit function types
+    - [x] add syntax
+    - [x] expand elaboration
+    - [x] add parser
   - [ ] improve unification error messages
   - [ ] avoid SomeException, use throw and throwIO
   - [ ] metas-as-globals if a file is elaborated
   - [ ] consider zonking again
-- [ ] parser for post-fix projections
+- [x] parser for `f \x. ...`
+- [x] named sigma projection
+  - [x] add syntax
+  - [x] add conversion checking
+  - [x] add unification
+  - [x] add verification
+  - [x] add elaboration
+  - [ ] add post-fix parser
+- [ ] improve core printing
 - [ ] parser for unit type () and nested units []
-- [ ] named sigma projection
+- [ ] qualified imports
 - [ ] QTT
+- [ ] internal fixpoints
+- [ ] coinductive types
+- [ ] postponing
+- [ ] instance arguments

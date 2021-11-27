@@ -16,6 +16,8 @@ import Data.List (intercalate)
 import qualified Data.IntMap as IM
 import Data.IORef
 import System.IO.Unsafe
+import Data.Bifunctor (first)
+import qualified Data.Set as S
 
 -- import Debug.Trace (trace)
 
@@ -46,6 +48,32 @@ freshMeta ctx a u = do
   m <- newMeta closed closedv
   pure $ AppPruning (Meta m) (pruning ctx)
 
+insert' :: Ctx -> IO (Core, Val, Univ) -> IO (Core, Val, Univ)
+insert' ctx act = go =<< act where
+  go (t, va, u) = case force va of
+    VPi x Impl a u1 b u2 -> do
+      m <- freshMeta ctx a u1
+      let mv = eval (vs ctx) m
+      go (App t m Impl, vinst b mv, u2)
+    va -> pure (t, va, u)
+
+insert :: Ctx -> IO (Core, Val, Univ) -> IO (Core, Val, Univ)
+insert ctx act = act >>= \case
+  (t@(Abs _ Impl _), va, u) -> return (t, va, u)
+  (t, va, u) -> insert' ctx (return (t, va, u))
+
+insertUntilName :: Ctx -> Name -> IO (Core, Val, Univ) -> IO (Core, Val, Univ)
+insertUntilName ctx name act = go =<< act where
+  go (t, va, u) = case force va of
+    va@(VPi x Impl a u1 b u2) -> do
+      if x == name then
+        return (t, va, u)
+      else do
+        m <- freshMeta ctx a u1
+        let mv = eval (vs ctx) m
+        go (App t m Impl, vinst b mv, u2)
+    _ -> error $ "name " ++ name ++ " not found in pi"
+
 checkOrInfer :: Ctx -> Surface -> Maybe Surface -> IO (Core, Core, Val, Univ)
 checkOrInfer ctx v Nothing = do
   (cv, ty, u) <- infer ctx v
@@ -60,15 +88,24 @@ check :: Ctx -> Surface -> Val -> Univ -> IO Core
 check ctx tm ty u = do
   let fty = force ty
   let fu = normalizeUniv u
-  case (tm, {-trace ("check (" ++ show tm ++ ") : " ++ showV ctx ty ++ " : " ++ show fu ++ " ~> " ++ showV ctx fty) $ -}fty, fu) of
+  case (tm, {-trace ("check (" ++ show tm ++ ") : " ++ showV ctx ty ++ " : " ++ show fu ++ " ~> " ++ showV ctx fty) $-} fty, fu) of
     (SPos p s, _, _) -> check (enter p ctx) s ty u
     (SHole x, _, _) -> do
       tm <- freshMeta ctx ty u
       maybe (return ()) (\x -> addHole x ctx tm ty) x
       return tm
-    (SAbs x b, VPi x' ty u1 b' u2, _) -> do
-      cb <- check (bind x ty u1 ctx) b (vinst b' $ vvar (lvl ctx)) u2
-      return $ Abs x cb
+    (SAbs x i ma b, VPi x' i' ty u1 b' u2, _) | either (\x -> x == x' && i' == Impl) (== i') i -> do
+      case ma of
+        Nothing -> return ()
+        Just a -> do
+          (ca, u') <- inferUniv ctx a
+          unifyUniv u' u1
+          unify (lvl ctx) (eval (vs ctx ) ca) ty
+      cb <- check (bind x i' ty u1 ctx) b (vinst b' $ vvar (lvl ctx)) u2
+      return $ Abs x i' cb
+    (t, VPi x Impl a u1 b u2, _) -> do
+      cb <- check (bindInsert x Impl a u1 ctx) t (vinst b (VVar (lvl ctx))) u2
+      return $ Abs x Impl cb
     (SPair a b, VSigma x ty u1 b' u2, _) -> do
       ta <- check ctx a ty u1
       tb <- check ctx b (vinst b' $ eval (vs ctx) ta) u2
@@ -80,8 +117,8 @@ check ctx tm ty u = do
     (SLift t, VU (UConst l), _) | l > 0 -> do
       c <- check ctx t (VU (UConst $ l - 1)) (UConst l)
       return $ Lift c
-    (SLiftTerm t, VLift ty, _) -> do
-      c <- check ctx t ty u
+    (SLiftTerm t, VLift ty, UConst l) -> do
+      c <- check ctx t ty (UConst (l - 1))
       return $ LiftTerm c
     (SLower t, ty, _) -> do
       c <- check ctx t (VLift ty) (us u)
@@ -137,24 +174,23 @@ check ctx tm ty u = do
       unify (lvl ctx) ty (VNe (HPrim PBool k) [])
       return $ Prim PFalse k
 
-    (SRefl, VNe (HPrim PHEq _) [EApp y, EApp x, EApp b, EApp a], _) -> do
+    (SRefl, VNe (HPrim PHEq _) [EApp y Expl, EApp x Expl, EApp b Expl, EApp a Expl], _) -> do
       testIO (unify (lvl ctx) a b) $ \e -> "type mismatch in Refl: " ++ showV ctx ty ++ ": " ++ show e
       testIO (unify (lvl ctx) x y) $ \e -> "value mismatch in Refl: " ++ showV ctx ty ++ ": " ++ show e
       return Refl
 
     -- infer fallback
     (s, _, _) -> do
-      (c, ty', u') <- infer ctx s
+      (c, ty', u') <- insert ctx $ infer ctx s
       testIO (unifyUniv u' u) $ \e -> "universe check failed " ++ show s ++ " : " ++ showV ctx ty ++ " : " ++ show u ++ " ~ " ++ show u' ++ ": " ++ show e
       testIO (unify (lvl ctx) ty' ty) $ \e -> "check failed " ++ show s ++ " : " ++ showV ctx ty ++ ", got " ++ showV ctx ty' ++ ": " ++ show e
       return c
 
 inferUniv :: Ctx -> Surface -> IO (Core, Univ)
 inferUniv ctx tm = do
-  (c, ty, _) <- infer ctx tm
-  case force ty of
-    VU l -> return (c, normalizeUniv l)
-    _ -> error $ "expected a universe but got " ++ showV ctx ty ++ ", while checking " ++ show tm 
+  u <- UMeta <$> newUMeta
+  ctm <- check ctx tm (VU u) (us u)
+  return (ctm, normalizeUniv u)
 
 infer :: Ctx -> Surface -> IO (Core, Val, Univ)
 infer ctx (SPos p s) = infer (enter p ctx) s
@@ -180,29 +216,40 @@ infer ctx (SPrimElim x l k) = do
       let (t, u) = primElimType prim l k
       return (PrimElim prim l k, t, u)
     Nothing -> error $ "undefined primitive " ++ x
-infer ctx c@(SApp f a) = do
-  (cf, fty, fu) <- infer ctx f
-  (t, u1, b, u2) <- case force fty of
-    VPi x t u1 b u2 -> return (t, u1, b, u2)
+infer ctx c@(SApp f a i) = do
+  (i, cf, tty, u) <- case i of
+    Left name -> do
+      (t, tty, u) <- insertUntilName ctx name $ infer ctx f
+      return (Impl, t, tty, u)
+    Right Impl -> do
+      (t, tty, u) <- infer ctx f
+      return (Impl, t, tty, u)
+    Right Expl -> do
+      (t, tty, u) <- insert' ctx $ infer ctx f
+      return (Expl, t, tty, u)
+  (pt, u1, rt, u2) <- case force tty of
+    VPi x i' a u1 b u2 -> do
+      test (i == i') $ "app icit mismatch in " ++ show c ++ ": " ++ showV ctx tty
+      return (a, u1, b, u2)
     tty -> do
       u1 <- UMeta <$> newUMeta
       u2 <- UMeta <$> newUMeta
       a <- eval (vs ctx) <$> freshMeta ctx (VU u1) (us u1)
-      b <- Clos (vs ctx) <$> freshMeta (bind "x" a u1 ctx) (VU u2) (us u2)
-      unify (lvl ctx) tty (VPi "x" a u1 b u2)
+      b <- Clos (vs ctx) <$> freshMeta (bind "x" i a u1 ctx) (VU u2) (us u2)
+      unify (lvl ctx) tty (VPi "x" i a u1 b u2)
       return (a, u1, b, u2)
-  ca <- check ctx a t u1
-  return (App cf ca, vinst b (eval (vs ctx) ca), u2)
-infer ctx (SPi x t b) = do
+  ca <- check ctx a pt u1
+  return (App cf ca i, vinst rt (eval (vs ctx) ca), u2)
+infer ctx (SPi x i t b) = do
   (ct, u1) <- inferUniv ctx t
   let ty = eval (vs ctx) ct
-  (cb, u2) <- inferUniv (bind x ty u1 ctx) b
+  (cb, u2) <- inferUniv (bind x i ty u1 ctx) b
   let lmax = umax u1 u2
-  return (Pi x ct u1 cb u2, VU lmax, us lmax)
+  return (Pi x i ct u1 cb u2, VU lmax, us lmax)
 infer ctx (SSigma x t b) = do
   (ct, u1) <- inferUniv ctx t
   let ty = eval (vs ctx) ct
-  (cb, u2) <- inferUniv (bind x ty u1 ctx) b
+  (cb, u2) <- inferUniv (bind x Expl ty u1 ctx) b
   let lmax = umax u1 u2
   return (Sigma x ct u1 cb u2, VU lmax, us lmax)
 infer ctx (SPair a b) = do
@@ -213,9 +260,39 @@ infer ctx (SPair a b) = do
 infer ctx c@(SProj t p) = do
   (tm, vt, _) <- infer ctx t
   case (force vt, p) of
-    (VSigma x ty u c _, Fst) -> return (Proj tm p, ty, u)
-    (VSigma x ty _ c u, Snd) -> return (Proj tm p, vinst c $ vproj (eval (vs ctx) tm) Fst, u)
-    _ -> error $ "not a sigma type in " ++ show c ++ ", got " ++ showV ctx vt
+    (VSigma x ty u c _, SFst) -> return (Proj tm Fst, ty, u)
+    (VSigma x ty _ c u, SSnd) -> return (Proj tm Snd, vinst c $ vproj (eval (vs ctx) tm) Fst, u)
+    (tty, SIndex i) -> do
+      (a, u) <- go (eval (vs ctx) tm) tty i 0
+      return (Proj tm (PNamed Nothing i), a, u)
+      where
+        go :: Val -> Val -> Ix -> Ix -> IO (Val, Univ)
+        go tm ty j j2 = case (force ty, j) of
+          (VSigma x ty u1 c u2, 0) -> return (ty, u1)
+          (VSigma x ty u1 c u2, j) -> go tm (vinst c (vproj tm (PNamed Nothing j2))) (j - 1) (j2 + 1)
+          _ -> error $ "not a sigma type in " ++ show c ++ ": " ++ showV ctx vt
+    (tty, SNamed x) -> do
+      (a, u, i) <- go (eval (vs ctx) tm) tty 0 S.empty
+      return (Proj tm (PNamed (Just x) i), a, u)
+      where
+        go :: Val -> Val -> Ix -> S.Set Name -> IO (Val, Univ, Ix)
+        go tm ty i xs = case force ty of
+          VSigma y ty u1 c u2 | x == y -> return (ty, u1, i)
+          VSigma y ty u1 c u2 -> do
+            let name = if x == "_" || S.member x xs then Nothing else Just y
+            go tm (vinst c (vproj tm (PNamed name i))) (i + 1) (S.insert y xs)
+          _ -> error $ "name not found " ++ show c ++ ": " ++ showV ctx vt
+    (tty, _) | p == SFst || p == SSnd -> do
+      u1 <- UMeta <$> newUMeta
+      u2 <- UMeta <$> newUMeta
+      a <- eval (vs ctx) <$> freshMeta ctx (VU u1) (us u1)
+      b <- Clos (vs ctx) <$> freshMeta (bind "x" Expl a u1 ctx) (VU u2) (us u2)
+      unify (lvl ctx) tty (VSigma "x" a u1 b u2)
+      case p of
+        SFst -> return (Proj tm Fst, a, u1) 
+        SSnd -> return (Proj tm Snd, vinst b (vproj (eval (vs ctx) tm) Fst), u2)
+        _ -> undefined
+    _ -> error $ "not a sigma type in " ++ show c ++ ": " ++ showV ctx vt
 infer ctx (SLet x t v b) = do
   (cv, ct, ty, ut) <- checkOrInfer ctx v t
   (cb, rty, u) <- infer (define x ct ty ut cv (eval (vs ctx) cv) ctx) b
@@ -228,30 +305,39 @@ infer ctx (SLiftTerm t) = do
   return (LiftTerm c, VLift ty, us u)
 infer ctx tm@(SLower t) = do
   (c, ty, u) <- infer ctx t
+  ulower <- UMeta <$> newUMeta
+  unifyUniv (us ulower) u
   case force ty of
-    VLift ty' -> return (Lower c, ty', u)
-    _ -> error $ "expected lift type in " ++ show tm ++ " but got " ++ showV ctx ty
+    VLift ty' -> return (Lower c, ty', ulower)
+    tty -> do
+      a <- eval (vs ctx) <$> freshMeta ctx (VU ulower) u
+      unify (lvl ctx) tty (VLift a)
+      return (Lower c, a, ulower)
 infer ctx (SHole x) = do
   u <- UMeta <$> newUMeta
   a <- eval (vs ctx) <$> freshMeta ctx (VU u) (us u)
   t <- freshMeta ctx a u
   maybe (return ()) (\x -> addHole x ctx t a) x
   return (t, a, u)
-infer ctx (SAbs x b) = do
-  u1 <- UMeta <$> newUMeta
-  a <- eval (vs ctx) <$> freshMeta ctx (VU u1) (us u1)
-  (cb, rty, u2) <- infer (bind x a u1 ctx) b
-  return (Abs x cb, VPi x a u1 (closeVal ctx rty) u2, umax u1 u2)
+infer ctx (SAbs x (Right i) ma b) = do
+  (a, u1) <- first (eval (vs ctx)) <$> case ma of
+    Just a -> inferUniv ctx a
+    Nothing -> do
+      u1 <- UMeta <$> newUMeta
+      a <- freshMeta ctx (VU u1) (us u1)
+      return (a, u1)
+  (cb, rty, u2) <- insert ctx $ infer (bind x i a u1 ctx) b
+  return (Abs x i cb, VPi x i a u1 (closeVal ctx rty) u2, umax u1 u2)
 infer ctx s = error $ "unable to infer " ++ show s
 
-includeMetas :: [MetaVar] -> Core -> Core
-includeMetas order t = go [] order
+includeMetas :: (Ctx, Val, Univ) -> [MetaVar] -> Core -> Core
+includeMetas (ctx, ty, u) order t = go [] order
   where
     go :: [MetaVar] -> [MetaVar] -> Core
     go partial [] = expandMetas order t
     go partial (m : ms) =
       case lookupMeta m of
-        Unsolved _ _ -> error $ "unsolved meta: ?" ++ show m
+        Unsolved _ _ -> error $ "unsolved meta: ?" ++ show m ++ "\ntype: " ++ showV ctx ty ++ "\nuniv: " ++ show (normalizeUniv u)
         Solved _ ct _ c _ ->
           let expandedType = expandMetas partial ct in
           let expandedValue = expandMetas partial c in
@@ -283,13 +369,12 @@ elaborate ctx s = do
   (c, ty, u) <- infer ctx s
   hs <- readIORef holes
   showHoles hs
-  test (null hs) $ "\nholes found: " ++ show (map fst $ reverse hs)
-  ums <- getUMetas
-  solved <- allUMetasSolved
-  test solved $ "\nunsolved universe metas:\n" ++ showUMetaMap ums
+  test (null hs) $ "\nholes found:\ntype: " ++ showV ctx ty ++ "\nuniv: " ++ show (normalizeUniv u) ++ "\n" ++ show (map fst $ reverse hs)
   order <- orderMetas
-  let c' = includeMetas order c
-  let ty' = nf $ includeMetas order (quote 0 ty)
+  let c' = includeMetas (ctx, ty, u) order c
+  let ty' = nf $ includeMetas (ctx, ty, u) order (quote 0 ty)
+  ums <- getUMetas
+  test (allUMetasSolved ums) $ "\nunsolved universe metas:\ntype: " ++ showV ctx ty ++ "\nuniv: " ++ show (normalizeUniv u) ++ "\n" ++ showUMetaMap ums
   verify c'
   return (c', ty', normalizeUniv u)
 

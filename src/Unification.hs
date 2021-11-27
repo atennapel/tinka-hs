@@ -35,11 +35,11 @@ invert gamma sp = do
   where
     go :: Spine -> IO (Lvl, IM.IntMap Lvl, Pruning, Bool)
     go [] = return (0, mempty, [], True)
-    go (EApp t : sp) = do
+    go (EApp t i : sp) = do
       (dom, ren, pr, isLinear) <- go sp
       case force t of
         VVar x | IM.member x ren -> return (dom + 1, IM.delete x ren, Nothing : pr, False)
-        VVar x -> return (dom + 1, IM.insert x dom ren, Just () : pr, isLinear)
+        VVar x -> return (dom + 1, IM.insert x dom ren, Just i : pr, isLinear)
         _ -> error "failed to unify"
     go (_ : sp) = error "elim in spine"
 
@@ -49,8 +49,8 @@ pruneTy (RevPruning pr) a = go pr (PR Nothing 0 0 mempty) a
     go :: Pruning -> PR -> Val -> IO Core
     go pr pren a = case (pr, force a) of
       ([], a) -> rename pren a
-      (Just () : pr, VPi x a u1 b u2) -> Pi x <$> rename pren a <*> return u1 <*> go pr (lift pren) (vinst b (VVar (cod pren))) <*> return u2
-      (Nothing : pr, VPi x a u1 b u2) -> go pr (skip pren) (vinst b (VVar (cod pren)))
+      (Just _ : pr, VPi x i a u1 b u2) -> Pi x i <$> rename pren a <*> return u1 <*> go pr (lift pren) (vinst b (VVar (cod pren))) <*> return u2
+      (Nothing : pr, VPi x i a u1 b u2) -> go pr (skip pren) (vinst b (VVar (cod pren)))
       _ -> error "impossible"
 
 getUnsolved :: MetaVar -> (Core, Val)
@@ -79,30 +79,30 @@ pruneFlex :: PR -> MetaVar -> Spine -> IO Core
 pruneFlex pren m sp = do
   (sp, status) <- go sp
   m' <- case status of
-    NeedsPruning -> pruneMeta (map (() <$) sp) m
+    NeedsPruning -> pruneMeta (map (\(mt, i) -> i <$ mt) sp) m
     OKRenaming -> case lookupMeta m of
       Unsolved _ _ -> return m
       _ -> error "impossible"
     OKNonRenaming -> case lookupMeta m of
       Unsolved _ _ -> return m
       _ -> error "impossible"
-  return $ foldr (\mu t -> maybe t (App t) mu) (Meta m') sp
+  return $ foldr (\(mu, i) t -> maybe t (\u -> App t u i) mu) (Meta m') sp
   where
-    go :: Spine -> IO ([Maybe Core], SpineStatus)
+    go :: Spine -> IO ([(Maybe Core, Icit)], SpineStatus)
     go [] = return ([], OKRenaming)
-    go (EApp t : sp) = do
+    go (EApp t i : sp) = do
       (sp, status) <- go sp
       case force t of
         VVar x -> case (IM.lookup x (ren pren), status) of
           (Just x, _) ->
-            return (Just (Var $ dom pren - x - 1) : sp, status)
+            return ((Just (Var $ dom pren - x - 1), i) : sp, status)
           (Nothing, OKNonRenaming) -> error "pruneFlex failure"
-          (Nothing, _) -> return (Nothing : sp, NeedsPruning)
+          (Nothing, _) -> return ((Nothing, i) : sp, NeedsPruning)
         t -> case status of
           NeedsPruning -> error "pruneFlex failure"
           _ -> do
             t <- rename pren t
-            return (Just t : sp, OKNonRenaming)
+            return ((Just t, i) : sp, OKNonRenaming)
     go _ = error "pruneFlex failure: eliminator in spine"
 
 rename :: PR -> Val -> IO Core
@@ -110,7 +110,7 @@ rename pren v = go pren v
   where
     goSp :: PR -> Core -> Spine -> IO Core
     goSp pren t [] = return t
-    goSp pren t (EApp u : sp) = App <$> goSp pren t sp <*> go pren u
+    goSp pren t (EApp u i : sp) = App <$> goSp pren t sp <*> go pren u <*> return i
     goSp pren t (ELower : sp) = Lower <$> goSp pren t sp
     goSp pren t (EProj p : sp) = flip Proj p <$> goSp pren t sp
     goSp pren t (EPrimElim x l k as : sp) = do
@@ -118,8 +118,8 @@ rename pren v = go pren v
       qas <- mapM (go pren) as
       t' <- goSp pren t sp
       return $ case primElimPosition x of
-        PEPLast -> App (foldl App h qas) t'
-        PEPFirst -> foldl App (App h t') qas
+        PEPLast -> App (foldl (\a b -> App a b Expl) h qas) t' Expl
+        PEPFirst -> foldl (\a b -> App a b Expl) (App h t' Expl) qas
 
     go :: PR -> Val -> IO Core
     go pren t = case force t of
@@ -131,8 +131,8 @@ rename pren v = go pren v
         Just x' -> goSp pren (Var $ dom pren - x' - 1) sp
       VNe (HPrim x l) sp -> goSp pren (Prim x l) sp
       VGlobal x l sp _ -> goSp pren (Global x l) sp
-      VAbs x t -> Abs x <$> go (lift pren) (vinst t (VVar (cod pren)))
-      VPi x a u1 b u2 -> Pi x <$> go pren a <*> return u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> return u2
+      VAbs x i t -> Abs x i <$> go (lift pren) (vinst t (VVar (cod pren)))
+      VPi x i a u1 b u2 -> Pi x i <$> go pren a <*> return u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> return u2
       VSigma x a u1 b u2 -> Sigma x <$> go pren a <*> return u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> return u2
       VPair a b -> Pair <$> go pren a <*> go pren b
       VU i -> return $ U i
@@ -146,8 +146,8 @@ lams l a t = go a 0
   where
     go a l' | l' == l = t
     go a l' = case force a of
-      VPi "_" _ _ b _ -> Abs ("x" ++ show l') $ go (vinst b (VVar l')) (l' + 1)
-      VPi x a _ b _ -> Abs x $ go (vinst b (VVar l')) (l' + 1)
+      VPi "_" i _ _ b _ -> Abs ("x" ++ show l') i $ go (vinst b (VVar l')) (l' + 1)
+      VPi x i a _ b _ -> Abs x i $ go (vinst b (VVar l')) (l' + 1)
       _ -> error "impossible"
 
 solveWithPR :: MetaVar -> (PR, Maybe Pruning) -> Val -> IO ()
@@ -173,9 +173,9 @@ unifyLift :: Lvl -> Clos -> Clos -> IO ()
 unifyLift k c c' = let v = vvar k in unify (k + 1) (vinst c v) (vinst c' v)
 
 unifyElim :: Lvl -> Elim -> Elim -> IO ()
-unifyElim k (EApp v) (EApp v') = unify k v v'
+unifyElim k (EApp v i) (EApp v' i') = unify k v v'
 unifyElim k ELower ELower = return ()
-unifyElim k (EProj p) (EProj p') | p == p' = return ()
+unifyElim k (EProj p) (EProj p') | eqvProj p p' = return ()
 unifyElim k (EPrimElim x l1 l1' as) (EPrimElim x' l2 l2' as') | x == x' && l1 == l2 && l1' == l2' =
   go as as'
   where
@@ -185,8 +185,15 @@ unifyElim k (EPrimElim x l1 l1' as) (EPrimElim x' l2 l2' as') | x == x' && l1 ==
     go _ _ = error "prim elim args mismatch"
 unifyElim _ _ _ = error "elim mismatch"
 
+unifySpProj :: Lvl -> Spine -> Spine -> Ix -> IO ()
+unifySpProj k sp sp' 0 = unifySp k sp sp'
+unifySpProj k (EProj Snd : sp) sp' n = unifySpProj k sp sp' (n - 1)
+unifySpProj _ _ _ _ = error $ "spine proj mismatch"
+
 unifySp :: Lvl -> Spine -> Spine -> IO ()
 unifySp k [] [] = return ()
+unifySp k (EProj Fst : sp) (EProj (PNamed j n) : sp') = unifySpProj k sp sp' n
+unifySp k (EProj (PNamed j n) : sp) (EProj Fst : sp') = unifySpProj k sp' sp n
 unifySp k (t : sp) (t' : sp') = unifySp k sp sp' >> unifyElim k t t'
 unifySp _ _ _ = error "spine mismatch"
 
@@ -206,9 +213,9 @@ intersect l m sp sp' = case go sp sp' of
   where
     go :: Spine -> Spine -> Maybe Pruning
     go [] [] = Just []
-    go (EApp t : sp) (EApp t' : sp') =
+    go (EApp t i : sp) (EApp t' _ : sp') =
       case (force t, force t') of
-        (VVar x, VVar x') -> (guard (x == x') :) <$> go sp sp'
+        (VVar x, VVar x') -> ((i <$ guard (x == x')) :) <$> go sp sp'
         _ -> Nothing
     go _ _ = error "impossible"
 
@@ -219,13 +226,13 @@ unify k a b = -- trace ("unify " ++ show (quote k a) ++ " ~ " ++ show (quote k b
     (VLift t1, VLift t2) -> unify k t1 t2
     (VLiftTerm t1, VLiftTerm t2) -> unify k t1 t2
     (VCon t1, VCon t2) -> unify k t1 t2
-    (VPi _ t u1 b u2, VPi _ t' u3 b' u4) ->
+    (VPi _ i t u1 b u2, VPi _ i' t' u3 b' u4) | i == i' ->
       unify k t t' >> unifyUniv u1 u3 >> unifyLift k b b' >> unifyUniv u2 u4
     (VSigma _ t u1 b u2, VSigma _ t' u3 b' u4) ->
       unify k t t' >> unifyUniv u1 u3 >> unifyLift k b b' >> unifyUniv u2 u4
-    (VAbs _ b, VAbs _ b') -> unifyLift k b b'
-    (VAbs _ b, x) -> let v = vvar k in unify (k + 1) (vinst b v) (vapp x v)
-    (x, VAbs _ b) -> let v = vvar k in unify (k + 1) (vapp x v) (vinst b v)
+    (VAbs _ i  b, VAbs _ i' b') -> unifyLift k b b'
+    (VAbs _ i b, x) -> let v = vvar k in unify (k + 1) (vinst b v) (vapp x v i)
+    (x, VAbs _ i b) -> let v = vvar k in unify (k + 1) (vapp x v i) (vinst b v)
     (VPair a b, VPair c d) -> unify k a c >> unify k b d
     (VPair a b, x) -> unify k a (vfst x) >> unify k b (vsnd x)
     (x, VPair a b) -> unify k (vfst x) a >> unify k (vsnd x) b

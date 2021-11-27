@@ -1,3 +1,5 @@
 .stack-work/
 *~
 *.txt
+.vscode
+.metals

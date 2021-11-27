@@ -34,6 +34,9 @@ char c = lexeme (C.char c)
 parens :: Parser a -> Parser a
 parens p = char '(' *> p <* char ')'
 
+braces :: Parser a -> Parser a
+braces p = char '{' *> p <* char '}'
+
 pArrow :: Parser String
 pArrow = symbol "→" <|> symbol "->"
 
@@ -43,8 +46,11 @@ pCross = symbol "⨯" <|> symbol "**"
 pLambda :: Parser Char
 pLambda = char 'λ' <|> char '\\'
 
+keywords :: [String]
+keywords = ["let", "λ", "Type", "fst", "snd", "Lift", "lift", "lower", "elim", "Con", "Refl", "index", "named"]
+
 keyword :: String -> Bool
-keyword x = x == "let" || x == "λ" || x == "Type" || x == "fst" || x == "snd" || x == "Lift" || x == "lift" || x == "lower" || x == "elim" || x == "Con" || x == "Refl"
+keyword x = x `elem` keywords
 
 pLifting :: Parser ULvl
 pLifting = do
@@ -85,8 +91,8 @@ pCommaSeparated = do
 pPair :: Parser Surface
 pPair = parens (foldr1 SPair <$> pCommaSeparated)
 
-pProjType :: Parser ProjType
-pProjType = Fst <$ symbol "fst" <|> Snd <$ symbol "snd"
+pProjType :: Parser SProjType
+pProjType = SFst <$ symbol "fst" <|> SSnd <$ symbol "snd"
 
 pProj :: Parser Surface
 pProj = do
@@ -116,6 +122,20 @@ pPrimElim = do
   k <- optional L.decimal
   return $ SPrimElim x l (fromMaybe 0 k)
 
+pIndexTemp :: Parser Surface
+pIndexTemp = do
+  symbol "index"
+  i <- L.decimal
+  t <- pSurface
+  return $ SProj t (SIndex i)
+
+pNamedTemp :: Parser Surface
+pNamedTemp = do
+  symbol "named"
+  x <- fst <$> pIdent
+  t <- pSurface
+  return $ SProj t (SNamed x)
+
 pCon :: Parser Surface
 pCon = do
   symbol "Con"
@@ -139,6 +159,7 @@ pAtom =
   <|> pLift
   <|> pLiftTerm
   <|> pLower
+  <|> pIndexTemp <|> pNamedTemp
   <|> pCon
   <|> pPrimElim
   <|> pPair
@@ -147,34 +168,88 @@ pAtom =
 pBinder :: Parser Name
 pBinder = (fst <$> pIdent) <|> symbol "_"
 
+pArg :: Parser (Either Name Icit, Surface)
+pArg = try abs <|> try implByName <|> impl <|> arg
+  where
+    impl = (Right Impl,) <$> (char '{' *> pSurface <* char '}')
+
+    arg = (Right Expl,) <$> pAtom
+
+    abs = (Right Expl,) <$> pLam
+
+    implByName = braces $ do
+      x <- fst <$> pIdent
+      char '='
+      t <- pSurface
+      return (Left x, t)
+
 pSpine :: Parser Surface
-pSpine = foldl1 SApp <$> some pAtom
+pSpine = do
+  h <- pAtom
+  args <- many pArg
+  pure $ foldl (\t (i, u) -> SApp t u i) h args
+
+pLamBinder :: Parser ([Name], Either Name Icit, Maybe Surface)
+pLamBinder = implBinder <|> binderWithType <|> justBinder
+  where
+    -- \x
+    justBinder = (\x -> ([x], Right Expl, Nothing)) <$> pBinder
+
+    -- \(x y z : A)
+    binderWithType = parens $ do
+      xs <- some pBinder
+      symbol ":"
+      ty <- pSurface
+      return (xs, Right Expl, Just ty)
+    
+    -- \{x y z} | \{x y z : A} | \{x y z = b} | \{x y z : A = b}
+    implBinder = braces $ do
+      xs <- some pBinder
+      ty <- optional (symbol ":" >> pSurface)
+      b <- optional (symbol "=" >> pBinder)
+      return $ maybe (xs, Right Impl, ty) (\b -> (xs, Left b, ty)) b
 
 pLam :: Parser Surface
 pLam = do
   pLambda
-  xs <- some pBinder
+  xs <- some pLamBinder
   char '.'
   t <- pSurface
-  pure (foldr SAbs t xs)
+  pure (foldr (\(xs, i, a) t -> foldr (\x t -> SAbs x i a t) t xs) t xs)
 
 pArrowOrCross :: Parser Bool
 pArrowOrCross = (True <$ pArrow) <|> (False <$ pCross)
 
+pPiSigmaBinder :: Parser ([Name], Icit, Surface)
+pPiSigmaBinder = implBinder <|> binderWithType
+  where
+    -- (x y z : A)
+    binderWithType = parens $ do
+      xs <- some pBinder
+      symbol ":"
+      ty <- pSurface
+      return (xs, Expl, ty)
+    
+    -- {x y z} | {x y z : A}
+    implBinder = braces $ do
+      xs <- some pBinder
+      ty <- optional (symbol ":" >> pSurface)
+      return (xs, Impl, fromMaybe (SHole Nothing) ty)
+
 pPiOrSigma :: Parser Surface
 pPiOrSigma = do
-  dom <- some (parens ((,) <$> some pBinder <*> (char ':' *> pSurface)))
+  dom <- some pPiSigmaBinder
   ty <- pArrowOrCross
   cod <- pSurface
-  let tyfun a = if ty then (`SPi` a) else (`SSigma` a)
-  pure $ foldr (\(xs, a) t -> foldr (tyfun a) t xs) cod dom
+  let tyfun x i a b = if ty then SPi x i a b else SSigma x a b
+  pure $ foldr (\(xs, i, a) t -> foldr (\x t -> tyfun x i a t) t xs) cod dom
 
 funOrSpine :: Parser Surface
 funOrSpine = do
   sp <- pSpine
   optional pArrowOrCross >>= \case
     Nothing -> pure sp
-    Just b  -> (if b then SPi else SSigma) "_" sp <$> pSurface
+    Just b -> (if b then SPi "_" Expl else SSigma "_") sp <$> pSurface
 
 pLet :: Parser Surface
 pLet = do

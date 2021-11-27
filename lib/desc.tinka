@@ -20,7 +20,7 @@ SumDBody : Desc -> Desc -> Bool -> Desc
 SumD : Desc -> Desc -> Desc
   = \A B. Arg Bool (SumDBody A B);
 
-DescD : Desc^ = SumD^ End^ (SumD^ (Arg^ Type (\A. HInd^ (Lift A) End^)) (SumD^ (Ind^ End^) (Arg^ Type (\_. Ind^ End^))));
+DescD : Desc^ = SumD^ End^ (SumD^ (Arg^ Type \A. HInd^ (Lift A) End^) (SumD^ (Ind^ End^) (Arg^ Type \_. Ind^ End^)));
 
 indSumD :
   (A : Desc)

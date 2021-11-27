@@ -15,7 +15,7 @@ data Head = HVar Lvl | HPrim PrimName ULvl | HMeta MetaVar
   deriving (Eq)
 
 data Elim
-  = EApp Val
+  = EApp Val Icit
   | EProj ProjType
   | EPrimElim PrimElimName ULvl ULvl [Val]
   | ELower
@@ -23,8 +23,8 @@ data Elim
 data Val
   = VNe Head Spine
   | VGlobal Name ULvl Spine Val
-  | VAbs Name Clos
-  | VPi Name Val Univ Clos Univ
+  | VAbs Name Icit Clos
+  | VPi Name Icit Val Univ Clos Univ
   | VSigma Name Val Univ Clos Univ
   | VPair Val Val
   | VU Univ
@@ -38,19 +38,19 @@ pattern VMeta x = VNe (HMeta x) []
 pattern VType l = VU (UConst l)
 
 vpi :: Name -> Val -> Univ -> Univ -> (Val -> Val) -> Val
-vpi x a u1 u2 b = VPi x a u1 (Fun b) u2
+vpi x a u1 u2 b = VPi x Expl a u1 (Fun b) u2
 
 vsigma :: Name -> Val -> Univ -> Univ -> (Val -> Val) -> Val
 vsigma x a u1 u2 b = VSigma x a u1 (Fun b) u2
 
 vfun :: Val -> Univ -> Univ -> Val -> Val
-vfun a u1 u2 b = VPi "_" a u1 (Fun $ const b) u2
+vfun a u1 u2 b = VPi "_" Expl a u1 (Fun $ const b) u2
 
 vpairty :: Val -> Univ -> Univ -> Val -> Val
 vpairty a u1 u2 b = VSigma "_" a u1 (Fun $ const b) u2
 
 vabs :: Name -> (Val -> Val) -> Val
-vabs x b = VAbs x (Fun b)
+vabs x b = VAbs x Expl (Fun b)
 
 vvar :: Lvl -> Val
 vvar k = VNe (HVar k) []
@@ -67,7 +67,7 @@ vtrue = vprim PTrue
 vfalse = vprim PFalse
 
 vheq :: ULvl -> Val -> Val -> Val -> Val -> Val
-vheq l a b x y = VNe (HPrim PHEq l) [EApp y, EApp x, EApp b, EApp a]
+vheq l a b x y = VNe (HPrim PHEq l) [EApp y Expl, EApp x Expl, EApp b Expl, EApp a Expl]
 
 vdata :: ULvl -> Val -> Val
-vdata l v = VNe (HPrim PData l) [EApp v]
+vdata l v = VNe (HPrim PData l) [EApp v Expl]
