@@ -126,6 +126,8 @@ check ctx tm ty u = do
     (SCon t, x@(VData l d), _) -> do
       c <- check ctx t (vel l 0 d x) u
       return $ Con c
+    (t@(SPair _ _), x@(VData l d), u) ->
+      check ctx (SCon t) x u
 
     -- some cumulativity
     -- Void^l : Type^k ~> Void^k (if l <= k)

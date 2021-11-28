@@ -37,6 +37,9 @@ parens p = char '(' *> p <* char ')'
 braces :: Parser a -> Parser a
 braces p = char '{' *> p <* char '}'
 
+brackets :: Parser a -> Parser a
+brackets p = char '[' *> p <* char ']'
+
 pArrow :: Parser String
 pArrow = symbol "→" <|> symbol "->"
 
@@ -98,6 +101,9 @@ pCommaSeparated = do
 pPair :: Parser Surface
 pPair = parens (foldr1 SPair <$> pCommaSeparated)
 
+pUnitPair :: Parser Surface
+pUnitPair = brackets (foldr SPair (SVar "[]" 0) <$> pCommaSeparated)
+
 pLift :: Parser Surface
 pLift = do
   symbol "Lift"
@@ -144,7 +150,10 @@ pAtom =
   <|> pLower
   <|> pCon
   <|> pPrimElim
-  <|> pPair
+  <|> try (SVar "()" 0 <$ parens ws)
+  <|> try (SVar "[]" 0 <$ brackets ws)
+  <|> try pPair
+  <|> try pUnitPair
   <|> parens pSurface
 
 pBinder :: Parser Name

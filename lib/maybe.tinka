@@ -1,9 +1,9 @@
 import lib/sum;
 
-Maybe : Type -> Type = \A. Sum A UnitType;
+Maybe : Type -> Type = \A. Sum A ();
 
 Just : {A : Type} -> A -> Maybe A = Left;
-Nothing : {A : Type} -> Maybe A = Right Unit;
+Nothing : {A : Type} -> Maybe A = Right [];
 
 indMaybe :
   {A : Type}

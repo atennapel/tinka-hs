@@ -2,8 +2,8 @@ import lib/desc;
 
 NatD = SumD (Ind End) End;
 Nat = Data NatD;
-Z : Nat = Con (False, Unit);
-S : Nat -> Nat = \n. Con (True, n, Unit);
+Z : Nat = [False];
+S : Nat -> Nat = \n. [True, n];
 
 indNat :
   (P : Nat -> Type)

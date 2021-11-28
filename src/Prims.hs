@@ -21,8 +21,8 @@ data PrimElimName
 
 instance Show PrimName where
   show PVoid = "Void"
-  show PUnitType = "UnitType"
-  show PUnit = "Unit"
+  show PUnitType = "()"
+  show PUnit = "[]"
   show PBool = "Bool"
   show PTrue = "True"
   show PFalse = "False"
@@ -41,8 +41,8 @@ instance Show PrimElimName where
 
 toPrimName :: String -> Maybe PrimName
 toPrimName "Void" = Just PVoid
-toPrimName "UnitType" = Just PUnitType
-toPrimName "Unit" = Just PUnit
+toPrimName "()" = Just PUnitType
+toPrimName "[]" = Just PUnit
 toPrimName "Bool" = Just PBool
 toPrimName "True" = Just PTrue
 toPrimName "False" = Just PFalse

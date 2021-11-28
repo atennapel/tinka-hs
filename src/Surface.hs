@@ -128,7 +128,11 @@ instance Show Surface where
   show s@(SSigma x t b) =
     let (as, s') = flattenSigma s in
     showTelescope (map (\(x, t) -> (x, Expl, t)) as) s' " ** "
-  show s@(SPair _ _) = "(" ++ intercalate ", " (map show $ flattenPair s) ++ ")"
+  show s@(SPair _ _) =
+    let ps = flattenPair s in
+    case last ps of
+      SVar "[]" _ -> "[" ++ intercalate ", " (map show $ init ps) ++ "]"
+      _ -> "(" ++ intercalate ", " (map show ps) ++ ")"      
   show s@(SProj _ _) = let (s', ps) = flattenProj s in showS s' ++ intercalate "" (map showSProjType ps)
   show (SLet x Nothing v b) = "let " ++ x ++ " = " ++ show v ++ "; " ++ show b
   show (SLet x (Just t) v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b

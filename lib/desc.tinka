@@ -1,13 +1,13 @@
 Desc = Data^ (
-  Con (False, True, Bool, \x. (elim BoolDesc^) (Con (True, Unit)) (
-  Con (False, True, Bool, \x. (elim BoolDesc^) (Con (False, True, Type, \x. Con (False, False, False, Lift (lower x), Con (True, Unit), Unit), Unit)) (
-  Con (False, True, Bool, \x. (elim BoolDesc^) (Con (False, False, True, Con (True, Unit), Unit)) (
-  Con (False, True, Type, \x. Con (False, False, True, Con (True, Unit), Unit), Unit)) (lower x), Unit)) (lower x), Unit)) (lower x), Unit));
+  [False, True, Bool, \x. (elim BoolDesc^) [True] (
+  [False, True, Bool, \x. (elim BoolDesc^) [False, True, Type, \x. [False, False, False, Lift (lower x), [True]]] (
+  [False, True, Bool, \x. (elim BoolDesc^) [False, False, True, [True]] (
+  [False, True, Type, \x. [False, False, True, [True]]]) (lower x)]) (lower x)]) (lower x)]);
 
-End : Desc = Con (True, Unit);
-Arg : (A : Type) -> (A -> Desc) -> Desc = \A K. Con (False, True, A, \x. K (lower x), Unit);
-Ind : Desc -> Desc = \K. Con (False, False, True, K, Unit);
-HInd : Type -> Desc -> Desc = \A K. Con (False, False, False, A, K, Unit);
+End : Desc = [True];
+Arg : (A : Type) -> (A -> Desc) -> Desc = \A K. [False, True, A, \x. K (lower x)];
+Ind : Desc -> Desc = \K. [False, False, True, K];
+HInd : Type -> Desc -> Desc = \A K. [False, False, False, A, K];
 
 El : Desc -> Type -> Type
   = \D X. (elim El) X D;
@@ -26,13 +26,13 @@ indSumD :
   (A : Desc)
   (B : Desc)
   (P : Data (SumD A B) -> Type)
-  (a : (d : El A (Data (SumD A B))) -> All A (Data (SumD A B)) P d -> P (Con (True, d)))
-  (b : (d : El B (Data (SumD A B))) -> All B (Data (SumD A B)) P d -> P (Con (False, d)))
+  (a : (d : El A (Data (SumD A B))) -> All A (Data (SumD A B)) P d -> P (True, d))
+  (b : (d : El B (Data (SumD A B))) -> All B (Data (SumD A B)) P d -> P (False, d))
   (x : Data (SumD A B))
   -> P x
   = \A B P a b x. (elim Data) (SumD A B) P
       (\d hs. (elim Bool)
-        (\b. (xs : El (SumDBody A B b) (Data (SumD A B))) -> All (SumD A B) (Data (SumD A B)) P (b, xs) -> P (Con (b, xs)))
+        (\b. (xs : El (SumDBody A B b) (Data (SumD A B))) -> All (SumD A B) (Data (SumD A B)) P (b, xs) -> P ((b, xs)))
         (\xs h. a xs h)
         (\xs h. b xs h)
         d._1 d._2 hs) x;

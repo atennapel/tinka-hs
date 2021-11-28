@@ -3,9 +3,8 @@ import lib/desc;
 ListD : Type -> Desc = \A. SumD (Arg A (\_. Ind End)) End;
 List : Type -> Type = \A. Data (ListD A);
 
-Nil : {A : Type} -> List A = Con (False, Unit);
-Cons : {A : Type} -> A -> List A -> List A
-  = \hd tl. Con (True, hd, tl, Unit);
+Nil : {A : Type} -> List A = [False];
+Cons : {A : Type} -> A -> List A -> List A = \hd tl. [True, hd, tl];
 
 indList :
   (A : Type)
