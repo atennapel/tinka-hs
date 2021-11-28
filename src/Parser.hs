@@ -47,7 +47,7 @@ pLambda :: Parser Char
 pLambda = char 'λ' <|> char '\\'
 
 keywords :: [String]
-keywords = ["let", "λ", "Type", "fst", "snd", "Lift", "lift", "lower", "elim", "Con", "Refl", "index", "named"]
+keywords = ["let", "λ", "Type", "Lift", "lift", "lower", "elim", "Con", "Refl"]
 
 keyword :: String -> Bool
 keyword x = x `elem` keywords
@@ -60,8 +60,15 @@ pLifting = do
     return $ fromMaybe 1 l)
   return $ fromMaybe 0 lift
 
-pIdent :: Parser (Name, ULvl)
+pIdent :: Parser Name
 pIdent = try $ do
+  x <- takeWhile1P Nothing isAlphaNum
+  guard (not (keyword x))
+  ws
+  return x
+
+pIdentLifting :: Parser (Name, ULvl)
+pIdentLifting = try $ do
   x <- takeWhile1P Nothing isAlphaNum
   guard (not (keyword x))
   lift <- pLifting
@@ -91,15 +98,6 @@ pCommaSeparated = do
 pPair :: Parser Surface
 pPair = parens (foldr1 SPair <$> pCommaSeparated)
 
-pProjType :: Parser SProjType
-pProjType = SFst <$ symbol "fst" <|> SSnd <$ symbol "snd"
-
-pProj :: Parser Surface
-pProj = do
-  ty <- pProjType
-  tm <- pSurface
-  return $ SProj tm ty
-
 pLift :: Parser Surface
 pLift = do
   symbol "Lift"
@@ -118,23 +116,9 @@ pLower = do
 pPrimElim :: Parser Surface
 pPrimElim = do
   symbol "elim"
-  (x, l) <- pIdent
+  (x, l) <- pIdentLifting
   k <- optional L.decimal
   return $ SPrimElim x l (fromMaybe 0 k)
-
-pIndexTemp :: Parser Surface
-pIndexTemp = do
-  symbol "index"
-  i <- L.decimal
-  t <- pSurface
-  return $ SProj t (SIndex i)
-
-pNamedTemp :: Parser Surface
-pNamedTemp = do
-  symbol "named"
-  x <- fst <$> pIdent
-  t <- pSurface
-  return $ SProj t (SNamed x)
 
 pCon :: Parser Surface
 pCon = do
@@ -154,40 +138,57 @@ pAtom =
     (SU <$> pType) <|>
     pHole <|>
     (SRefl <$ symbol "Refl") <|>
-    (uncurry SVar <$> pIdent))
-  <|> pProj
+    (uncurry SVar <$> pIdentLifting))
   <|> pLift
   <|> pLiftTerm
   <|> pLower
-  <|> pIndexTemp <|> pNamedTemp
   <|> pCon
   <|> pPrimElim
   <|> pPair
   <|> parens pSurface
 
 pBinder :: Parser Name
-pBinder = (fst <$> pIdent) <|> symbol "_"
+pBinder = pIdent <|> symbol "_"
 
-pArg :: Parser (Either Name Icit, Surface)
-pArg = try abs <|> try implByName <|> impl <|> arg
+pProj :: Parser SProjType
+pProj = do
+  char '.'
+  p <- simple <|> index <|> named
+  ws
+  return p
   where
-    impl = (Right Impl,) <$> (char '{' *> pSurface <* char '}')
+    simple = char '_' >> (SFst <$ char '1' <|> SSnd <$ char '2')
+    index = SIndex <$> L.decimal
+    named = SNamed <$> pIdent
 
-    arg = (Right Expl,) <$> pAtom
+pArg :: Parser (Either SProjType (Either Name Icit, Surface))
+pArg = proj <|> abs <|> try implByName <|> impl <|> arg
+  where
+    impl = Right . (Right Impl,) <$> (char '{' *> pSurface <* char '}')
 
-    abs = (Right Expl,) <$> pLam
+    arg = Right . (Right Expl,) <$> pAtom
+
+    abs = Right . (Right Expl,) <$> pLam
+
+    proj = Left <$> pProj
 
     implByName = braces $ do
-      x <- fst <$> pIdent
+      x <- pIdent
       char '='
       t <- pSurface
-      return (Left x, t)
+      return $ Right (Left x, t)
 
 pSpine :: Parser Surface
 pSpine = do
   h <- pAtom
   args <- many pArg
-  pure $ foldl (\t (i, u) -> SApp t u i) h args
+  pure $ apps h args
+  where
+    apps :: Surface -> [Either SProjType (Either Name Icit, Surface)] -> Surface
+    apps t [] = t
+    apps t (Left p : as) = apps (SProj t p) as
+    apps t (Right (Right Expl, u) : Left p : as) = apps t (Right (Right Expl, SProj u p) : as)
+    apps t (Right (i, u) : as) = apps (SApp t u i) as
 
 pLamBinder :: Parser ([Name], Either Name Icit, Maybe Surface)
 pLamBinder = implBinder <|> binderWithType <|> justBinder

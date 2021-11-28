@@ -35,4 +35,4 @@ indSumD :
         (\b. (xs : El (SumDBody A B b) (Data (SumD A B))) -> All (SumD A B) (Data (SumD A B)) P (b, xs) -> P (Con (b, xs)))
         (\xs h. a xs h)
         (\xs h. b xs h)
-        (fst d) (snd d) hs) x;
+        d._1 d._2 hs) x;

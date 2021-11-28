@@ -15,7 +15,7 @@ indList :
   -> (l : List A)
   -> P l
   = \A P nil cons l. indSumD (Arg A (\_. Ind End)) End P
-        (\xs h. cons (fst xs) (fst (snd xs)) (fst h))
+        (\xs h. cons xs.0 xs.1 h.0)
         (\_ _. nil)
         l;
 

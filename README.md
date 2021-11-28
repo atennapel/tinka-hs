@@ -95,7 +95,7 @@ TODO:
   - [x] add unification
   - [x] add verification
   - [x] add elaboration
-  - [ ] add post-fix parser
+  - [x] add post-fix parser
 - [ ] improve core printing
 - [ ] parser for unit type () and nested units []
 - [ ] qualified imports

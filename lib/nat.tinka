@@ -12,7 +12,7 @@ indNat :
   -> (n : Nat)
   -> P n
   = \P z s n. indSumD (Ind End) End P
-        (\xs h. s (fst xs) (fst h))
+        (\xs h. s xs.0 h.0)
         (\_ _. z)
         n;
 

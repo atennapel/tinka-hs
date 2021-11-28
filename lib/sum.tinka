@@ -11,7 +11,7 @@ indSum :
   (right : (x : B) -> P (Right x))
   (sum : Sum A B)
   -> P sum
-  = \{A} {B} P left right sum. (elim Bool) (\b. (x : (elim Bool 1) (\_. Type) A B b) -> P (b, x)) left right (fst sum) (snd sum);
+  = \{A} {B} P left right sum. (elim Bool) (\b. (x : (elim Bool 1) (\_. Type) A B b) -> P (b, x)) left right sum._1 sum._2;
 
 sum :
   {A B R : Type}
