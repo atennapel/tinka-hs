@@ -97,7 +97,7 @@ TODO:
   - [x] add elaboration
   - [x] add post-fix parser
 - [x] parser for unit type () and nested units []
-- [ ] improve core printing
+- [x] improve core printing
 - [ ] qualified imports
 - [ ] QTT
 - [ ] internal fixpoints

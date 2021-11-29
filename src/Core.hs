@@ -6,7 +6,7 @@ import Universes
 
 import qualified Data.Set as S
 import Data.Set (Set)
-import Data.List (elemIndex)
+import Data.List (elemIndex, intercalate)
 import Data.Maybe (fromJust)
 
 data ProjType = Fst | Snd | PNamed (Maybe Name) Ix
@@ -39,8 +39,37 @@ showProjType Snd = "._2"
 showProjType (PNamed (Just x) _) = "." ++ x
 showProjType (PNamed Nothing i) = "." ++ show i
 
+flattenApp :: Core -> (Core, [(Core, Icit)])
+flattenApp s = go s []
+  where
+    go (App f a i) as = go f ((a, i) : as)
+    go s as = (s, as)
+
+flattenAbs :: Core -> ([(Name, Icit)], Core)
+flattenAbs (Abs x i b) = let (as, s') = flattenAbs b in ((x, i) : as, s')
+flattenAbs s = ([], s)
+
+flattenPair :: Core -> [Core]
+flattenPair (Pair a b) = a : flattenPair b
+flattenPair s = [s]
+
+flattenPi :: Core -> ([(Name, Icit, Core)], Core)
+flattenPi (Pi x i t _ b _) = let (as, s') = flattenPi b in ((x, i, t) : as, s')
+flattenPi s = ([], s)
+
+flattenSigma :: Core -> ([(Name, Core)], Core)
+flattenSigma (Sigma x t _ b _) = let (as, s') = flattenSigma b in ((x, t) : as, s')
+flattenSigma s = ([], s)
+
+showTelescope :: [(Name, Icit, Core)] -> Core -> String -> String
+showTelescope ps rt delim = go ps
+  where
+    go [] = show rt
+    go (("_", Expl, s) : tl) = show s ++ delim ++ go tl
+    go ((x, i, s) : tl) = icit i "{" "(" ++ x ++ " : " ++ show s ++ icit i "}" ")" ++ delim ++ go tl
+
 instance Show Core where
-  show (Var x) = show x
+  show (Var x) = "'" ++ show x
   show (Global x 0) = x
   show (Global x 1) = x ++ "^"
   show (Global x l) = x ++ "^" ++ show l
@@ -50,13 +79,27 @@ instance Show Core where
   show (PrimElim x 0 k) = "elim " ++ show x ++ (if k == 0 then "" else " " ++ show k)
   show (PrimElim x 1 k) = "elim " ++ show x ++ "^" ++ (if k == 0 then "" else " " ++ show k)
   show (PrimElim x l k) = "elim " ++ show x ++ "^" ++ show l ++ (if k == 0 then "" else " " ++ show k)
-  show (App f a i) = "(" ++ show f ++ icit i " {" " " ++ show a ++ icit i "})" ")"
-  show (Abs x i b) = "(\\" ++ icit i "{" "" ++ x ++ icit i "}" "" ++ ". " ++ show b ++ ")"
-  show (Pi x i t _ b _) = icit i "({" "((" ++ x ++ " : " ++ show t ++ icit i "}" ")" ++ " -> " ++ show b ++ ")"
-  show (Sigma x t _ b _) = "((" ++ x ++ " : " ++ show t ++ ") ** " ++ show b ++ ")"
-  show (Pair a b) = "(" ++ show a ++ ", " ++ show b ++ ")"
+  show s@(App f a i) =
+    let (f, as) = flattenApp s in
+    "(" ++ show f ++ " " ++ unwords (map (\(a, i) -> icit i "{" "" ++ show a ++ icit i "}" "") as) ++ ")"
+  show s@(Abs x i b) =
+    let (as, b) = flattenAbs s in
+    "(\\" ++ unwords (map (\(x, i) -> icit i "{" "" ++ x ++ icit i "}" "") as) ++ ". " ++ show b ++ ")"
+  show s@(Pi x i t _ b _) =
+    let (as, s') = flattenPi s in
+    showTelescope as s' " -> "
+  show s@(Sigma x t _ b _) =
+    let (as, s') = flattenSigma s in
+    showTelescope (map (\(x, t) -> (x, Expl, t)) as) s' " ** "
+  show s@(Pair a b) =
+    let ps = flattenPair s in
+    case last ps of
+      Prim PUnit _ -> "[" ++ intercalate ", " (map show $ init ps) ++ "]"
+      _ -> "(" ++ intercalate ", " (map show ps) ++ ")"
   show (Proj s p) = show s ++ showProjType p
-  show (U l) = "Type " ++ show l
+  show (U (UConst 0)) = "Type"
+  show (U (UConst l)) = "Type" ++ show l
+  show (U l) = "Type^(" ++ show l ++ ")"
   show (Let x t v b) = "(let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b ++ ")"
   show (Lift t) = "(Lift " ++ show t ++ ")"
   show (LiftTerm t) = "(lift " ++ show t ++ ")"
