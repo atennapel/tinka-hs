@@ -104,3 +104,5 @@ mapDesc2 : (D : Desc2) -> {A B : Type} -> (A -> B) -> ElDesc2 D A -> ElDesc2 D B
       (\T K map {A} {B} fn x. (\y. fn (x._1 y), map {A} {B} fn x._2))
       D;
 -}
+
+main = \X. ElDesc2 (Arg2 Bool (\_. End2)) X;

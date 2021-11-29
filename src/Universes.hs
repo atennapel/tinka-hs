@@ -89,6 +89,8 @@ tryNormalizeUniv u@(UMeta m) =
     UUnsolved -> Nothing
 tryNormalizeUniv (UMax u1 u2) | u1 == u2 = Just u1
 tryNormalizeUniv (UMax (UConst l1) (UConst l2)) = Just (UConst (max l1 l2))
+tryNormalizeUniv (UMax (UConst 0) u) = Just u
+tryNormalizeUniv (UMax u (UConst 0)) = Just u
 tryNormalizeUniv (UMax (US u1) (US u2)) = Just (US (UMax u1 u2))
 tryNormalizeUniv (UMax u1 u2) | lteqUniv u1 u2 == Just True = Just u2
 tryNormalizeUniv (UMax u1 u2) | lteqUniv u2 u1 == Just True = Just u1
