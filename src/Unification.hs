@@ -183,6 +183,14 @@ unifyElim k (EPrimElim x l1 l1' as) (EPrimElim x' l2 l2' as') | x == x' && l1 ==
     go [] [] = return ()
     go (v : sp) (v' : sp') = unify k v v' >> go sp sp'
     go _ _ = error "prim elim args mismatch"
+unifyElim k (EPrimElim PEBoolDesc l1 k1 [t1, f1]) (EPrimElim PEBool l2 k2 [p, t2, f2]) | l1 == l2 && k1 + 1 == k2 = do
+  unify k (vabs "_" $ \_ -> vDesc l1) p
+  unify k t1 t2
+  unify k f1 f2
+unifyElim k (EPrimElim PEBool l2 k2 [p, t2, f2]) (EPrimElim PEBoolDesc l1 k1 [t1, f1]) | l1 == l2 && k1 + 1 == k2 = do
+  unify k p (vabs "_" $ \_ -> vDesc l1)
+  unify k t2 t1
+  unify k f2 f1
 unifyElim _ _ _ = error "elim mismatch"
 
 unifySpProj :: Lvl -> Spine -> Spine -> Ix -> IO ()

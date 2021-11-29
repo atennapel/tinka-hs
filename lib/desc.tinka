@@ -1,4 +1,4 @@
-Desc = Data^ (
+Desc : Type1 = Data^ (
   [False, True, Bool, \x. (elim BoolDesc^) [True] (
   [False, True, Bool, \x. (elim BoolDesc^) [False, True, Type, \x. [False, False, False, Lift (lower x), [True]]] (
   [False, True, Bool, \x. (elim BoolDesc^) [False, False, True, [True]] (
@@ -21,6 +21,8 @@ SumD : Desc -> Desc -> Desc
   = \A B. Arg Bool (SumDBody A B);
 
 DescD : Desc^ = SumD^ End^ (SumD^ (Arg^ Type \A. HInd^ (Lift A) End^) (SumD^ (Ind^ End^) (Arg^ Type \_. Ind^ End^)));
+
+_ : HEq^2 Type1 Type1 Desc (Data^ DescD) = Refl;
 
 indSumD :
   (A : Desc)

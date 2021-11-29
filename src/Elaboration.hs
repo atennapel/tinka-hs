@@ -356,9 +356,7 @@ showMetas = do
   return ()
 
 showHoles :: HoleMap -> IO ()
-showHoles [] = do
-  showMetas
-  putStrLn ""
+showHoles [] = showMetas
 showHoles ((x, HoleEntry ctx tm ty) : t) = do
   showHoles t
   putStrLn ""
