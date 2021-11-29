@@ -13,6 +13,10 @@ test :: Bool -> String -> IO ()
 test False msg = error msg
 test True _ = return ()
 
+onlyIf :: Bool -> IO () -> IO ()
+onlyIf True action = action
+onlyIf False _ = return ()
+
 testIO :: IO a -> (SomeException -> String) -> IO a
 testIO a msg = catch a (error . msg)
 

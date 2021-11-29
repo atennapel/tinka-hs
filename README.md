@@ -62,7 +62,6 @@ TODO:
   - [x] add Data elimination
   - [x] add HInd
   - [x] fix universe level issues
-  - [ ] indexed descriptions
 - [x] gentle art of levitation
 - [x] clean up GlobalCtx mess
 - [x] get rid of ConD
@@ -73,7 +72,7 @@ TODO:
   - [x] handle double imports (topological sort of imports)
   - [x] do not exit REPL on module cycles
   - [x] store what file globals come from, improve duplicate global error message
-- [ ] metas, unification and _ solving
+- [x] metas, unification and _ solving
   - [x] typed metas
   - [x] expand elaboration to use more metas
   - [x] named holes
@@ -84,10 +83,7 @@ TODO:
     - [x] add syntax
     - [x] expand elaboration
     - [x] add parser
-  - [ ] improve unification error messages
-  - [ ] avoid SomeException, use throw and throwIO
-  - [ ] metas-as-globals if a file is elaborated
-  - [ ] consider zonking again
+  - [x] add some zonking
 - [x] parser for `f \x. ...`
 - [x] named sigma projection
   - [x] add syntax
@@ -98,9 +94,21 @@ TODO:
   - [x] add post-fix parser
 - [x] parser for unit type () and nested units []
 - [x] improve core printing
-- [ ] qualified imports
+- [ ] improve meta handling
+  - [ ] metas-as-globals if a file is elaborated
+  - [ ] do not print core terms (so zonking is not necessary)
+  - [ ] top-level generalization?
+- [ ] improve error messages
+  - [ ] avoid SomeException, use throw and throwIO
+  - [ ] improve unification error messages
+  - [ ] improve elaboration error message, use location info
+- [ ] improve imports
+  - [ ] qualified imports
+- [ ] improve unification
+  - [ ] postponing
+- [ ] indexed datatypes
+  - [ ] internal fixpoints
+  - [ ] coinductive types
+  - [ ] inductive-recursive types
 - [ ] QTT
-- [ ] internal fixpoints
-- [ ] coinductive types
-- [ ] postponing
 - [ ] instance arguments

@@ -356,11 +356,13 @@ showMetas = do
   return ()
 
 showHoles :: HoleMap -> IO ()
-showHoles [] = showMetas
+showHoles [] = do
+  showMetas
+  putStrLn ""
 showHoles ((x, HoleEntry ctx tm ty) : t) = do
   showHoles t
   putStrLn ""
-  putStrLn $ "hole _" ++ x ++ " : " ++ showV ctx ty ++ " = " ++ showC ctx tm
+  putStrLn $ "hole _" ++ x ++ " : " ++ showVZ ctx ty ++ " = " ++ showCZ ctx tm
   putStrLn $ showLocal ctx
 
 elaborate :: Ctx -> Surface -> IO (Core, Core, Univ)
@@ -368,15 +370,16 @@ elaborate ctx s = do
   reset
   resetHoles
   resetUMetas
-  (c, ty, u) <- infer ctx s
+  (xc, ty, u) <- infer ctx s
+  let c = zonkCtx ctx xc
   hs <- readIORef holes
-  showHoles hs
-  test (null hs) $ "\nholes found:\ntype: " ++ showV ctx ty ++ "\nuniv: " ++ show (normalizeUniv u) ++ "\n" ++ show (map fst $ reverse hs)
+  onlyIf (not $ null hs) $ showHoles hs
+  test (null hs) $ "\nholes found:\ntype: " ++ showVZ ctx ty ++ "\nuniv: " ++ show (normalizeUniv u) ++ "\n" ++ show (map fst $ reverse hs)
   order <- orderMetas
-  let c' = includeMetas (ctx, ty, u) order c
+  let c' = {- includeMetas (ctx, ty, u) order -} c
   let ty' = nf $ includeMetas (ctx, ty, u) order (quote 0 ty)
   ums <- getUMetas
-  test (allUMetasSolved ums) $ "\nunsolved universe metas:\ntype: " ++ showV ctx ty ++ "\nuniv: " ++ show (normalizeUniv u) ++ "\n" ++ showUMetaMap ums
+  test (allUMetasSolved ums) $ "\nunsolved universe metas:\ntype: " ++ showVZ ctx ty ++ "\nuniv: " ++ show (normalizeUniv u) ++ "\n" ++ showUMetaMap ums
   verify c'
   return (c', ty', normalizeUniv u)
 

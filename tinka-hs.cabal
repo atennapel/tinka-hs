@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d6676d1d824f62487554a0639926195e3168f9eb75a50ddd3cf24f5b15af82dc
+-- hash: 3bba5424750447732aba1055ccc7b647becc92b356c35090079748c7e3ae7bb0
 
 name:           tinka-hs
 version:        0.1.0.0
@@ -43,6 +43,7 @@ executable tinka-hs
       Universes
       Val
       Verification
+      Zonking
       Paths_tinka_hs
   hs-source-dirs:
       src

@@ -7,6 +7,7 @@ import GHC.IO.Encoding
 import Data.List (isPrefixOf)
 import Control.Exception (catch, SomeException)
 
+import Common
 import Surface
 import Ctx
 import Elaboration
@@ -122,9 +123,13 @@ elabDefs getDefs = do
   elaborateDefs Nothing ds
   return ()
 
+reduceGlobalLet :: Name -> Core -> Core
+reduceGlobalLet x (Let y _ v (Var 0)) | x == y = v
+reduceGlobalLet _ t = t
+
 showElabDef :: GlobalEntry -> String
 showElabDef (GlobalEntry x etm ety _ _ _ file) =
-  maybe "" (++ ".") file ++ x ++ " : " ++ showC empty ety ++ " = " ++ showC empty etm
+  maybe "" (++ ".") file ++ x ++ " : " ++ showC empty ety ++ " = " ++ showC empty (reduceGlobalLet x etm)
 
 showElabDefs :: GlobalCtx -> String
 showElabDefs [] = ""

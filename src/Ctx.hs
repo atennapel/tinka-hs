@@ -10,6 +10,7 @@ import Val
 import Evaluation
 import Globals
 import Universes
+import Zonking
 
 data Path
   = Here
@@ -72,6 +73,12 @@ showVWith ql ctx v = show $ fromCore (allNames ctx) (quoteWith ql (lvl ctx) v)
 showV :: Ctx -> Val -> String
 showV ctx v = show $ fromCore (allNames ctx) (quote (lvl ctx) v)
 
+showVZ :: Ctx -> Val -> String
+showVZ ctx v = show $ fromCore (allNames ctx) (zonkCtx ctx $ quote (lvl ctx) v)
+
+showCZ :: Ctx -> Core -> String
+showCZ ctx c = showC ctx (zonkCtx ctx c)
+
 showLocal :: Ctx -> String
 showLocal ctx = let zipped = zip3 (allNames ctx) (ts ctx) (vs ctx) in
   intercalate "\n" $ map format zipped
@@ -109,3 +116,6 @@ lookupGlobal x = do
   case getGlobal x of
     Just e -> return e
     Nothing -> error $ "undefined global " ++ x
+
+zonkCtx :: Ctx -> Core -> Core
+zonkCtx ctx = zonk (lvl ctx) (vs ctx)

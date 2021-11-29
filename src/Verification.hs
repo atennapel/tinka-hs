@@ -102,6 +102,6 @@ infer ctx tm = error $ "verify: cannot infer: " ++ show tm
 
 verify :: Core -> IO Core
 verify c = do
-  print c
+  -- print c
   ty <- infer empty c
   return $ quote 0 ty
