@@ -94,6 +94,7 @@ TODO:
   - [x] add post-fix parser
 - [x] parser for unit type () and nested units []
 - [x] improve core printing
+- [ ] some global unfolding in holes
 - [ ] improve meta handling
   - [ ] metas-as-globals if a file is elaborated
   - [ ] do not print core terms (so zonking is not necessary)

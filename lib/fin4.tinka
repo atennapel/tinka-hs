@@ -1,0 +1,42 @@
+Fin4 = Bool ** Bool;
+
+F4-0 : Fin4 = (False, False);
+F4-1 : Fin4 = (False, True);
+F4-2 : Fin4 = (True, False);
+F4-3 : Fin4 = (True, True);
+
+indFin4 :
+  (P : Fin4 -> Type)
+  (f0 : P F4-0)
+  (f1 : P F4-1)
+  (f2 : P F4-2)
+  (f3 : P F4-3)
+  (x : Fin4)
+  -> P x
+  = \P f0 f1 f2 f3 x.
+      (elim Bool) (\b1. (b2 : Bool) -> P (b1, b2))
+      ((elim Bool) (\b2. P (True, b2)) f3 f2)
+      ((elim Bool) (\b2. P (False, b2)) f1 f0)
+      x._1
+      x._2;
+
+indFin4l1 :
+  (P : Fin4 -> Type1)
+  (f0 : P F4-0)
+  (f1 : P F4-1)
+  (f2 : P F4-2)
+  (f3 : P F4-3)
+  (x : Fin4)
+  -> P x
+  = \P f0 f1 f2 f3 x.
+      (elim Bool 1) (\b1. (b2 : Bool) -> P (b1, b2))
+      ((elim Bool 1) (\b2. P (True, b2)) f3 f2)
+      ((elim Bool 1) (\b2. P (False, b2)) f1 f0)
+      x._1
+      x._2;
+
+caseFin4 : {R : Type} -> Fin4 -> R -> R -> R -> R -> R
+  = \{R} x f0 f1 f2 f3. indFin4 (\_. R) f0 f1 f2 f3 x;
+
+caseFin4l1 : {R : Type1} -> Fin4 -> R -> R -> R -> R -> R
+  = \{R} x f0 f1 f2 f3. indFin4l1 (\_. R) f0 f1 f2 f3 x;

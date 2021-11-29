@@ -63,17 +63,21 @@ pLifting = do
     return $ fromMaybe 1 l)
   return $ fromMaybe 0 lift
 
+pName :: Parser Name
+pName = try $ do
+  x <- takeWhile1P Nothing (\c -> isAlphaNum c || c == '-' || c == '\'')
+  guard (not (keyword x) && x /= "-" && x /= "'")
+  return x
+
 pIdent :: Parser Name
 pIdent = try $ do
-  x <- takeWhile1P Nothing isAlphaNum
-  guard (not (keyword x))
+  x <- pName
   ws
   return x
 
 pIdentLifting :: Parser (Name, ULvl)
 pIdentLifting = try $ do
-  x <- takeWhile1P Nothing isAlphaNum
-  guard (not (keyword x))
+  x <- pName
   lift <- pLifting
   ws
   return (x, lift)

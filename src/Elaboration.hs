@@ -360,7 +360,7 @@ showHoles [] = showMetas
 showHoles ((x, HoleEntry ctx tm ty) : t) = do
   showHoles t
   putStrLn ""
-  putStrLn $ "hole _" ++ x ++ " : " ++ showVZ ctx ty ++ " = " ++ showCZ ctx tm
+  putStrLn $ "hole\n_" ++ x ++ " : " ++ showVZ ctx ty ++ " = " ++ showCZ ctx tm
   putStrLn $ showLocal ctx
 
 elaborate :: Ctx -> Surface -> IO (Core, Core, Univ)
