@@ -1,11 +1,11 @@
-module Unification (unify) where
+module Unification (unify, unifyLevel) where
 
 import Common
 import Core
 import Val
 import Evaluation
 import Metas
-import Universes
+import Prims
 
 import qualified Data.IntMap as IM
 import qualified Data.Set as S
@@ -49,7 +49,8 @@ pruneTy (RevPruning pr) a = go pr (PR Nothing 0 0 mempty) a
     go :: Pruning -> PR -> Val -> IO Core
     go pr pren a = case (pr, force a) of
       ([], a) -> rename pren a
-      (Just _ : pr, VPi x i a u1 b u2) -> Pi x i <$> rename pren a <*> return u1 <*> go pr (lift pren) (vinst b (VVar (cod pren))) <*> return u2
+      (Just _ : pr, VPi x i a u1 b u2) ->
+        Pi x i <$> rename pren a <*> renameLevel pren u1 <*> go pr (lift pren) (vinst b (VVar (cod pren))) <*> renameClosLevel pren u2
       (Nothing : pr, VPi x i a u1 b u2) -> go pr (skip pren) (vinst b (VVar (cod pren)))
       _ -> error "impossible"
 
@@ -105,6 +106,13 @@ pruneFlex pren m sp = do
             return ((Just t, i) : sp, OKNonRenaming)
     go _ = error "pruneFlex failure: eliminator in spine"
 
+renameLevel :: PR -> VLevel -> IO Level
+renameLevel pren VOmega = return Omega
+renameLevel pren (VFin a) = Fin <$> rename pren a
+
+renameClosLevel :: PR -> ClosLevel -> IO Level
+renameClosLevel pren u = renameLevel (lift pren) (vinstlevel u (VVar (cod pren)))
+
 rename :: PR -> Val -> IO Core
 rename pren v = go pren v
   where
@@ -113,13 +121,13 @@ rename pren v = go pren v
     goSp pren t (EApp u i : sp) = App <$> goSp pren t sp <*> go pren u <*> return i
     goSp pren t (ELower : sp) = Lower <$> goSp pren t sp
     goSp pren t (EProj p : sp) = flip Proj p <$> goSp pren t sp
-    goSp pren t (EPrimElim x l k as : sp) = do
-      let h = PrimElim x l k
-      qas <- mapM (go pren) as
+    goSp pren t (EPrimElim x as : sp) = do
+      let h = PrimElim x
+      qas <- mapM (\(v, i) -> go pren v >>= \v -> return (v, i)) as
       t' <- goSp pren t sp
       return $ case primElimPosition x of
-        PEPLast -> App (foldl (\a b -> App a b Expl) h qas) t' Expl
-        PEPFirst -> foldl (\a b -> App a b Expl) (App h t' Expl) qas
+        PEPLast -> App (foldl (\a (b, i) -> App a b i) h qas) t' (primElimIcit x)
+        PEPFirst -> foldl (\a (b, i) -> App a b i) (App h t' (primElimIcit x)) qas
 
     go :: PR -> Val -> IO Core
     go pren t = case force t of
@@ -129,17 +137,20 @@ rename pren v = go pren v
       VNe (HVar x) sp -> case IM.lookup x (ren pren) of
         Nothing -> error "scope error"
         Just x' -> goSp pren (Var $ dom pren - x' - 1) sp
-      VNe (HPrim x l) sp -> goSp pren (Prim x l) sp
-      VGlobal x l sp _ -> goSp pren (Global x l) sp
+      VNe (HPrim x) sp -> goSp pren (Prim x) sp
+      VGlobal x sp _ -> goSp pren (Global x) sp
       VAbs x i t -> Abs x i <$> go (lift pren) (vinst t (VVar (cod pren)))
-      VPi x i a u1 b u2 -> Pi x i <$> go pren a <*> return u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> return u2
-      VSigma x a u1 b u2 -> Sigma x <$> go pren a <*> return u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> return u2
+      VPi x i a u1 b u2 -> Pi x i <$> go pren a <*> renameLevel pren u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> renameLevel (lift pren) (vinstlevel u2 (VVar (cod pren)))
+      VSigma x a u1 b u2 -> Sigma x <$> go pren a <*> renameLevel pren u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> renameLevel (lift pren) (vinstlevel u2 (VVar (cod pren)))
       VPair a b -> Pair <$> go pren a <*> go pren b
-      VU i -> return $ U i
+      VU i -> U <$> renameLevel pren i
+      VULevel -> return ULevel
+      VL0 -> return L0
+      VLS a -> LS <$> go pren a
+      VLMax a b -> LMax <$> go pren a <*> go pren b
       VRefl -> return Refl
       VLift t -> Lift <$> go pren t
       VLiftTerm t -> LiftTerm <$> go pren t
-      VCon t -> Con <$> go pren t
 
 lams :: Lvl -> Val -> Core -> Core
 lams l a t = go a 0
@@ -176,27 +187,19 @@ unifyElim :: Lvl -> Elim -> Elim -> IO ()
 unifyElim k (EApp v i) (EApp v' i') = unify k v v'
 unifyElim k ELower ELower = return ()
 unifyElim k (EProj p) (EProj p') | eqvProj p p' = return ()
-unifyElim k (EPrimElim x l1 l1' as) (EPrimElim x' l2 l2' as') | x == x' && l1 == l2 && l1' == l2' =
-  go as as'
+unifyElim k (EPrimElim x as) (EPrimElim x' as') | x == x' =
+  go (map fst as) (map fst as')
   where
     go :: [Val] -> [Val] -> IO ()
     go [] [] = return ()
     go (v : sp) (v' : sp') = unify k v v' >> go sp sp'
     go _ _ = error "prim elim args mismatch"
-unifyElim k (EPrimElim PEBoolDesc l1 k1 [t1, f1]) (EPrimElim PEBool l2 k2 [p, t2, f2]) | l1 == l2 && k1 + 1 == k2 = do
-  unify k (vabs "_" $ \_ -> vDesc l1) p
-  unify k t1 t2
-  unify k f1 f2
-unifyElim k (EPrimElim PEBool l2 k2 [p, t2, f2]) (EPrimElim PEBoolDesc l1 k1 [t1, f1]) | l1 == l2 && k1 + 1 == k2 = do
-  unify k p (vabs "_" $ \_ -> vDesc l1)
-  unify k t2 t1
-  unify k f2 f1
 unifyElim _ _ _ = error "elim mismatch"
 
 unifySpProj :: Lvl -> Spine -> Spine -> Ix -> IO ()
 unifySpProj k sp sp' 0 = unifySp k sp sp'
 unifySpProj k (EProj Snd : sp) sp' n = unifySpProj k sp sp' (n - 1)
-unifySpProj _ _ _ _ = error $ "spine proj mismatch"
+unifySpProj _ _ _ _ = error "spine proj mismatch"
 
 unifySp :: Lvl -> Spine -> Spine -> IO ()
 unifySp k [] [] = return ()
@@ -227,17 +230,28 @@ intersect l m sp sp' = case go sp sp' of
         _ -> Nothing
     go _ _ = error "impossible"
 
+unifyLevel :: Lvl -> VLevel -> VLevel -> IO ()
+unifyLevel k VOmega VOmega = return ()
+unifyLevel k (VFin a) (VFin b) = unify k a b
+unifyLevel k a b = error $ "level unification failed: " ++ show (quoteLevel k a) ++ " ~ " ++ show (quoteLevel k b)
+
+unifyLiftLevel :: Lvl -> ClosLevel -> ClosLevel -> IO ()
+unifyLiftLevel k c c' = let v = vvar k in unifyLevel (k + 1) (vinstlevel c v) (vinstlevel c' v)
+
 unify :: Lvl -> Val -> Val -> IO ()
 unify k a b = -- trace ("unify " ++ show (quote k a) ++ " ~ " ++ show (quote k b)) $ do
   case (force a, force b) of
-    (VU l1, VU l2) -> unifyUniv l1 l2
+    (VU l1, VU l2) -> unifyLevel k l1 l2
+    (VULevel, VULevel) -> return ()
+    (VL0, VL0) -> return ()
+    (VLS a, VLS b) -> unify k a b
+    (VLMax a b, VLMax a' b') -> unify k a a' >> unify k b b'
     (VLift t1, VLift t2) -> unify k t1 t2
     (VLiftTerm t1, VLiftTerm t2) -> unify k t1 t2
-    (VCon t1, VCon t2) -> unify k t1 t2
     (VPi _ i t u1 b u2, VPi _ i' t' u3 b' u4) | i == i' ->
-      unify k t t' >> unifyUniv u1 u3 >> unifyLift k b b' >> unifyUniv u2 u4
+      unify k t t' >> unifyLevel k u1 u3 >> unifyLift k b b' >> unifyLiftLevel k u2 u4
     (VSigma _ t u1 b u2, VSigma _ t' u3 b' u4) ->
-      unify k t t' >> unifyUniv u1 u3 >> unifyLift k b b' >> unifyUniv u2 u4
+      unify k t t' >> unifyLevel k u1 u3 >> unifyLift k b b' >> unifyLiftLevel k u2 u4
     (VAbs _ i  b, VAbs _ i' b') -> unifyLift k b b'
     (VAbs _ i b, x) -> let v = vvar k in unify (k + 1) (vinst b v) (vapp x v i)
     (x, VAbs _ i b) -> let v = vvar k in unify (k + 1) (vapp x v i) (vinst b v)
@@ -249,8 +263,8 @@ unify k a b = -- trace ("unify " ++ show (quote k a) ++ " ~ " ++ show (quote k b
     (VNe (HMeta m) sp, VNe (HMeta m') sp') -> flexFlex k m sp m' sp'
     (VNe h sp, VNe h' sp') | h == h' -> unifySp k sp sp'
     
-    (VNe (HPrim PUnit _) [], v) -> return ()
-    (v, VNe (HPrim PUnit _) []) -> return ()
+    (VNe (HPrim PUnit) [], v) -> return ()
+    (v, VNe (HPrim PUnit) []) -> return ()
     
     (VRefl, v) -> return () -- is this safe?
     (v, VRefl) -> return () -- is this safe?
@@ -258,9 +272,9 @@ unify k a b = -- trace ("unify " ++ show (quote k a) ++ " ~ " ++ show (quote k b
     (VNe (HMeta m) sp, t) -> solve k m sp t
     (t, VNe (HMeta m) sp) -> solve k m sp t
 
-    (VGlobal x l sp v, VGlobal x' l' sp' v') | x == x' && l == l' ->
+    (VGlobal x sp v, VGlobal x' sp' v') | x == x' ->
       catch (unifySp k sp sp') $ \(_ :: SomeException) -> unify k v v'
-    (VGlobal _ _ _ v, VGlobal _ _ _ v') -> unify k v v'
-    (VGlobal _ _ _ v, v') -> unify k v v'
-    (v, VGlobal _ _ _ v') -> unify k v v'
+    (VGlobal _ _ v, VGlobal _ _ v') -> unify k v v'
+    (VGlobal _ _ v, v') -> unify k v v'
+    (v, VGlobal _ _ v') -> unify k v v'
     (_, _) -> error $ "failed to unify: " ++ show (quote k a) ++ " ~ " ++ show (quote k b)

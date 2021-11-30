@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3bba5424750447732aba1055ccc7b647becc92b356c35090079748c7e3ae7bb0
+-- hash: 6d302548ccda777d6925515e02d250dd1d24bce56365aa531898350b8a843c04
 
 name:           tinka-hs
 version:        0.1.0.0
@@ -40,7 +40,6 @@ executable tinka-hs
       Prims
       Surface
       Unification
-      Universes
       Val
       Verification
       Zonking

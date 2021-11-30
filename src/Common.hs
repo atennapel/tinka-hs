@@ -5,7 +5,6 @@ import Control.Exception (catch, SomeException)
 type Name = String
 type Ix = Int
 type Lvl = Int
-type ULvl = Int
 
 newtype MetaVar = MetaVar { unMetaVar :: Int } deriving (Eq, Show, Num, Ord) via Int
 

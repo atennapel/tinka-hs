@@ -5,7 +5,6 @@ import Val
 import Common
 import Parser
 import Surface
-import Universes
 
 import Data.IORef
 import GHC.IO.Unsafe (unsafeDupablePerformIO)
@@ -23,7 +22,7 @@ data GlobalEntry = GlobalEntry {
   gtype :: Core,
   gval :: Val,
   gvtype :: Val,
-  guniv :: Univ,
+  guniv :: VLevel,
   gmodule :: Maybe String
 }
 

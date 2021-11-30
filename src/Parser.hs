@@ -50,18 +50,10 @@ pLambda :: Parser Char
 pLambda = char 'λ' <|> char '\\'
 
 keywords :: [String]
-keywords = ["let", "λ", "Type", "Lift", "lift", "lower", "elim", "Con", "Refl"]
+keywords = ["let", "λ", "Type", "Lift", "lift", "lower", "elim", "Con", "Refl", "Level", "LZ", "LS", "lmax"]
 
 keyword :: String -> Bool
 keyword x = x `elem` keywords
-
-pLifting :: Parser ULvl
-pLifting = do
-  lift <- optional (do
-    char '^'
-    l <- optional L.decimal
-    return $ fromMaybe 1 l)
-  return $ fromMaybe 0 lift
 
 pName :: Parser Name
 pName = try $ do
@@ -75,24 +67,20 @@ pIdent = try $ do
   ws
   return x
 
-pIdentLifting :: Parser (Name, ULvl)
-pIdentLifting = try $ do
-  x <- pName
-  lift <- pLifting
-  ws
-  return (x, lift)
-
 pKeyword :: String -> Parser ()
 pKeyword kw = do
   C.string kw
   (takeWhile1P Nothing isAlphaNum *> empty) <|> ws
 
-pType :: Parser ULvl
+pType :: Parser Surface
 pType = do
-  C.string "Type"
-  l <- optional L.decimal
-  (takeWhile1P Nothing isAlphaNum *> empty) <|> ws
-  return $ fromMaybe 0 l
+  symbol "Type"
+  SU <$> pAtom
+
+pLS :: Parser Surface
+pLS = do
+  symbol "LS"
+  SLS <$> pAtom
 
 pCommaSeparated :: Parser [Surface]
 pCommaSeparated = do
@@ -106,34 +94,33 @@ pPair :: Parser Surface
 pPair = parens (foldr1 SPair <$> pCommaSeparated)
 
 pUnitPair :: Parser Surface
-pUnitPair = brackets (foldr SPair (SVar "[]" 0) <$> pCommaSeparated)
+pUnitPair = brackets (foldr SPair (SVar "[]") <$> pCommaSeparated)
 
 pLift :: Parser Surface
 pLift = do
   symbol "Lift"
-  SLift <$> pSurface
+  SLift <$> pAtom
 
 pLiftTerm :: Parser Surface
 pLiftTerm = do
   symbol "lift"
-  SLiftTerm <$> pSurface
+  SLiftTerm <$> pAtom
 
 pLower :: Parser Surface
 pLower = do
   symbol "lower"
-  SLower <$> pSurface
+  SLower <$> pAtom
+
+pLMax :: Parser Surface
+pLMax = do
+  symbol "lmax"
+  a <- pAtom
+  SLMax a <$> pAtom
 
 pPrimElim :: Parser Surface
 pPrimElim = do
   symbol "elim"
-  (x, l) <- pIdentLifting
-  k <- optional L.decimal
-  return $ SPrimElim x l (fromMaybe 0 k)
-
-pCon :: Parser Surface
-pCon = do
-  symbol "Con"
-  SCon <$> pSurface
+  SPrimElim <$> pIdent
 
 pHole :: Parser Surface
 pHole = do
@@ -145,17 +132,20 @@ pHole = do
 pAtom :: Parser Surface
 pAtom =
   withPos (
-    (SU <$> pType) <|>
+    pType <|>
     pHole <|>
+    pLS <|>
     (SRefl <$ symbol "Refl") <|>
-    (uncurry SVar <$> pIdentLifting))
+    (SLevel <$ symbol "Level") <|>
+    (SL0 <$ symbol "L0") <|>
+    (SVar <$> pIdent))
   <|> pLift
   <|> pLiftTerm
   <|> pLower
-  <|> pCon
   <|> pPrimElim
-  <|> try (SVar "()" 0 <$ parens ws)
-  <|> try (SVar "[]" 0 <$ brackets ws)
+  <|> pLMax
+  <|> try (SVar "()" <$ parens ws)
+  <|> try (SVar "[]" <$ brackets ws)
   <|> try pPair
   <|> try pUnitPair
   <|> parens pSurface
