@@ -82,7 +82,9 @@ TODO:
 - [x] parser for unit type () and nested units []
 - [x] improve core printing
 - [x] universe polymorphism
-- [ ] add eliminators for Bool and HEq
+- [x] add eliminator for Bool
+- [ ] add eliminator for HEq
+- [ ] infer {l} {A : Type l} -> A -> A
 - [ ] some global unfolding in holes
 - [ ] improve meta handling
   - [ ] metas-as-globals if a file is elaborated

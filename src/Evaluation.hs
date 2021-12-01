@@ -69,6 +69,9 @@ vprimelim PELMax [(b, _)] VL0 = b
 vprimelim PELMax [(VL0, _)] a = a
 vprimelim PELMax [(VLS b, i)] (VLS a) = vprimelim PELMax [(b, i)] a
 
+vprimelim PEIndBool [(l, _), (p, _), (t, _), (f, _)] VTrue = t
+vprimelim PEIndBool [(l, _), (p, _), (t, _), (f, _)] VFalse = f
+
 vprimelim x as (VNe h sp) = VNe h (EPrimElim x as : sp)
 vprimelim p as (VGlobal x sp v) = VGlobal x (EPrimElim p as : sp) (vprimelim p as v)
 vprimelim x as _ = undefined
@@ -143,6 +146,13 @@ evalprimelim PELower =
   vabsimpl "l" $ \l -> vabsimpl "A" $ \a -> vabs "x" $ \x -> vlower l a x
 evalprimelim PELMax =
   vabs "a" $ \a -> vabs "b" $ \b -> vfinmax a b
+evalprimelim PEIndBool =
+  vabsimpl "l" $ \l ->
+  vabs "P" $ \p ->
+  vabs "t" $ \t ->
+  vabs "f" $ \f ->
+  vabs "b" $ \b ->
+  vprimelim PEIndBool [(l, Impl), (p, Expl), (t, Expl), (f, Expl)] b
 
 data QuoteLevel = KeepGlobals | Full
 
@@ -299,6 +309,20 @@ primElimType PELower =
   (vpimpl "l" VULevel VOmega (VFin . VLS) $ \l -> vpimpl "A" (VType l) (VFin $ VLS l) (\_ -> VFin $ VLS l) $ \a -> vfun (VLift l a) (VFin $ VLS l) (\_ -> VFin l) a, VOmega)
 primElimType PELMax =
   (vfun VULevel VOmega (const VOmega) $ vfun VULevel VOmega (const VOmega) VULevel, VOmega)
+{-
+  {l : Level}
+  (P : Bool -> Type l)
+  (t : P True)
+  (f : P False)
+  (b : Bool)
+  -> P b
+-}
+primElimType PEIndBool =
+  (vpimpl "l" VULevel VOmega (VFin . VLS) $ \l ->
+   vpi "P" (vfun VBool (VFin VL0) (\_ -> VFin (VLS l)) (VType l)) (VFin (VLS l)) (\_ -> VFin l) $ \p ->
+   vfun (vapp p VTrue Expl) (VFin l) (\_ -> VFin l) $
+   vfun (vapp p VFalse Expl) (VFin l) (\_ -> VFin l) $
+   vpi "b" VBool (VFin VL0) (\_ -> VFin l) $ \b -> vapp p b Expl, VOmega)
 
 strLevel :: Lvl -> Lvl -> VLevel -> Maybe Level
 strLevel l x = \case
