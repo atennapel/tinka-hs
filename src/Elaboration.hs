@@ -18,7 +18,7 @@ import System.IO.Unsafe
 import Data.Bifunctor (first)
 import qualified Data.Set as S
 
--- import Debug.Trace (trace)
+import Debug.Trace (trace)
 
 -- holes
 data HoleEntry = HoleEntry Ctx Core Val
@@ -87,7 +87,7 @@ check :: Ctx -> Surface -> Val -> VLevel -> IO Core
 check ctx tm ty u = do
   let fty = force ty
   let fu = forceLevel u
-  case (tm, {-trace ("check (" ++ show tm ++ ") : " ++ showV ctx ty ++ " : " ++ showVLevel ctx fu ++ " ~> " ++ showV ctx fty) $-} fty, fu) of
+  case (tm, trace ("check (" ++ show tm ++ ") : " ++ showV ctx ty ++ " : " ++ showVLevel ctx fu ++ " ~> " ++ showV ctx fty) $ fty, fu) of
     (SPos p s, _, _) -> check (enter p ctx) s ty u
     (SHole x, _, _) -> do
       tm <- freshMeta ctx ty u
@@ -140,7 +140,7 @@ inferUniv ctx tm = do
     _ -> error $ "expected a universe but got " ++ showV ctx ty ++ ", while checking " ++ show tm
 
 infer :: Ctx -> Surface -> IO (Core, Val, VLevel)
-infer ctx tm = case {-trace ("synth " ++ show tm)-} tm of
+infer ctx tm = case trace ("synth " ++ show tm) tm of
   SPos p s -> infer (enter p ctx) s
   SU l -> do
     cl <- check ctx l VULevel VOmega
@@ -197,6 +197,7 @@ infer ctx tm = case {-trace ("synth " ++ show tm)-} tm of
       VOmega -> do
         (cb, l2) <- inferUniv (bind x i (eval (vs ctx) ct) l1 ctx) b
         let pi = Pi x i ct (quoteLevel (lvl ctx) l1) cb (quoteLevel (lvl ctx + 1) l2)
+        putStrLn $ "pi1: " ++ show pi ++ " | " ++ show (quoteLevel (lvl ctx) l1) ++ " | " ++ show (quoteLevel (lvl ctx + 1) l2)
         return (pi, VU VOmega, VOmegaSuc)
       u1@(VFin l1) -> do
         (cb, l2a) <- inferUniv (bind x i (eval (vs ctx) ct) u1 ctx) b
@@ -206,6 +207,7 @@ infer ctx tm = case {-trace ("synth " ++ show tm)-} tm of
             let qu1 = quoteLevel (lvl ctx) u1
             let lmax = vlmax u1 (evallevel (vs ctx) l2b)
             let pi = Pi x i ct qu1 cb (quoteLevel (lvl ctx + 1) l2a)
+            putStrLn $ "pi2: " ++ show pi ++ " | " ++ show qu1 ++ " | " ++ show (quoteLevel (lvl ctx + 1) l2a)
             let vl = forceLevel lmax
             case vl of
               VOmegaSuc -> error $ "omega^ in pi: " ++ show c

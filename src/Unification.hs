@@ -13,7 +13,7 @@ import Data.IORef
 import Control.Exception (catch, try, SomeException)
 import Control.Monad (guard)
 
--- import Debug.Trace (trace)
+import Debug.Trace (trace)
 
 data PR = PR {
   occ :: Maybe MetaVar,
@@ -47,12 +47,15 @@ pruneTy :: RevPruning -> Val -> IO Core
 pruneTy (RevPruning pr) a = go pr (PR Nothing 0 0 mempty) a
   where
     go :: Pruning -> PR -> Val -> IO Core
-    go pr pren a = case (pr, force a) of
-      ([], a) -> rename pren a
-      (Just _ : pr, VPi x i a u1 b u2) ->
-        Pi x i <$> rename pren a <*> renameLevel pren u1 <*> go pr (lift pren) (vinst b (VVar (cod pren))) <*> renameClosLevel pren u2
-      (Nothing : pr, VPi x i a u1 b u2) -> go pr (skip pren) (vinst b (VVar (cod pren)))
-      _ -> error "impossible"
+    go pr pren a = do
+      putStrLn "Here prunety"
+      putStrLn $ "pruneTy " ++ show (quote (cod pren) a)
+      case (pr, force a) of
+        ([], a) -> rename pren a
+        (Just _ : pr, VPi x i a u1 b u2) ->
+          Pi x i <$> rename pren a <*> renameLevel pren u1 <*> go pr (lift pren) (vinst b (VVar (cod pren))) <*> renameClosLevel pren u2
+        (Nothing : pr, VPi x i a u1 b u2) -> go pr (skip pren) (vinst b (VVar (cod pren)))
+        _ -> error "impossible"
 
 getUnsolved :: MetaVar -> (Core, Val)
 getUnsolved m = case lookupMeta m of
@@ -140,8 +143,8 @@ rename pren v = go pren v
       VNe (HPrim x) sp -> goSp pren (Prim $ Left x) sp
       VGlobal x sp _ -> goSp pren (Global x) sp
       VAbs x i t -> Abs x i <$> go (lift pren) (vinst t (VVar (cod pren)))
-      VPi x i a u1 b u2 -> Pi x i <$> go pren a <*> renameLevel pren u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> renameLevel (lift pren) (vinstlevel u2 (VVar (cod pren)))
-      VSigma x a u1 b u2 -> Sigma x <$> go pren a <*> renameLevel pren u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> renameLevel (lift pren) (vinstlevel u2 (VVar (cod pren)))
+      VPi x i a u1 b u2 -> Pi x i <$> go pren a <*> renameLevel pren u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> renameClosLevel pren u2
+      VSigma x a u1 b u2 -> Sigma x <$> go pren a <*> renameLevel pren u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> renameClosLevel pren u2
       VPair a b -> Pair <$> go pren a <*> go pren b
       VU i -> U <$> renameLevel pren i
 
@@ -156,14 +159,24 @@ lams l a t = go a 0
 
 solveWithPR :: MetaVar -> (PR, Maybe Pruning) -> Val -> IO ()
 solveWithPR m (pren, pruneNonLinear) rhs = do
+  putStrLn $ "solve ?" ++ show m ++ " := " ++ show (quote (cod pren) rhs)
   let (cty, mty) = getUnsolved m
+  putStrLn $ "meta type: " ++ show cty
+  putStrLn $ show (cod pren)
+  let mty = eval [] cty
+  putStrLn $ "eval done"
+  putStrLn $ "meta type quoted: " ++ show (quote (cod pren) mty)
   
   case pruneNonLinear of
     Nothing -> return ()
     Just pr -> () <$ pruneTy (revPruning pr) mty
   
+  print "here2"
   rhs <- rename (pren {occ = Just m}) rhs
+  print "here3"
   let solution = lams (dom pren) mty rhs
+  print "here4"
+  print solution
   let solutionv = eval [] solution
   let deps = S.union (allMetas solution) (allMetas cty) 
   modifyIORef' mcxt $ IM.insert (unMetaVar m) (Solved deps cty mty solution solutionv)
@@ -232,7 +245,7 @@ unifyLiftLevel :: Lvl -> ClosLevel -> ClosLevel -> IO ()
 unifyLiftLevel k c c' = let v = vvar k in unifyLevel (k + 1) (vinstlevel c v) (vinstlevel c' v)
 
 unify :: Lvl -> Val -> Val -> IO ()
-unify k a b = -- trace ("unify " ++ show (quote k a) ++ " ~ " ++ show (quote k b)) $ do
+unify k a b = trace ("unify (" ++ show k ++ ") " ++ show (quote k a) ++ " ~ " ++ show (quote k b)) $ do
   case (force a, force b) of
     (VU l1, VU l2) -> unifyLevel k l1 l2
     (VPi _ i t u1 b u2, VPi _ i' t' u3 b' u4) | i == i' ->

@@ -10,7 +10,7 @@ import Prims
 import Data.Foldable (foldrM)
 import Data.Bifunctor (first)
 
--- import Debug.Trace (trace)
+import Debug.Trace (trace)
 
 vinst :: Clos -> Val -> Val
 vinst (Clos e c) v = eval (v : e) c
@@ -118,23 +118,26 @@ vprim PLiftTerm =
 vprim x = VNe (HPrim x) []
 
 eval :: Env -> Core -> Val
-eval e (Var i) = e !! i
-eval e (Global x) =
-  case getGlobal x of
-    Just e -> VGlobal x [] $ gval e
-    Nothing -> undefined
-eval e (Prim (Left x)) = vprim x
-eval e (Prim (Right x)) = evalprimelim x
-eval e (App f a i) = vapp (eval e f) (eval e a) i
-eval e (Abs x i b) = VAbs x i (Clos e b)
-eval e (Pi x i t u1 b u2) = VPi x i (eval e t) (evallevel e u1) (Clos e b) (ClosLevel e u2)
-eval e (Sigma x t u1 b u2) = VSigma x (eval e t) (evallevel e u1) (Clos e b) (ClosLevel e u2)
-eval e (Pair a b) = VPair (eval e a) (eval e b)
-eval e (Proj t p) = vproj (eval e t) p
-eval e (U l) = VU (evallevel e l)
-eval e (Let x t v b) = eval (eval e v : e) b
-eval e (Meta x) = VMeta x
-eval e (AppPruning t p) = vappPruning e (eval e t) p
+eval e c = case trace ("eval (" ++ show (length e) ++ ") " ++ show c) c of
+  Var i | i < 0 || i >= length e ->
+    error $ "eval var out of range: " ++ show i ++ "/" ++ show (length e)
+  Var i -> e !! i
+  Global x ->
+    case getGlobal x of
+      Just e -> VGlobal x [] $ gval e
+      Nothing -> error $ "undefined global " ++ x ++ " in eval"
+  Prim (Left x) -> vprim x
+  Prim (Right x) -> evalprimelim x
+  App f a i -> vapp (eval e f) (eval e a) i
+  Abs x i b -> VAbs x i (Clos e b)
+  Pi x i t u1 b u2 -> VPi x i (eval e t) (evallevel e u1) (Clos e b) (ClosLevel e u2)
+  Sigma x t u1 b u2 -> VSigma x (eval e t) (evallevel e u1) (Clos e b) (ClosLevel e u2)
+  Pair a b -> VPair (eval e a) (eval e b)
+  Proj t p -> vproj (eval e t) p
+  U l -> VU (evallevel e l)
+  Let x t v b -> eval (eval e v : e) b
+  Meta x -> VMeta x
+  AppPruning t p -> vappPruning e (eval e t) p
 
 evalprimelim :: PrimElimName -> Val
 evalprimelim PEAbsurd =
