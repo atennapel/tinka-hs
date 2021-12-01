@@ -11,7 +11,7 @@ import Data.Maybe (fromJust)
 data ProjType = Fst | Snd | PNamed (Maybe Name) Ix
   deriving (Eq)
 
-data Level = Fin Core | Omega
+data Level = Fin Core | Omega | OmegaSuc
   deriving (Show)
 
 data Core
@@ -89,6 +89,7 @@ instance Show Core where
   show (Proj s p) = show s ++ showProjType p
   show (U (Fin c)) = "Type " ++ show c
   show (U Omega) = "Type omega"
+  show (U OmegaSuc) = "Type omega^"
   show (Let x t v b) = "(let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b ++ ")"
   show (Meta x) = "?" ++ show x
   show (AppPruning x _) = show x ++ "*"

@@ -18,6 +18,8 @@ data Path
 
 lmax :: Level -> Level -> Level
 lmax (Fin a) (Fin b) = Fin (App (App (Prim (Right PELMax)) a Expl) b Expl)
+lmax OmegaSuc _ = OmegaSuc
+lmax _ OmegaSuc = OmegaSuc
 lmax _ _ = Omega
 
 closeType :: Path -> Core -> Level -> Core
@@ -83,14 +85,15 @@ showVZ ctx v = show $ fromCore (allNames ctx) (zonkCtx ctx $ quote (lvl ctx) v)
 
 showVLevel :: Ctx -> VLevel -> String
 showVLevel ctx VOmega = "omega"
+showVLevel ctx VOmegaSuc = "omega^"
 showVLevel ctx (VFin v) = showV ctx v
 
 showCZ :: Ctx -> Core -> String
 showCZ ctx c = showC ctx (zonkCtx ctx c)
 
 showVLevelZ :: Ctx -> VLevel -> String
-showVLevelZ ctx VOmega = "omega"
 showVLevelZ ctx (VFin v) = showVZ ctx v
+showVLevelZ ctx l = showVLevel ctx l
 
 showLocal :: Ctx -> String
 showLocal ctx = let zipped = zip3 (allNames ctx) (ts ctx) (vs ctx) in

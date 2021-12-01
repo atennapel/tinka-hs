@@ -23,12 +23,14 @@ data Surface
   | SU Surface
   | SPos SourcePos Surface
   | SHole (Maybe Name)
+  | SNatLit Int
 
 isSimple :: Surface -> Bool
 isSimple (SVar _) = True
 isSimple (SHole _) = True
 isSimple (SPair _ _) = True
 isSimple (SProj _ _) = True
+isSimple (SNatLit _) = True
 isSimple (SPos _ s) = isSimple s
 isSimple _ = False
 
@@ -99,21 +101,29 @@ showAppArgument (a, Right Expl) = showS a
 showAppArgument (a, Right Impl) = "{" ++ show a ++ "}"
 showAppArgument (a, Left x) = "{" ++ x ++ " = " ++ show a ++ "}"
 
-showLevel :: Surface -> String
-showLevel top = go 0 top
-  where
-    go :: Int -> Surface -> String
-    go n (SVar "L0") = show n
-    go n (SApp (SVar "LS") a (Right Expl)) = go (n + 1) a
-    go _ _ = showS top
+tryShowNat :: Surface -> Maybe Int
+tryShowNat (SApp (SVar "S") x (Right Expl)) = (+ 1) <$> tryShowNat x
+tryShowNat (SVar "Z") = return 0
+tryShowNat _ = Nothing
+
+tryShowNatLevel :: Surface -> Maybe Int
+tryShowNatLevel (SApp (SVar "LS") x (Right Expl)) = (+ 1) <$> tryShowNatLevel x
+tryShowNatLevel (SVar "L0") = return 0
+tryShowNatLevel _ = Nothing
 
 instance Show Surface where
+  show (SVar "Z") = "0"
+  show (SVar "L0") = "0"
   show (SVar x) = x
-  show (SU c) = "Type " ++ showLevel c
+  show (SU c) = "Type " ++ maybe (showS c) show (tryShowNatLevel c)
   show (SHole x) = "_" ++ fromMaybe "" x
   show s@SApp {} =
-    let (f', as) = flattenApp s in
-    showS f' ++ " " ++ unwords (map showAppArgument as)
+    case (tryShowNat s, tryShowNatLevel s) of
+      (Just n, _) -> show n
+      (_, Just n) -> show n
+      (_, _) ->
+        let (f', as) = flattenApp s in
+        showS f' ++ " " ++ unwords (map showAppArgument as)
   show s@SAbs {} =
     let (as, s') = flattenAbs s in
     "\\" ++ unwords (map showAbsParameter as) ++ ". " ++ show s'
@@ -132,6 +142,7 @@ instance Show Surface where
   show (SLet x Nothing v b) = "let " ++ x ++ " = " ++ show v ++ "; " ++ show b
   show (SLet x (Just t) v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (SPos _ s) = show s
+  show (SNatLit x) = show x
 
 instance IsString Surface where
   fromString x = SVar x
@@ -155,6 +166,7 @@ fromCore ns (Proj s p) = SProj (fromCore ns s) (go p)
     go (PNamed Nothing i) = SIndex i
 fromCore ns (U (Fin l)) = SU (fromCore ns l)
 fromCore ns (U Omega) = SVar "Type omega"
+fromCore ns (U OmegaSuc) = SVar "Type omega^"
 fromCore ns (Let x t v b) = SLet x (Just $ fromCore ns t) (fromCore ns v) (fromCore (x : ns) b)
 fromCore _ (Meta x) = SVar ("?" ++ show x)
 fromCore ns (AppPruning t _) = SApp (fromCore ns t) (SVar "*") (Right Expl)

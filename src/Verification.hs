@@ -46,6 +46,7 @@ infer ctx (Prim (Right x)) = return $ fst $ primElimType x
 infer ctx c@(Pi x i t _ b _) = do
   l1 <- inferUniv ctx t
   case forceLevel l1 of
+    VOmegaSuc -> error $ "verify: omega^ in pi: " ++ show c
     VOmega -> do
       l2 <- inferUniv (bind x i (eval (vs ctx) t) l1 ctx) b
       return $ VU VOmega
@@ -57,6 +58,7 @@ infer ctx c@(Pi x i t _ b _) = do
 infer ctx c@(Sigma x t _ b _) = do
   l1 <- inferUniv ctx t
   case forceLevel l1 of
+    VOmegaSuc -> error $ "verify: omega^ in sigma: " ++ show c
     VOmega -> do
       l2 <- inferUniv (bind x Expl (eval (vs ctx) t) l1 ctx) b
       return $ VU VOmega

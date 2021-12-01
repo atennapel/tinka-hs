@@ -54,19 +54,6 @@ TODO:
 - [x] some base types (void, unit, bool)
 - [x] heterogenous equality type with axiom k
 - [x] Lift, lift and lower, for simple universe lifting
-- [x] simple descriptions: Desc, End, Arg and Ind and Desc elimination
-- [x] descriptions fixpoint: Data, Con and Data elimination
-  - [x] make some scrutinees first argument of eliminators
-  - [x] add All
-  - [x] add all
-  - [x] add Data elimination
-  - [x] add HInd
-  - [x] fix universe level issues
-- [x] gentle art of levitation
-- [x] clean up GlobalCtx mess
-- [x] get rid of ConD
-- [x] add some cumulativity in elaboration
-- [x] add primitive Refl
 - [x] REPL
   - [x] simple imports
   - [x] handle double imports (topological sort of imports)
@@ -94,6 +81,8 @@ TODO:
   - [x] add post-fix parser
 - [x] parser for unit type () and nested units []
 - [x] improve core printing
+- [x] universe polymorphism
+- [ ] add eliminators for Bool and HEq
 - [ ] some global unfolding in holes
 - [ ] improve meta handling
   - [ ] metas-as-globals if a file is elaborated
@@ -107,12 +96,10 @@ TODO:
   - [ ] qualified imports
 - [ ] improve unification
   - [ ] postponing
+- [ ] gentle art of levitation
 - [ ] indexed datatypes
   - [ ] internal fixpoints
   - [ ] coinductive types
   - [ ] inductive-recursive types
 - [ ] QTT
 - [ ] instance arguments
-
-- [ ] add SucOmega
-- [ ] nat literals for universes (parsing and printing)

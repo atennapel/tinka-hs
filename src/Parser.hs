@@ -98,10 +98,17 @@ pHole = do
   ws
   return $ SHole x
 
+pNat :: Parser Surface
+pNat = do
+  i <- L.decimal
+  ws
+  return $ SNatLit i
+
 pAtom :: Parser Surface
 pAtom =
   withPos (
     pHole <|>
+    pNat <|>
     (SVar <$> pIdent))
   <|> pType
   <|> try (SVar "()" <$ parens ws)

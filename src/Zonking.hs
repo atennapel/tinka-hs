@@ -8,7 +8,7 @@ import Metas
 
 zonkLevel :: Lvl -> Env -> Level -> Level
 zonkLevel k vs (Fin l) = Fin (zonk k vs l)
-zonkLevel k vs Omega = Omega
+zonkLevel k vs l = l
 
 zonk :: Lvl -> Env -> Core -> Core
 zonk = go

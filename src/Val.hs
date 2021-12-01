@@ -22,7 +22,7 @@ data Elim
   | EProj ProjType
   | EPrimElim PrimElimName [(Val, Icit)]
 
-data VLevel = VFin Val | VOmega
+data VLevel = VFin Val | VOmega | VOmegaSuc
 
 data Val
   = VNe Head Spine

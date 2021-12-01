@@ -108,6 +108,7 @@ pruneFlex pren m sp = do
 
 renameLevel :: PR -> VLevel -> IO Level
 renameLevel pren VOmega = return Omega
+renameLevel pren VOmegaSuc = return OmegaSuc
 renameLevel pren (VFin a) = Fin <$> rename pren a
 
 renameClosLevel :: PR -> ClosLevel -> IO Level
@@ -223,6 +224,7 @@ intersect l m sp sp' = case go sp sp' of
 
 unifyLevel :: Lvl -> VLevel -> VLevel -> IO ()
 unifyLevel k VOmega VOmega = return ()
+unifyLevel k VOmegaSuc VOmegaSuc = return ()
 unifyLevel k (VFin a) (VFin b) = unify k a b
 unifyLevel k a b = error $ "level unification failed: " ++ show (quoteLevel k a) ++ " ~ " ++ show (quoteLevel k b)
 

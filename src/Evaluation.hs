@@ -81,6 +81,8 @@ vfinmax l1 l2 = vprimelim PELMax [(l2, Expl)] l1
 
 vlmax :: VLevel -> VLevel -> VLevel
 vlmax (VFin t) (VFin t') = VFin (vfinmax t t')
+vlmax VOmegaSuc _ = VOmegaSuc
+vlmax _ VOmegaSuc = VOmegaSuc
 vlmax _ _ = VOmega
 
 force :: Val -> Val
@@ -92,8 +94,8 @@ force (VGlobal _ _ v) = force v
 force v = v
 
 forceLevel :: VLevel -> VLevel
-forceLevel VOmega = VOmega
 forceLevel (VFin l) = VFin (force l)
+forceLevel l = l
 
 vappPruning :: Env -> Val -> Pruning -> Val
 vappPruning e v p = case (e, p) of
@@ -104,6 +106,7 @@ vappPruning e v p = case (e, p) of
 
 evallevel :: Env -> Level -> VLevel
 evallevel e Omega = VOmega
+evallevel e OmegaSuc = VOmegaSuc
 evallevel e (Fin t) = VFin (eval e t)
 
 vprim :: PrimName -> Val
@@ -164,6 +167,7 @@ quoteClosLevel ql k c = quoteLevelWith ql (k + 1) $ vinstlevel c (vvar k)
 
 quoteLevelWith :: QuoteLevel -> Lvl -> VLevel -> Level
 quoteLevelWith ql k VOmega = Omega
+quoteLevelWith ql k VOmegaSuc = OmegaSuc
 quoteLevelWith ql k (VFin v) = Fin (quoteWith ql k v)
 
 quoteLevel :: Lvl -> VLevel -> Level
@@ -226,6 +230,7 @@ convSp _ _ _ = False
 convLevel :: Lvl -> VLevel -> VLevel -> Bool
 convLevel k (VFin l1) (VFin l2) = conv k l1 l2
 convLevel k VOmega VOmega = True
+convLevel k VOmegaSuc VOmegaSuc = True
 convLevel _ _ _ = False
 
 conv :: Lvl -> Val -> Val -> Bool
@@ -264,7 +269,7 @@ primType PUnit = (VUnitType, VFin VL0)
 primType PBool = (VType VL0, VFin (VLS VL0))
 primType PTrue = (VBool, VFin VL0)
 primType PFalse = (VBool, VFin VL0)
-primType PLevel = (VU VOmega, VOmega)
+primType PLevel = (VU VOmega, VOmegaSuc)
 primType PL0 = (VULevel, VOmega)
 primType PLS = (vfun VULevel VOmega (const VOmega) VULevel, VOmega)
 -- {l : Level} -> Type l -> Type (S l)
@@ -284,7 +289,7 @@ primType PHRefl =
   (vpimpl "l" VULevel VOmega (VFin . VLS) $ \l ->
    vpimpl "A" (VType l) (VFin $ VLS l) (\_ -> VFin l) $ \a ->
    vpimpl "x" a (VFin l) (\_ -> VFin l) $ \x ->
-   VHEq l a a x x , VOmega)
+   VHEq l a a x x, VOmega)
 
 primElimType :: PrimElimName -> (Val, VLevel)
 -- {l : Level} {A : Type l} -> Void -> A
@@ -298,6 +303,7 @@ primElimType PELMax =
 strLevel :: Lvl -> Lvl -> VLevel -> Maybe Level
 strLevel l x = \case
   VOmega -> return Omega
+  VOmegaSuc -> return OmegaSuc
   VFin t -> Fin <$> str l x t
 
 strHead :: Lvl -> Lvl -> Head -> Maybe Core

@@ -116,6 +116,12 @@ check ctx tm ty u = do
       (cv, ct, pty, ua) <- checkOrInfer ctx v t
       cb <- check (define x ct pty ua cv (eval (vs ctx) cv) ctx) b ty u
       return $ Let x ct cv cb
+    (s@(SNatLit i), VULevel, _) -> do
+      test (i >= 0) $ "negative nat literal: " ++ show s
+      check ctx (go i) ty u
+      where
+        go 0 = SVar "L0"
+        go n = SApp (SVar "LS") (go (n - 1)) (Right Expl)
 
     -- infer fallback
     (s, _, _) -> do
@@ -187,10 +193,11 @@ infer ctx tm = case {-trace ("synth " ++ show tm)-} tm of
   c@(SPi x i t b) -> do
     (ct, l1) <- inferUniv ctx t
     case forceLevel l1 of
+      VOmegaSuc -> error $ "omega^ in pi: " ++ show c
       VOmega -> do
         (cb, l2) <- inferUniv (bind x i (eval (vs ctx) ct) l1 ctx) b
         let pi = Pi x i ct (quoteLevel (lvl ctx) l1) cb (quoteLevel (lvl ctx + 1) l2)
-        return (pi, VU VOmega, VOmega)
+        return (pi, VU VOmega, VOmegaSuc)
       u1@(VFin l1) -> do
         (cb, l2a) <- inferUniv (bind x i (eval (vs ctx) ct) u1 ctx) b
         case strLevel (lvl ctx) (lvl ctx) l2a of
@@ -201,14 +208,16 @@ infer ctx tm = case {-trace ("synth " ++ show tm)-} tm of
             let pi = Pi x i ct qu1 cb (quoteLevel (lvl ctx + 1) l2a)
             let vl = forceLevel lmax
             case vl of
-              VOmega -> return (pi, VU lmax, VOmega)
+              VOmegaSuc -> error $ "omega^ in pi: " ++ show c
+              VOmega -> return (pi, VU lmax, VOmegaSuc)
               VFin l -> return (pi, VU lmax, VFin (VLS l))
   c@(SSigma x t b) -> do
     (ct, l1) <- inferUniv ctx t
     case forceLevel l1 of
+      VOmegaSuc -> error $ "omega^ in sigma: " ++ show c
       VOmega -> do
         (cb, l2) <- inferUniv (bind x Expl (eval (vs ctx) ct) l1 ctx) b
-        return (Sigma x ct (quoteLevel (lvl ctx) l1) cb (quoteLevel (lvl ctx + 1) l2), VU VOmega, VOmega)
+        return (Sigma x ct (quoteLevel (lvl ctx) l1) cb (quoteLevel (lvl ctx + 1) l2), VU VOmega, VOmegaSuc)
       u1@(VFin l1) -> do
         (cb, l2a) <- inferUniv (bind x Expl (eval (vs ctx) ct) u1 ctx) b
         case strLevel (lvl ctx) (lvl ctx) l2a of
@@ -217,7 +226,8 @@ infer ctx tm = case {-trace ("synth " ++ show tm)-} tm of
             let lmax = vlmax u1 (evallevel (vs ctx) l2b)
             let sigma = Sigma x ct (quoteLevel (lvl ctx) u1) cb (quoteLevel (lvl ctx + 1) l2a)
             case forceLevel lmax of
-              VOmega -> return (sigma, VU lmax, VOmega)
+              VOmegaSuc -> error $ "omega^ in sigma: " ++ show c
+              VOmega -> return (sigma, VU lmax, VOmegaSuc)
               VFin l -> return (sigma, VU lmax, VFin (VLS l))
   SPair a b -> do
     (ta, va, u1) <- infer ctx a
@@ -282,6 +292,13 @@ infer ctx tm = case {-trace ("synth " ++ show tm)-} tm of
         return (a, VFin u1)
     (cb, rty, u2) <- insert ctx $ infer (bind x i a u1 ctx) b
     return (Abs x i cb, VPi x i a u1 (closeVal ctx rty) (closeVLevel ctx u2), vlmax u1 u2)
+  s@(SNatLit i) -> do
+    test (i >= 0) $ "negative nat literal: " ++ show s
+    infer ctx (go i)
+    where
+      go :: Int -> Surface
+      go 0 = SVar "Z"
+      go n = SApp (SVar "S") (go (n - 1)) (Right Expl)
   s -> error $ "unable to infer " ++ show s
 
 includeMetas :: (Ctx, Val, VLevel) -> [MetaVar] -> Core -> Core
