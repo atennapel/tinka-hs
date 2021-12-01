@@ -45,19 +45,10 @@ zonk = go
           Left t -> go k vs $ quote k (vapp t (eval vs u) i)
           Right t -> App t (go k vs u) i
       Var x -> Var x
-      Refl -> Refl
-      Lower c -> Lower (go k vs c)
-      LiftTerm c -> LiftTerm (go k vs c)
-      Lift c -> Lift (go k vs c)
       U u -> U (zonkLevel k vs u)
-      ULevel -> ULevel
-      L0 -> L0
-      LS a -> LS (go k vs a)
-      LMax a b -> LMax (go k vs a) (go k vs b)
       Pair a b -> Pair (go k vs a) (go k vs b)
       Global x -> Global x
       Prim x -> Prim x
-      PrimElim x -> PrimElim x
       Proj c p -> Proj (go k vs c) p
       Abs x i b -> Abs x i (goUnder k vs b)
       Pi x i t u1 b u2 -> Pi x i (go k vs t) (zonkLevel k vs u1) (goUnder k vs b) (goUnderLevel k vs u2)

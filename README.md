@@ -113,3 +113,6 @@ TODO:
   - [ ] inductive-recursive types
 - [ ] QTT
 - [ ] instance arguments
+
+- [ ] add SucOmega
+- [ ] nat literals for universes (parsing and printing)

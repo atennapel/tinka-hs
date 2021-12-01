@@ -17,8 +17,7 @@ data Level = Fin Core | Omega
 data Core
   = Var Ix
   | Global Name
-  | Prim PrimName
-  | PrimElim PrimElimName
+  | Prim (Either PrimName PrimElimName)
   | App Core Core Icit
   | AppPruning Core Pruning
   | Abs Name Icit Core
@@ -27,15 +26,7 @@ data Core
   | Pair Core Core
   | Proj Core ProjType
   | U Level
-  | ULevel
-  | L0
-  | LS Core
-  | LMax Core Core
   | Let Name Core Core Core
-  | Lift Core
-  | LiftTerm Core
-  | Lower Core
-  | Refl
   | Meta MetaVar
 
 showProjType :: ProjType -> String
@@ -76,8 +67,8 @@ showTelescope ps rt delim = go ps
 instance Show Core where
   show (Var x) = "'" ++ show x
   show (Global x) = x
-  show (Prim x) = show x
-  show (PrimElim x) = "elim " ++ show x
+  show (Prim (Left x)) = show x
+  show (Prim (Right x)) = show x
   show s@(App f a i) =
     let (f, as) = flattenApp s in
     "(" ++ show f ++ " " ++ unwords (map (\(a, i) -> icit i "{" "" ++ show a ++ icit i "}" "") as) ++ ")"
@@ -93,20 +84,12 @@ instance Show Core where
   show s@(Pair a b) =
     let ps = flattenPair s in
     case last ps of
-      Prim PUnit -> "[" ++ intercalate ", " (map show $ init ps) ++ "]"
+      Prim (Left PUnit) -> "[" ++ intercalate ", " (map show $ init ps) ++ "]"
       _ -> "(" ++ intercalate ", " (map show ps) ++ ")"
   show (Proj s p) = show s ++ showProjType p
   show (U (Fin c)) = "Type " ++ show c
   show (U Omega) = "Type omega"
-  show ULevel = "Level"
-  show L0 = "L0"
-  show (LS c) = "(LS " ++ show c ++ ")"
-  show (LMax a b) = "(max " ++ show a ++ " " ++ show b ++ ")"
   show (Let x t v b) = "(let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b ++ ")"
-  show (Lift t) = "(Lift " ++ show t ++ ")"
-  show (LiftTerm t) = "(lift " ++ show t ++ ")"
-  show (Lower t) = "(lower " ++ show t ++ ")"
-  show Refl = "Refl"
   show (Meta x) = "?" ++ show x
   show (AppPruning x _) = show x ++ "*"
 
@@ -120,9 +103,6 @@ allMetas (Sigma x t _ b _) = S.union (allMetas t) (allMetas b)
 allMetas (Pair t b) = S.union (allMetas t) (allMetas b)
 allMetas (Proj t _) = allMetas t
 allMetas (Let _ t v b) = S.union (allMetas t) $ S.union (allMetas v) (allMetas b)
-allMetas (Lift t) = allMetas t
-allMetas (LiftTerm t) = allMetas t
-allMetas (Lower t) = allMetas t
 allMetas _ = S.empty
 
 expandMetas :: [MetaVar] -> Core -> Core
@@ -134,14 +114,9 @@ expandMetas ms c = go 0 c
       let as = concatMap (\(i, bd) -> maybe [] (\pl -> [(Var i, pl)]) bd) $ zip [0..] bds in
       foldr (\(x, i) a -> App a x i) (go l t) as
     go l (U l') = U l'
-    go l ULevel = ULevel
-    go l L0 = L0
-    go l (LS c) = LS (go l c)
-    go l (LMax a b) = LMax (go l a) (go l b)
     go l c@(Var _) = c
     go l (Global x) = Global x
     go l (Prim x) = Prim x
-    go l (PrimElim x) = PrimElim x
     go l (App a b i) = App (go l a) (go l b) i
     go l (Abs x i b) = Abs x i (go (l + 1) b)
     go l (Pi x i t u1 b u2) = Pi x i (go l t) u1 (go (l + 1) b) u2
@@ -149,10 +124,6 @@ expandMetas ms c = go 0 c
     go l (Pair a b) = Pair (go l a) (go l b)
     go l (Proj t p) = Proj (go l t) p
     go l (Let x t v b) = Let x (go l t) (go l v) (go (l + 1) b)
-    go l (Lift t) = Lift (go l t)
-    go l (LiftTerm t) = LiftTerm (go l t)
-    go l (Lower t) = Lower (go l t)
-    go _ Refl = Refl
 
     goMeta :: Lvl -> MetaVar -> Core
     goMeta l x = let i = fromJust (elemIndex x ms) in Var (l + length ms - i - 1)

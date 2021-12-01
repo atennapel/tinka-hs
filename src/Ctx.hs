@@ -17,8 +17,7 @@ data Path
   | Bind Path Name Icit Core Level
 
 lmax :: Level -> Level -> Level
-lmax Omega Omega = Omega
-lmax (Fin a) (Fin b) = Fin (LMax a b)
+lmax (Fin a) (Fin b) = Fin (App (App (Prim (Right PELMax)) a Expl) b Expl)
 lmax _ _ = Omega
 
 closeType :: Path -> Core -> Level -> Core

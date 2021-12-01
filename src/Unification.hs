@@ -119,10 +119,9 @@ rename pren v = go pren v
     goSp :: PR -> Core -> Spine -> IO Core
     goSp pren t [] = return t
     goSp pren t (EApp u i : sp) = App <$> goSp pren t sp <*> go pren u <*> return i
-    goSp pren t (ELower : sp) = Lower <$> goSp pren t sp
     goSp pren t (EProj p : sp) = flip Proj p <$> goSp pren t sp
     goSp pren t (EPrimElim x as : sp) = do
-      let h = PrimElim x
+      let h = Prim (Right x)
       qas <- mapM (\(v, i) -> go pren v >>= \v -> return (v, i)) as
       t' <- goSp pren t sp
       return $ case primElimPosition x of
@@ -137,20 +136,13 @@ rename pren v = go pren v
       VNe (HVar x) sp -> case IM.lookup x (ren pren) of
         Nothing -> error "scope error"
         Just x' -> goSp pren (Var $ dom pren - x' - 1) sp
-      VNe (HPrim x) sp -> goSp pren (Prim x) sp
+      VNe (HPrim x) sp -> goSp pren (Prim $ Left x) sp
       VGlobal x sp _ -> goSp pren (Global x) sp
       VAbs x i t -> Abs x i <$> go (lift pren) (vinst t (VVar (cod pren)))
       VPi x i a u1 b u2 -> Pi x i <$> go pren a <*> renameLevel pren u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> renameLevel (lift pren) (vinstlevel u2 (VVar (cod pren)))
       VSigma x a u1 b u2 -> Sigma x <$> go pren a <*> renameLevel pren u1 <*> go (lift pren) (vinst b (VVar (cod pren))) <*> renameLevel (lift pren) (vinstlevel u2 (VVar (cod pren)))
       VPair a b -> Pair <$> go pren a <*> go pren b
       VU i -> U <$> renameLevel pren i
-      VULevel -> return ULevel
-      VL0 -> return L0
-      VLS a -> LS <$> go pren a
-      VLMax a b -> LMax <$> go pren a <*> go pren b
-      VRefl -> return Refl
-      VLift t -> Lift <$> go pren t
-      VLiftTerm t -> LiftTerm <$> go pren t
 
 lams :: Lvl -> Val -> Core -> Core
 lams l a t = go a 0
@@ -185,7 +177,6 @@ unifyLift k c c' = let v = vvar k in unify (k + 1) (vinst c v) (vinst c' v)
 
 unifyElim :: Lvl -> Elim -> Elim -> IO ()
 unifyElim k (EApp v i) (EApp v' i') = unify k v v'
-unifyElim k ELower ELower = return ()
 unifyElim k (EProj p) (EProj p') | eqvProj p p' = return ()
 unifyElim k (EPrimElim x as) (EPrimElim x' as') | x == x' =
   go (map fst as) (map fst as')
@@ -242,12 +233,6 @@ unify :: Lvl -> Val -> Val -> IO ()
 unify k a b = -- trace ("unify " ++ show (quote k a) ++ " ~ " ++ show (quote k b)) $ do
   case (force a, force b) of
     (VU l1, VU l2) -> unifyLevel k l1 l2
-    (VULevel, VULevel) -> return ()
-    (VL0, VL0) -> return ()
-    (VLS a, VLS b) -> unify k a b
-    (VLMax a b, VLMax a' b') -> unify k a a' >> unify k b b'
-    (VLift t1, VLift t2) -> unify k t1 t2
-    (VLiftTerm t1, VLiftTerm t2) -> unify k t1 t2
     (VPi _ i t u1 b u2, VPi _ i' t' u3 b' u4) | i == i' ->
       unify k t t' >> unifyLevel k u1 u3 >> unifyLift k b b' >> unifyLiftLevel k u2 u4
     (VSigma _ t u1 b u2, VSigma _ t' u3 b' u4) ->
@@ -263,11 +248,11 @@ unify k a b = -- trace ("unify " ++ show (quote k a) ++ " ~ " ++ show (quote k b
     (VNe (HMeta m) sp, VNe (HMeta m') sp') -> flexFlex k m sp m' sp'
     (VNe h sp, VNe h' sp') | h == h' -> unifySp k sp sp'
     
-    (VNe (HPrim PUnit) [], v) -> return ()
-    (v, VNe (HPrim PUnit) []) -> return ()
-    
-    (VRefl, v) -> return () -- is this safe?
-    (v, VRefl) -> return () -- is this safe?
+    (VUnit, v) -> return ()
+    (v, VUnit) -> return ()
+
+    (VLiftTerm l a x, y) -> unify k x (vlower l a y)
+    (y, VLiftTerm l a x) -> unify k (vlower l a y) x
 
     (VNe (HMeta m) sp, t) -> solve k m sp t
     (t, VNe (HMeta m) sp) -> solve k m sp t

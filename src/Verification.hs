@@ -24,12 +24,6 @@ check ctx c ty =
       let pty = eval (vs ctx) t
       _ <- check ctx v ty
       check (define x t pty u v (eval (vs ctx) v) ctx) b ty
-    (Lift t, VU (VFin (VLS l))) -> check ctx t (VU $ VFin l)
-    (LiftTerm t, VLift ty) -> check ctx t ty
-    (Lower t, ty) -> check ctx t (VLift ty)
-    (Refl, VNe (HPrim PHEq) [EApp y Expl, EApp x Expl, EApp b Expl, EApp a Expl]) -> do
-      test (conv (lvl ctx) a b) $ "verify: type mismatch in Refl: " ++ showV ctx ty
-      test (conv (lvl ctx) x y) $ "verify: value mismatch in Refl: " ++ showV ctx ty
     (c, _) -> do
       ty' <- infer ctx c
       test (conv (lvl ctx) ty' ty) $ "verify: check failed " ++ show c ++ " : " ++ showV ctx ty ++ ", got " ++ showV ctx ty'
@@ -43,21 +37,12 @@ inferUniv ctx tm = do
 
 infer :: Ctx -> Core -> IO Val
 infer ctx (U (Fin l)) = return $ VU (VFin $ VLS (eval (vs ctx) l))
-infer ctx ULevel = return $ VU VOmega
-infer ctx L0 = return VULevel
-infer ctx (LS a) = do
-  check ctx a VULevel
-  return VULevel
-infer ctx (LMax a b) = do
-  check ctx a VULevel
-  check ctx b VULevel
-  return VULevel
 infer ctx c@(Var i) = indexCtx ctx i
 infer ctx (Global x) = do
   e <- lookupGlobal x
   return $ gvtype e
-infer ctx c@(Prim x) = return $ fst $ primType x
-infer ctx (PrimElim x) = return $ fst $ primElimType x
+infer ctx c@(Prim (Left x)) = return $ fst $ primType x
+infer ctx (Prim (Right x)) = return $ fst $ primElimType x
 infer ctx c@(Pi x i t _ b _) = do
   l1 <- inferUniv ctx t
   case forceLevel l1 of
@@ -107,19 +92,6 @@ infer ctx (Let x t v b) = do
   let ty = eval (vs ctx) t
   check ctx v ty
   infer (define x t ty u v (eval (vs ctx) v) ctx) b
-infer ctx tm@(Lift t) = do
-  l <- inferUniv ctx t
-  case l of
-    VOmega -> error $ "verify: cannot lift omega in " ++ show tm
-    VFin l -> return $ VU (VFin $ VLS l)
-infer ctx (LiftTerm t) = do
-  ty <- infer ctx t
-  return $ VLift ty
-infer ctx tm@(Lower t) = do
-  ty <- infer ctx t
-  case force ty of
-    VLift ty' -> return ty'
-    _ -> error $ "verify: expected lift type in " ++ show tm ++ " but got " ++ showV ctx ty
 infer ctx tm = error $ "verify: cannot infer: " ++ show tm 
 
 verify :: Core -> IO Core

@@ -13,34 +13,22 @@ data SProjType = SFst | SSnd | SIndex Ix | SNamed Name
 
 data Surface
   = SVar Name
-  | SPrimElim Name
   | SApp Surface Surface (Either Name Icit)
   | SAbs Name (Either Name Icit) (Maybe Surface) Surface
   | SPi Name Icit Surface Surface
   | SSigma Name Surface Surface
   | SPair Surface Surface
   | SProj Surface SProjType
-  | SU Surface
-  | SLevel
-  | SL0
-  | SLS Surface
-  | SLMax Surface Surface
   | SLet Name (Maybe Surface) Surface Surface
+  | SU Surface
   | SPos SourcePos Surface
   | SHole (Maybe Name)
-  | SLift Surface
-  | SLiftTerm Surface
-  | SLower Surface
-  | SRefl
 
 isSimple :: Surface -> Bool
 isSimple (SVar _) = True
 isSimple (SHole _) = True
 isSimple (SPair _ _) = True
-isSimple SRefl = True
 isSimple (SProj _ _) = True
-isSimple SLevel = True
-isSimple SL0 = True
 isSimple (SPos _ s) = isSimple s
 isSimple _ = False
 
@@ -115,18 +103,13 @@ showLevel :: Surface -> String
 showLevel top = go 0 top
   where
     go :: Int -> Surface -> String
-    go n SL0 = show n
-    go n (SLS a) = go (n + 1) a
+    go n (SVar "L0") = show n
+    go n (SApp (SVar "LS") a (Right Expl)) = go (n + 1) a
     go _ _ = showS top
 
 instance Show Surface where
   show (SVar x) = x
-  show (SPrimElim x) = "elim " ++ x
   show (SU c) = "Type " ++ showLevel c
-  show SLevel = "Level"
-  show SL0 = "L0"
-  show (SLS c) = "LS " ++ showLevel c
-  show (SLMax a b) = "max " ++ showLevel a ++ " " ++ showLevel b
   show (SHole x) = "_" ++ fromMaybe "" x
   show s@SApp {} =
     let (f', as) = flattenApp s in
@@ -149,10 +132,6 @@ instance Show Surface where
   show (SLet x Nothing v b) = "let " ++ x ++ " = " ++ show v ++ "; " ++ show b
   show (SLet x (Just t) v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (SPos _ s) = show s
-  show (SLift s) = "Lift " ++ showS s
-  show (SLiftTerm s) = "lift " ++ showS s
-  show (SLower s) = "lower " ++ showS s
-  show SRefl = "Refl"
 
 instance IsString Surface where
   fromString x = SVar x
@@ -161,8 +140,8 @@ instance IsString Surface where
 fromCore :: [Name] -> Core -> Surface
 fromCore ns (Var i) = SVar (ns !! i)
 fromCore ns (Global x) = SVar x
-fromCore ns (Prim x) = SVar (show x)
-fromCore ns (PrimElim x) = SPrimElim (show x)
+fromCore ns (Prim (Left x)) = SVar (show x)
+fromCore ns (Prim (Right x)) = SVar (show x)
 fromCore ns (App f a i) = SApp (fromCore ns f) (fromCore ns a) (Right i)
 fromCore ns (Abs x i b) = SAbs x (Right i) Nothing (fromCore (x : ns) b)
 fromCore ns (Pi x i t _ b _) = SPi x i (fromCore ns t) (fromCore (x : ns) b)
@@ -176,15 +155,7 @@ fromCore ns (Proj s p) = SProj (fromCore ns s) (go p)
     go (PNamed Nothing i) = SIndex i
 fromCore ns (U (Fin l)) = SU (fromCore ns l)
 fromCore ns (U Omega) = SVar "Type omega"
-fromCore ns ULevel = SLevel
-fromCore ns L0 = SL0
-fromCore ns (LS a) = SLS (fromCore ns a)
-fromCore ns (LMax a b) = SLMax (fromCore ns a) (fromCore ns b)
 fromCore ns (Let x t v b) = SLet x (Just $ fromCore ns t) (fromCore ns v) (fromCore (x : ns) b)
-fromCore ns (Lift t) = SLift (fromCore ns t)
-fromCore ns (LiftTerm t) = SLiftTerm (fromCore ns t)
-fromCore ns (Lower t) = SLower (fromCore ns t)
-fromCore _ Refl = SRefl
 fromCore _ (Meta x) = SVar ("?" ++ show x)
 fromCore ns (AppPruning t _) = SApp (fromCore ns t) (SVar "*") (Right Expl)
 

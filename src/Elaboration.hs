@@ -18,7 +18,7 @@ import System.IO.Unsafe
 import Data.Bifunctor (first)
 import qualified Data.Set as S
 
-import Debug.Trace (trace)
+-- import Debug.Trace (trace)
 
 -- holes
 data HoleEntry = HoleEntry Ctx Core Val
@@ -87,7 +87,7 @@ check :: Ctx -> Surface -> Val -> VLevel -> IO Core
 check ctx tm ty u = do
   let fty = force ty
   let fu = forceLevel u
-  case (tm, trace ("check (" ++ show tm ++ ") : " ++ showV ctx ty ++ " : " ++ showVLevel ctx fu ++ " ~> " ++ showV ctx fty) $ fty, fu) of
+  case (tm, {-trace ("check (" ++ show tm ++ ") : " ++ showV ctx ty ++ " : " ++ showVLevel ctx fu ++ " ~> " ++ showV ctx fty) $-} fty, fu) of
     (SPos p s, _, _) -> check (enter p ctx) s ty u
     (SHole x, _, _) -> do
       tm <- freshMeta ctx ty u
@@ -116,20 +116,6 @@ check ctx tm ty u = do
       (cv, ct, pty, ua) <- checkOrInfer ctx v t
       cb <- check (define x ct pty ua cv (eval (vs ctx) cv) ctx) b ty u
       return $ Let x ct cv cb
-    (SLift t, VU (VFin (VLS l)), _) -> do
-      c <- check ctx t (VU (VFin l)) (VFin (VLS l))
-      return $ Lift c
-    (SLiftTerm t, VLift ty, VFin (VLS l)) -> do
-      c <- check ctx t ty (VFin l)
-      return $ LiftTerm c
-    (SLower t, ty, VFin u) -> do
-      c <- check ctx t (VLift ty) (VFin (VLS u))
-      return $ Lower c
-
-    (SRefl, VNe (HPrim PHEq) [EApp y Expl, EApp x Expl, EApp b Expl, EApp a Expl], _) -> do
-      testIO (unify (lvl ctx) a b) $ \e -> "type mismatch in Refl: " ++ showV ctx ty ++ ": " ++ show e
-      testIO (unify (lvl ctx) x y) $ \e -> "value mismatch in Refl: " ++ showV ctx ty ++ ": " ++ show e
-      return Refl
 
     -- infer fallback
     (s, _, _) -> do
@@ -148,7 +134,7 @@ inferUniv ctx tm = do
     _ -> error $ "expected a universe but got " ++ showV ctx ty ++ ", while checking " ++ show tm
 
 infer :: Ctx -> Surface -> IO (Core, Val, VLevel)
-infer ctx tm = case trace ("synth " ++ show tm) tm of
+infer ctx tm = case {-trace ("synth " ++ show tm)-} tm of
   SPos p s -> infer (enter p ctx) s
   SU l -> do
     cl <- check ctx l VULevel VOmega
@@ -158,21 +144,20 @@ infer ctx tm = case trace ("synth " ++ show tm) tm of
     case toPrimName x of
       Just prim -> do
         let (t, u) = primType prim
-        return (Prim prim, t, u)
-      Nothing -> do
-        res <- lookupVarMaybe ctx x
-        case res of
-          Just (i, ty, u) -> return (Var i, ty, u)
+        return (Prim (Left prim), t, u)
+      Nothing ->
+        case toPrimElimName x of
+          Just prim -> do
+            let (t, u) = primElimType prim
+            return (Prim (Right prim), t, u)
           Nothing -> do
-            e <- lookupGlobal x
-            let vt = gvtype e
-            return (Global x, vt, guniv e)
-  SPrimElim x -> do
-    case toPrimElimName x of
-      Just prim -> do
-        let (t, u) = primElimType prim
-        return (PrimElim prim, t, u)
-      Nothing -> error $ "undefined primitive " ++ x
+            res <- lookupVarMaybe ctx x
+            case res of
+              Just (i, ty, u) -> return (Var i, ty, u)
+              Nothing -> do
+                e <- lookupGlobal x
+                let vt = gvtype e
+                return (Global x, vt, guniv e)    
   c@(SApp f a i) -> do
     (i, cf, tty, u) <- case i of
       Left name -> do
@@ -282,26 +267,6 @@ infer ctx tm = case trace ("synth " ++ show tm) tm of
     (cv, ct, ty, ut) <- checkOrInfer ctx v t
     (cb, rty, u) <- infer (define x ct ty ut cv (eval (vs ctx) cv) ctx) b
     return (Let x ct cv cb, rty, u)
-  s@(SLift t) -> do
-    (c, l) <- inferUniv ctx t
-    case forceLevel l of
-      VOmega -> error $ "unexpected omega level in " ++ show s
-      VFin l -> return (Lift c, VU (VFin $ VLS l), VFin $ VLS (VLS l))
-  s@(SLiftTerm t) -> do
-    (c, ty, l) <- infer ctx t
-    case forceLevel l of
-      VOmega -> error $ "unexpected omega level in " ++ show s
-      VFin l -> return (LiftTerm c, VLift ty, VFin $ VLS l)
-  tm@(SLower t) -> do
-    (c, ty, u) <- infer ctx t
-    ulower <- eval (vs ctx) <$> freshMeta ctx VULevel VOmega
-    unifyLevel (lvl ctx) (VFin (VLS ulower)) u
-    case force ty of
-      VLift ty' -> return (Lower c, ty', VFin ulower)
-      tty -> do
-        a <- eval (vs ctx) <$> freshMeta ctx (VU $ VFin ulower) u
-        unify (lvl ctx) tty (VLift a)
-        return (Lower c, a, VFin ulower)
   SHole x -> do
     u <- eval (vs ctx) <$> freshMeta ctx VULevel VOmega
     a <- eval (vs ctx) <$> freshMeta ctx (VU (VFin u)) (VFin (VLS u))
@@ -317,15 +282,6 @@ infer ctx tm = case trace ("synth " ++ show tm) tm of
         return (a, VFin u1)
     (cb, rty, u2) <- insert ctx $ infer (bind x i a u1 ctx) b
     return (Abs x i cb, VPi x i a u1 (closeVal ctx rty) (closeVLevel ctx u2), vlmax u1 u2)
-  SLevel -> return (ULevel, VU VOmega, VOmega)
-  SL0 -> return (L0, VULevel, VOmega)
-  SLS a -> do
-    ca <- check ctx a VULevel VOmega
-    return (LS ca, VULevel, VOmega)
-  SLMax a b -> do
-    ca <- check ctx a VULevel VOmega
-    cb <- check ctx b VULevel VOmega
-    return (LMax ca cb, VULevel, VOmega)
   s -> error $ "unable to infer " ++ show s
 
 includeMetas :: (Ctx, Val, VLevel) -> [MetaVar] -> Core -> Core
@@ -373,9 +329,6 @@ elaborate ctx s = do
   let ty' = {- nf $ includeMetas (ctx, ty, u) order -} zonkCtx ctx (quote 0 ty)
   let cu = zonkLevelCtx ctx (quoteLevel (lvl ctx) u)
   let u' = evallevel (vs ctx) cu
-  print c'
-  print ty'
-  print cu
   verify c'
   return (c', ty', u')
 

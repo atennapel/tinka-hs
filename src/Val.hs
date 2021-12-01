@@ -21,7 +21,6 @@ data Elim
   = EApp Val Icit
   | EProj ProjType
   | EPrimElim PrimElimName [(Val, Icit)]
-  | ELower
 
 data VLevel = VFin Val | VOmega
 
@@ -33,17 +32,24 @@ data Val
   | VSigma Name Val VLevel Clos ClosLevel
   | VPair Val Val
   | VU VLevel
-  | VULevel
-  | VL0
-  | VLS Val
-  | VLMax Val Val
-  | VLift Val
-  | VLiftTerm Val
-  | VRefl
 
 pattern VVar x = VNe (HVar x) []
 pattern VMeta x = VNe (HMeta x) []
 pattern VType v = VU (VFin v)
+
+pattern VVoid = VNe (HPrim PVoid) []
+pattern VUnitType = VNe (HPrim PUnitType) []
+pattern VUnit = VNe (HPrim PUnit) []
+pattern VBool = VNe (HPrim PBool) []
+pattern VTrue = VNe (HPrim PTrue) []
+pattern VFalse = VNe (HPrim PFalse) []
+pattern VULevel = VNe (HPrim PLevel) []
+pattern VL0 = VNe (HPrim PL0) []
+pattern VLS x = VNe (HPrim PLS) [EApp x Expl]
+pattern VLift l x = VNe (HPrim PLift) [EApp x Expl, EApp l Impl]
+pattern VLiftTerm l a x = VNe (HPrim PLiftTerm) [EApp x Expl, EApp a Impl, EApp l Impl]
+pattern VHEq l a b x y = VNe (HPrim PHEq) [EApp y Expl, EApp x Expl, EApp b Impl, EApp a Impl, EApp l Impl]
+pattern VHRefl l a x = VNe (HPrim PHRefl) [EApp x Impl, EApp a Impl, EApp l Impl]
 
 vpi :: Name -> Val -> VLevel -> (Val -> VLevel) -> (Val -> Val) -> Val
 vpi x a u1 u2 b = VPi x Expl a u1 (Fun b) (FunLevel u2)
@@ -68,17 +74,3 @@ vabsimpl x b = VAbs x Impl (Fun b)
 
 vvar :: Lvl -> Val
 vvar k = VNe (HVar k) []
-
-vprim :: PrimName -> Val
-vprim x = VNe (HPrim x) []
-
-vvoid, vunittype, vunit, vbool, vtrue, vfalse :: Val
-vvoid = vprim PVoid
-vunittype = vprim PUnitType
-vunit = vprim PUnit
-vbool = vprim PBool
-vtrue = vprim PTrue
-vfalse = vprim PFalse
-
-vheq :: Val -> Val -> Val -> Val -> Val
-vheq a b x y = VNe (HPrim PHEq) [EApp y Expl, EApp x Expl, EApp b Expl, EApp a Expl]
