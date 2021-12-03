@@ -1,4 +1,4 @@
-module Unification (unify, unifyLevel) where
+module Unification (unify, unifyLevel, strLevel) where
 
 import Common
 import Core
@@ -12,8 +12,9 @@ import qualified Data.Set as S
 import Data.IORef
 import Control.Exception (catch, try, SomeException)
 import Control.Monad (guard)
+import Data.Foldable (foldrM)
 
-import Debug.Trace (trace)
+-- import Debug.Trace (trace)
 
 data PR = PR {
   occ :: Maybe MetaVar,
@@ -48,8 +49,6 @@ pruneTy (RevPruning pr) a = go pr (PR Nothing 0 0 mempty) a
   where
     go :: Pruning -> PR -> Val -> IO Core
     go pr pren a = do
-      putStrLn "Here prunety"
-      putStrLn $ "pruneTy " ++ show (quote (cod pren) a)
       case (pr, force a) of
         ([], a) -> rename pren a
         (Just _ : pr, VPi x i a u1 b u2) ->
@@ -159,24 +158,15 @@ lams l a t = go a 0
 
 solveWithPR :: MetaVar -> (PR, Maybe Pruning) -> Val -> IO ()
 solveWithPR m (pren, pruneNonLinear) rhs = do
-  putStrLn $ "solve ?" ++ show m ++ " := " ++ show (quote (cod pren) rhs)
+  -- putStrLn $ "solve ?" ++ show m ++ " := " ++ show (quote (cod pren) rhs)
   let (cty, mty) = getUnsolved m
-  putStrLn $ "meta type: " ++ show cty
-  putStrLn $ show (cod pren)
-  let mty = eval [] cty
-  putStrLn $ "eval done"
-  putStrLn $ "meta type quoted: " ++ show (quote (cod pren) mty)
-  
+
   case pruneNonLinear of
     Nothing -> return ()
     Just pr -> () <$ pruneTy (revPruning pr) mty
   
-  print "here2"
   rhs <- rename (pren {occ = Just m}) rhs
-  print "here3"
   let solution = lams (dom pren) mty rhs
-  print "here4"
-  print solution
   let solutionv = eval [] solution
   let deps = S.union (allMetas solution) (allMetas cty) 
   modifyIORef' mcxt $ IM.insert (unMetaVar m) (Solved deps cty mty solution solutionv)
@@ -245,7 +235,7 @@ unifyLiftLevel :: Lvl -> ClosLevel -> ClosLevel -> IO ()
 unifyLiftLevel k c c' = let v = vvar k in unifyLevel (k + 1) (vinstlevel c v) (vinstlevel c' v)
 
 unify :: Lvl -> Val -> Val -> IO ()
-unify k a b = trace ("unify (" ++ show k ++ ") " ++ show (quote k a) ++ " ~ " ++ show (quote k b)) $ do
+unify k a b = {-trace ("unify (" ++ show k ++ ") " ++ show (quote k a) ++ " ~ " ++ show (quote k b)) $-} do
   case (force a, force b) of
     (VU l1, VU l2) -> unifyLevel k l1 l2
     (VPi _ i t u1 b u2, VPi _ i' t' u3 b' u4) | i == i' ->
@@ -278,3 +268,48 @@ unify k a b = trace ("unify (" ++ show k ++ ") " ++ show (quote k a) ++ " ~ " ++
     (VGlobal _ _ v, v') -> unify k v v'
     (v, VGlobal _ _ v') -> unify k v v'
     (_, _) -> error $ "failed to unify: " ++ show (quote k a) ++ " ~ " ++ show (quote k b)
+
+strLevel :: Lvl -> Lvl -> VLevel -> IO Level
+strLevel l x = \case
+  VOmega -> return Omega
+  VOmegaSuc -> return OmegaSuc
+  VFin t -> Fin <$> str l x t
+
+strHead :: Lvl -> Lvl -> Head -> IO Core
+strHead l x (HPrim x') = return $ Prim (Left x')
+strHead l x (HMeta x') = return $ Meta x'
+strHead l x (HVar x') =
+  case compare x' x of
+    EQ -> error "illegal dependency for universe level"
+    LT -> return (Var (l - x' - 1))
+    GT -> return (Var (l - x'))
+
+strElim :: Lvl -> Lvl -> Elim -> Core -> IO Core
+strElim l x (EApp v i) t = App t <$> str l x v <*> return i
+strElim l x (EProj p) t = return $ Proj t p
+strElim l x (EPrimElim x' as) t =
+  case primElimPosition x' of
+    PEPLast -> do
+      as' <- mapM (\(v, i) -> str l x v >>= \v -> return (v, i)) as
+      return $ App (foldl (\a (b, i) -> App a b i) (Prim $ Right x') as') t (primElimIcit x')
+    PEPFirst -> do
+      as' <- mapM (\(v, i) -> str l x v >>= \v -> return (v, i)) as
+      return $ foldl (\a (b, i) -> App a b i) (App (Prim $ Right x') t (primElimIcit x')) as'
+
+strClos :: Lvl -> Lvl -> Clos -> IO Core
+strClos l x c = str (l + 1) x $ vinst c (vvar l)
+
+strClosLevel :: Lvl -> Lvl -> ClosLevel -> IO Level
+strClosLevel l x c = strLevel (l + 1) x $ vinstlevel c (vvar l)
+
+str :: Lvl -> Lvl -> Val -> IO Core
+str l x = \case
+  VU u -> U <$> strLevel l x u
+  VNe h sp -> strHead l x h >>= \h -> foldrM (strElim l x) h sp
+  VGlobal x' sp v -> foldrM (strElim l x) (Global x') sp
+  VAbs y i b -> Abs y i <$> strClos l x b
+  VPi x' i t u1 b u2 ->
+    Pi x' i <$> str l x t <*> strLevel l x u1 <*> strClos l x b <*> strClosLevel l x u2
+  VSigma x' t u1 b u2 ->
+    Sigma x' <$> str l x t <*> strLevel l x u1 <*> strClos l x b <*> strClosLevel l x u2
+  VPair a b -> Pair <$> str l x a <*> str l x b

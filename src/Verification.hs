@@ -6,6 +6,7 @@ import Val
 import Common
 import Evaluation
 import Globals
+import Unification (strLevel)
 
 import qualified Data.Set as S
 
@@ -37,6 +38,7 @@ inferUniv ctx tm = do
 
 infer :: Ctx -> Core -> IO Val
 infer ctx (U (Fin l)) = return $ VU (VFin $ VLS (eval (vs ctx) l))
+infer ctx (U Omega) = return $ VU VOmegaSuc
 infer ctx c@(Var i) = indexCtx ctx i
 infer ctx (Global x) = do
   e <- lookupGlobal x
@@ -52,9 +54,8 @@ infer ctx c@(Pi x i t _ b _) = do
       return $ VU VOmega
     u1@(VFin l1) -> do
       l2 <- inferUniv (bind x i (eval (vs ctx) t) u1 ctx) b
-      case strLevel (lvl ctx) (lvl ctx) l2 of
-        Nothing -> error $ "verify: invalid level dependency in " ++ show c
-        Just l2s -> return $ VU (vlmax u1 (evallevel (vs ctx) l2s))
+      l2s <- testIO (strLevel (lvl ctx) (lvl ctx) l2) $ \e -> "verify: invalid level dependency in " ++ show c
+      return $ VU (vlmax u1 (evallevel (vs ctx) l2s))
 infer ctx c@(Sigma x t _ b _) = do
   l1 <- inferUniv ctx t
   case forceLevel l1 of
@@ -64,9 +65,8 @@ infer ctx c@(Sigma x t _ b _) = do
       return $ VU VOmega
     u1@(VFin l1) -> do
       l2 <- inferUniv (bind x Expl (eval (vs ctx) t) u1 ctx) b
-      case strLevel (lvl ctx) (lvl ctx) l2 of
-        Nothing -> error $ "verify: invalid level dependency in " ++ show c
-        Just l2s -> return $ VU (vlmax u1 (evallevel (vs ctx) l2s))
+      l2s <- testIO (strLevel (lvl ctx) (lvl ctx) l2) $ \e -> "verify: invalid level dependency in " ++ show c
+      return $ VU (vlmax u1 (evallevel (vs ctx) l2s))
 infer ctx c@(App f a i) = do
   fty <- infer ctx f
   case force fty of

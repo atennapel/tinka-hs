@@ -110,7 +110,8 @@ pAtom =
     pHole <|>
     pNat <|>
     (SVar <$> pIdent))
-  <|> pType
+  <|> try pType
+  <|> (SU (SVar "L0") <$ symbol "Type")
   <|> try (SVar "()" <$ parens ws)
   <|> try (SVar "[]" <$ brackets ws)
   <|> try pPair

@@ -10,23 +10,20 @@ import Val
 import Evaluation
 import Globals
 import Zonking
+import Unification (strLevel)
 
 data Path
   = Here
   | Define Path Name Core Core
-  | Bind Path Name Icit Core Level
+  | Bind Path Name Icit Core VLevel
 
-lmax :: Level -> Level -> Level
-lmax (Fin a) (Fin b) = Fin (App (App (Prim (Right PELMax)) a Expl) b Expl)
-lmax OmegaSuc _ = OmegaSuc
-lmax _ OmegaSuc = OmegaSuc
-lmax _ _ = Omega
-
-closeType :: Path -> Core -> Level -> Core
-closeType mcl b ub = case mcl of
-  Here -> b
-  Bind mcl x i a ua -> closeType mcl (Pi x i a ua b ub) (lmax ua ub)
-  Define mcl x a t -> closeType mcl (Let x a t b) ub
+closeType :: Lvl -> Path -> Core -> VLevel -> IO Core
+closeType k mcl b ub = case mcl of
+  Here -> return b
+  Bind mcl x i a ua -> do
+    ub' <- strLevel k k ub
+    closeType (k - 1) mcl (Pi x i a (quoteLevel k ua) b ub') (vlmax ua ub)
+  Define mcl x a t -> closeType (k - 1) mcl (Let x a t b) ub
 
 data Ctx = Ctx {
   lvl :: Lvl,
@@ -54,10 +51,10 @@ define :: Name -> Core -> Val -> VLevel -> Core -> Val -> Ctx -> Ctx
 define x a t u c v ctx = Ctx (lvl ctx + 1) (x : ns ctx) (Right x : allns ctx) (t : ts ctx) (v : vs ctx) (u : ctxus ctx) (pos ctx) (Nothing : pruning ctx) (Define (path ctx) x a c)
 
 bind :: Name -> Icit -> Val -> VLevel -> Ctx -> Ctx
-bind x i t u ctx = Ctx (lvl ctx + 1) (x : ns ctx) (Right x : allns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just i : pruning ctx) (Bind (path ctx) x i (quote (lvl ctx) t) (quoteLevel (lvl ctx) u))
+bind x i t u ctx = Ctx (lvl ctx + 1) (x : ns ctx) (Right x : allns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just i : pruning ctx) (Bind (path ctx) x i (quote (lvl ctx) t) u)
 
 bindInsert :: Name -> Icit -> Val -> VLevel -> Ctx -> Ctx
-bindInsert x i t u ctx = Ctx (lvl ctx + 1) (ns ctx) (Left x : allns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just i : pruning ctx) (Bind (path ctx) x i (quote (lvl ctx) t) (quoteLevel (lvl ctx) u))
+bindInsert x i t u ctx = Ctx (lvl ctx + 1) (ns ctx) (Left x : allns ctx) (t : ts ctx) (vvar (lvl ctx) : vs ctx) (u : ctxus ctx) (pos ctx) (Just i : pruning ctx) (Bind (path ctx) x i (quote (lvl ctx) t) u)
 
 enter :: SourcePos -> Ctx -> Ctx
 enter p ctx = ctx { pos = Just p }

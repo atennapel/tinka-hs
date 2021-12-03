@@ -1,4 +1,4 @@
-module Core (ProjType(..), Level(..), Core(..), PrimName(..), PrimElimName(..), toPrimName, toPrimElimName, PrimElimPosition(..), primElimPosition, allMetas, expandMetas) where
+module Core (ProjType(..), Level(..), Core(..), PrimName(..), PrimElimName(..), toPrimName, toPrimElimName, PrimElimPosition(..), primElimPosition, allMetas, expandMetas, showPi) where
 
 import Common
 import Prims
@@ -93,6 +93,10 @@ instance Show Core where
   show (Let x t v b) = "(let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b ++ ")"
   show (Meta x) = "?" ++ show x
   show (AppPruning x _) = show x ++ "*"
+
+showPi :: Core -> String
+showPi (Pi x i a ua b ub) = icit i "{" "(" ++ x ++ " : " ++ show a ++ " : " ++ show ua ++ icit i "}" ")" ++ " : " ++ show ub ++ " -> " ++ showPi b
+showPi c = show c
 
 allMetas :: Core -> Set MetaVar
 allMetas (Meta x) = S.singleton x

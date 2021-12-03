@@ -7,10 +7,9 @@ import Globals
 import Metas
 import Prims
 
-import Data.Foldable (foldrM)
 import Data.Bifunctor (first)
 
-import Debug.Trace (trace)
+-- import Debug.Trace (trace)
 
 vinst :: Clos -> Val -> Val
 vinst (Clos e c) v = eval (v : e) c
@@ -118,7 +117,7 @@ vprim PLiftTerm =
 vprim x = VNe (HPrim x) []
 
 eval :: Env -> Core -> Val
-eval e c = case trace ("eval (" ++ show (length e) ++ ") " ++ show c) c of
+eval e c = case {-trace ("eval (" ++ show (length e) ++ ") " ++ show c)-} c of
   Var i | i < 0 || i >= length e ->
     error $ "eval var out of range: " ++ show i ++ "/" ++ show (length e)
   Var i -> e !! i
@@ -326,48 +325,3 @@ primElimType PEIndBool =
    vfun (vapp p VTrue Expl) (VFin l) (\_ -> VFin l) $
    vfun (vapp p VFalse Expl) (VFin l) (\_ -> VFin l) $
    vpi "b" VBool (VFin VL0) (\_ -> VFin l) $ \b -> vapp p b Expl, VOmega)
-
-strLevel :: Lvl -> Lvl -> VLevel -> Maybe Level
-strLevel l x = \case
-  VOmega -> return Omega
-  VOmegaSuc -> return OmegaSuc
-  VFin t -> Fin <$> str l x t
-
-strHead :: Lvl -> Lvl -> Head -> Maybe Core
-strHead l x (HPrim x') = return $ Prim (Left x')
-strHead l x (HMeta x') = return $ Meta x'
-strHead l x (HVar x') =
-  case compare x' x of
-    EQ -> Nothing
-    LT -> return (Var (l - x' - 1))
-    GT -> return (Var (l - x'))
-
-strElim :: Lvl -> Lvl -> Elim -> Core -> Maybe Core
-strElim l x (EApp v i) t = App t <$> str l x v <*> return i
-strElim l x (EProj p) t = return $ Proj t p
-strElim l x (EPrimElim x' as) t =
-  case primElimPosition x' of
-    PEPLast -> do
-      as' <- mapM (\(v, i) -> str l x v >>= \v -> return (v, i)) as
-      return $ App (foldl (\a (b, i) -> App a b i) (Prim $ Right x') as') t (primElimIcit x')
-    PEPFirst -> do
-      as' <- mapM (\(v, i) -> str l x v >>= \v -> return (v, i)) as
-      return $ foldl (\a (b, i) -> App a b i) (App (Prim $ Right x') t (primElimIcit x')) as'
-
-strClos :: Lvl -> Lvl -> Clos -> Maybe Core
-strClos l x c = str (l + 1) x $ vinst c (vvar l)
-
-strClosLevel :: Lvl -> Lvl -> ClosLevel -> Maybe Level
-strClosLevel l x c = strLevel (l + 1) x $ vinstlevel c (vvar l)
-
-str :: Lvl -> Lvl -> Val -> Maybe Core
-str l x = \case
-  VU u -> U <$> strLevel l x u
-  VNe h sp -> strHead l x h >>= \h -> foldrM (strElim l x) h sp
-  VGlobal x' sp v -> foldrM (strElim l x) (Global x') sp
-  VAbs y i b -> Abs y i <$> strClos l x b
-  VPi x' i t u1 b u2 ->
-    Pi x' i <$> str l x t <*> strLevel l x u1 <*> strClos l x b <*> strClosLevel l x u2
-  VSigma x' t u1 b u2 ->
-    Sigma x' <$> str l x t <*> strLevel l x u1 <*> strClos l x b <*> strClosLevel l x u2
-  VPair a b -> Pair <$> str l x a <*> str l x b

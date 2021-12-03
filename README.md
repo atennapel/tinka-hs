@@ -85,6 +85,7 @@ TODO:
 - [x] add eliminator for Bool
 - [ ] add eliminator for HEq
 - [ ] infer {l} {A : Type l} -> A -> A
+- [ ] handle lmax a b ~ lmax c d unification
 - [ ] some global unfolding in holes
 - [ ] improve meta handling
   - [ ] metas-as-globals if a file is elaborated

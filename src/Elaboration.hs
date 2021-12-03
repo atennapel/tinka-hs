@@ -18,7 +18,7 @@ import System.IO.Unsafe
 import Data.Bifunctor (first)
 import qualified Data.Set as S
 
-import Debug.Trace (trace)
+-- import Debug.Trace (trace)
 
 -- holes
 data HoleEntry = HoleEntry Ctx Core Val
@@ -42,7 +42,8 @@ addHole x ctx tm ty = do
 -- elaboration
 freshMeta :: Ctx -> Val -> VLevel -> IO Core
 freshMeta ctx a u = do
-  let closed = closeType (path ctx) (quote (lvl ctx) a) (quoteLevel (lvl ctx) u)
+  closed <- closeType (lvl ctx) (path ctx) (quote (lvl ctx) a) u
+  putStrLn $ "freshMeta: " ++ showPi closed
   let closedv = eval [] closed
   m <- newMeta closed closedv
   pure $ AppPruning (Meta m) (pruning ctx)
@@ -87,7 +88,7 @@ check :: Ctx -> Surface -> Val -> VLevel -> IO Core
 check ctx tm ty u = do
   let fty = force ty
   let fu = forceLevel u
-  case (tm, trace ("check (" ++ show tm ++ ") : " ++ showV ctx ty ++ " : " ++ showVLevel ctx fu ++ " ~> " ++ showV ctx fty) $ fty, fu) of
+  case (tm, {-trace ("check (" ++ show tm ++ ") : " ++ showV ctx ty ++ " : " ++ showVLevel ctx fu ++ " ~> " ++ showV ctx fty) $-} fty, fu) of
     (SPos p s, _, _) -> check (enter p ctx) s ty u
     (SHole x, _, _) -> do
       tm <- freshMeta ctx ty u
@@ -140,7 +141,7 @@ inferUniv ctx tm = do
     _ -> error $ "expected a universe but got " ++ showV ctx ty ++ ", while checking " ++ show tm
 
 infer :: Ctx -> Surface -> IO (Core, Val, VLevel)
-infer ctx tm = case trace ("synth " ++ show tm) tm of
+infer ctx tm = case {-trace ("synth " ++ show tm)-} tm of
   SPos p s -> infer (enter p ctx) s
   SU l -> do
     cl <- check ctx l VULevel VOmega
@@ -197,22 +198,18 @@ infer ctx tm = case trace ("synth " ++ show tm) tm of
       VOmega -> do
         (cb, l2) <- inferUniv (bind x i (eval (vs ctx) ct) l1 ctx) b
         let pi = Pi x i ct (quoteLevel (lvl ctx) l1) cb (quoteLevel (lvl ctx + 1) l2)
-        putStrLn $ "pi1: " ++ show pi ++ " | " ++ show (quoteLevel (lvl ctx) l1) ++ " | " ++ show (quoteLevel (lvl ctx + 1) l2)
         return (pi, VU VOmega, VOmegaSuc)
       u1@(VFin l1) -> do
         (cb, l2a) <- inferUniv (bind x i (eval (vs ctx) ct) u1 ctx) b
-        case strLevel (lvl ctx) (lvl ctx) l2a of
-          Nothing -> error $ "invalid level dependency in " ++ show c
-          Just l2b -> do
-            let qu1 = quoteLevel (lvl ctx) u1
-            let lmax = vlmax u1 (evallevel (vs ctx) l2b)
-            let pi = Pi x i ct qu1 cb (quoteLevel (lvl ctx + 1) l2a)
-            putStrLn $ "pi2: " ++ show pi ++ " | " ++ show qu1 ++ " | " ++ show (quoteLevel (lvl ctx + 1) l2a)
-            let vl = forceLevel lmax
-            case vl of
-              VOmegaSuc -> error $ "omega^ in pi: " ++ show c
-              VOmega -> return (pi, VU lmax, VOmegaSuc)
-              VFin l -> return (pi, VU lmax, VFin (VLS l))
+        l2b <- testIO (strLevel (lvl ctx) (lvl ctx) l2a) $ \e -> "invalid level dependency in " ++ show c
+        let qu1 = quoteLevel (lvl ctx) u1
+        let lmax = vlmax u1 (evallevel (vs ctx) l2b)
+        let pi = Pi x i ct qu1 cb (quoteLevel (lvl ctx + 1) l2a)
+        let vl = forceLevel lmax
+        case vl of
+          VOmegaSuc -> error $ "omega^ in pi: " ++ show c
+          VOmega -> return (pi, VU lmax, VOmegaSuc)
+          VFin l -> return (pi, VU lmax, VFin (VLS l))
   c@(SSigma x t b) -> do
     (ct, l1) <- inferUniv ctx t
     case forceLevel l1 of
@@ -222,15 +219,13 @@ infer ctx tm = case trace ("synth " ++ show tm) tm of
         return (Sigma x ct (quoteLevel (lvl ctx) l1) cb (quoteLevel (lvl ctx + 1) l2), VU VOmega, VOmegaSuc)
       u1@(VFin l1) -> do
         (cb, l2a) <- inferUniv (bind x Expl (eval (vs ctx) ct) u1 ctx) b
-        case strLevel (lvl ctx) (lvl ctx) l2a of
-          Nothing -> error $ "invalid level dependency in " ++ show c
-          Just l2b -> do
-            let lmax = vlmax u1 (evallevel (vs ctx) l2b)
-            let sigma = Sigma x ct (quoteLevel (lvl ctx) u1) cb (quoteLevel (lvl ctx + 1) l2a)
-            case forceLevel lmax of
-              VOmegaSuc -> error $ "omega^ in sigma: " ++ show c
-              VOmega -> return (sigma, VU lmax, VOmegaSuc)
-              VFin l -> return (sigma, VU lmax, VFin (VLS l))
+        l2b <- testIO (strLevel (lvl ctx) (lvl ctx) l2a) $ \e -> "invalid level dependency in " ++ show c
+        let lmax = vlmax u1 (evallevel (vs ctx) l2b)
+        let sigma = Sigma x ct (quoteLevel (lvl ctx) u1) cb (quoteLevel (lvl ctx + 1) l2a)
+        case forceLevel lmax of
+          VOmegaSuc -> error $ "omega^ in sigma: " ++ show c
+          VOmega -> return (sigma, VU lmax, VOmegaSuc)
+          VFin l -> return (sigma, VU lmax, VFin (VLS l))
   SPair a b -> do
     (ta, va, u1) <- infer ctx a
     (tb, vb, u2) <- infer ctx b
@@ -270,6 +265,7 @@ infer ctx tm = case trace ("synth " ++ show tm) tm of
         u2 <- eval (vs ctx) <$> freshMeta extctx VULevel VOmega
         b <- Clos (vs ctx) <$> freshMeta extctx (VU $ VFin u2) (VFin $ VLS u2)
         unify (lvl ctx) tty (VSigma "x" a (VFin u1) b (FunLevel $ const $ VFin u2))
+        -- TODO: strengthen u2?
         case p of
           SFst -> return (Proj tm Fst, a, VFin u1) 
           SSnd -> return (Proj tm Snd, vinst b (vproj (eval (vs ctx) tm) Fst), VFin u2)
@@ -293,6 +289,7 @@ infer ctx tm = case trace ("synth " ++ show tm) tm of
         a <- freshMeta ctx (VU (VFin u1)) (VFin (VLS u1))
         return (a, VFin u1)
     (cb, rty, u2) <- insert ctx $ infer (bind x i a u1 ctx) b
+    -- TODO: strengthen u2
     return (Abs x i cb, VPi x i a u1 (closeVal ctx rty) (closeVLevel ctx u2), vlmax u1 u2)
   s@(SNatLit i) -> do
     test (i >= 0) $ "negative nat literal: " ++ show s
