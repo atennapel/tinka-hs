@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c707eb8a1ea61f6d083161a08e3bba802116954067117eb0b22d7f168a75baaf
+-- hash: 40f3b8ff00b3b697b34c702e2afc203478e92deeb75b1189182a005323194617
 
 name:           tinka-hs
 version:        0.1.0.0
@@ -29,6 +29,13 @@ executable tinka-hs
   other-modules:
       Common
       Core
+      Ctx
+      Errors
+      Evaluation
+      Levels
+      Surface
+      Val
+      Verification
       Paths_tinka_hs
   hs-source-dirs:
       src

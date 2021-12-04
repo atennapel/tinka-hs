@@ -1,7 +1,7 @@
 # tinka-hs
 
 Dependently typed programming language written in Haskell.
-Code is based on https://github.com/AndrasKovacs/elaboration-zoo .
+Code is based on https://github.com/AndrasKovacs/elaboration-zoo and https://gist.github.com/AndrasKovacs/d5d78d8e556d91afb1f724d1c2246b6b.
 
 Start REPL
 ```
@@ -48,11 +48,11 @@ indSum :
 ```
 
 TODO:
-- [ ] core language
-  - [ ] syntax
-  - [ ] levels
-  - [ ] values
-  - [ ] verification
+- [x] core language
+  - [x] syntax
+  - [x] levels
+  - [x] values
+  - [x] verification
 - [ ] surface language
   - [ ] syntax
   - [ ] elaboration
