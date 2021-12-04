@@ -28,13 +28,21 @@ bind x t (Ctx l e b) = Ctx (l + 1) (Right (VVar l) : e) ((x, Just t) : b)
 bindLevel :: Name -> Ctx -> Ctx
 bindLevel x (Ctx l e b) = Ctx (l + 1) (Left (vFinLevelVar l) : e) ((x, Nothing) : b) 
 
-ixCtx :: Ctx -> Ix -> Maybe (Maybe VTy)
-ixCtx ctx i = go (binders ctx) (coerce i)
+indexCtx :: Ctx -> Ix -> Maybe (Maybe VTy)
+indexCtx ctx i = go (binders ctx) (coerce i)
   where
     go :: Binders -> Int -> Maybe (Maybe VTy)
     go [] _ = Nothing
-    go (b : _) 0 = Just (snd b)
-    go (_ : t) i = go t (i - 1)
+    go ((_, mty) : _) 0 = Just mty
+    go (_ : bs) i = go bs (i - 1)
+  
+lookupCtx :: Ctx -> Name -> Maybe (Ix, Maybe VTy)
+lookupCtx ctx x = go (binders ctx) 0
+  where
+    go :: Binders -> Int -> Maybe (Ix, Maybe VTy)
+    go [] _ = Nothing
+    go ((y, mty) : _) i | x == y = Just (Ix i, mty)
+    go (_ : bs) i = go bs (i + 1)
 
 showV :: Ctx -> Val -> String
 showV ctx v = show (quote (lvl ctx) v)

@@ -4,6 +4,7 @@ import Control.Exception (Exception, throwIO)
 
 data Error
   = VerifyError String
+  | ElaborateError String
   deriving (Show)
 
 instance Exception Error

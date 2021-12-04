@@ -54,8 +54,8 @@ TODO:
   - [x] values
   - [x] verification
 - [ ] surface language
-  - [ ] syntax
-  - [ ] elaboration
+  - [x] syntax
+  - [x] elaboration
   - [ ] parser
 - [ ] REPL
 - [ ] definitions

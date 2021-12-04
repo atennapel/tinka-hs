@@ -20,6 +20,7 @@ data Tm
 
 showTmS :: Tm -> String
 showTmS t@(Var _) = show t
+showTmS t@(Type (FinLevel FLZ)) = show t
 showTmS t = "(" ++ show t ++ ")"
 
 showTmApp :: Tm -> String
@@ -71,4 +72,5 @@ instance Show Tm where
   show t@(LamLvl _ _) = showTmLam t
   show t@(PiLvl _ _) = showTmPi t
   show (Let x t v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
+  show (Type (FinLevel FLZ)) = "Type"
   show (Type l) = "Type " ++ showLevelS l
