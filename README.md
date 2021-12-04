@@ -56,7 +56,10 @@ TODO:
 - [ ] surface language
   - [x] syntax
   - [x] elaboration
-  - [ ] parser
+  - [x] parser
+  - [ ] fix level lam/app/pi syntax
+  - [ ] lambdas and let with optional types
+  - [ ] sigma elaboration
 - [ ] REPL
 - [ ] definitions
 - [ ] modules

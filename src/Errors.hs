@@ -5,9 +5,12 @@ import Control.Exception (Exception, throwIO)
 data Error
   = VerifyError String
   | ElaborateError String
-  deriving (Show)
 
 instance Exception Error
+
+instance Show Error where
+  show (VerifyError msg) = "verify: " ++ msg
+  show (ElaborateError msg) = msg
 
 throwUnless :: Bool -> Error -> IO ()
 throwUnless True err = return ()

@@ -1,6 +1,7 @@
 module Ctx where
 
 import Data.Coerce (coerce)
+import Text.Megaparsec (SourcePos)
 
 import Common
 import Levels
@@ -13,20 +14,24 @@ type Binders = [(Name, Maybe VTy)]
 data Ctx = Ctx {
   lvl :: Lvl,
   env :: Env,
-  binders :: Binders
+  binders :: Binders,
+  pos :: Maybe SourcePos
 }
 
 empty :: Ctx
-empty = Ctx 0 [] []
+empty = Ctx 0 [] [] Nothing
 
 define :: Name -> VTy -> Val -> Ctx -> Ctx
-define x t v (Ctx l e b) = Ctx (l + 1) (Right v : e) ((x, Just t) : b)
+define x t v (Ctx l e b pos) = Ctx (l + 1) (Right v : e) ((x, Just t) : b) pos
 
 bind :: Name -> VTy -> Ctx -> Ctx
-bind x t (Ctx l e b) = Ctx (l + 1) (Right (VVar l) : e) ((x, Just t) : b)
+bind x t (Ctx l e b pos) = Ctx (l + 1) (Right (VVar l) : e) ((x, Just t) : b) pos
 
 bindLevel :: Name -> Ctx -> Ctx
-bindLevel x (Ctx l e b) = Ctx (l + 1) (Left (vFinLevelVar l) : e) ((x, Nothing) : b) 
+bindLevel x (Ctx l e b pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) ((x, Nothing) : b) pos
+
+enter :: SourcePos -> Ctx -> Ctx
+enter p ctx = ctx { pos = Just p }
 
 indexCtx :: Ctx -> Ix -> Maybe (Maybe VTy)
 indexCtx ctx i = go (binders ctx) (coerce i)
@@ -46,6 +51,9 @@ lookupCtx ctx x = go (binders ctx) 0
 
 showV :: Ctx -> Val -> String
 showV ctx v = show (quote (lvl ctx) v)
+
+showC :: Ctx -> Tm -> String
+showC _ = show -- TODO
 
 evalCtx :: Ctx -> Tm -> Val
 evalCtx ctx tm = eval (env ctx) tm

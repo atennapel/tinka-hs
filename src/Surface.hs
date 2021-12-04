@@ -1,6 +1,8 @@
 module Surface where
 
 import Data.List (intercalate)
+import Text.Megaparsec (SourcePos)
+import Data.Maybe (fromMaybe)
 
 import Common
 
@@ -21,6 +23,15 @@ instance Show SLevel where
   show (SLS l) = "S " ++ showSLevelS l
   show (SLMax a b) = "max " ++ showSLevelS a ++ " " ++ showSLevelS b
 
+data SProjType = SFst | SSnd | SIndex Ix | SNamed Name
+  deriving (Eq)
+
+instance Show SProjType where
+  show SFst = "._1"
+  show SSnd = "._2"
+  show (SIndex i) = "." ++ show i
+  show (SNamed x) = "." ++ x
+
 type STy = STm
 
 data STm
@@ -31,12 +42,20 @@ data STm
   | SAppLvl STm SLevel
   | SLamLvl Name STm
   | SPiLvl Name STm
+  | SProj STm SProjType
+  | SPair STm STm
+  | SSigma Name STm STm
   | SLet Name STy STm STm
   | SType SLevel
+  | SHole (Maybe Name)
+  | SPos SourcePos STm
 
 showSTmS :: STm -> String
 showSTmS t@(SVar _) = show t
 showSTmS t@(SType SLZ) = show t
+showSTmS t@(SPair _ _) = show t
+showSTmS t@(SHole _) = show t
+showSTmS (SPos _ t) = showSTmS t
 showSTmS t = "(" ++ show t ++ ")"
 
 showSTmApp :: STm -> String
@@ -79,14 +98,61 @@ showSTmPi t =
     showParam (x, Just t) = "(" ++ x ++ " : " ++ show t ++ ")"
     showParam (x, Nothing) = "@" ++ x
 
+showSTmPair :: STm -> String
+showSTmPair s =
+  let ps = flattenPair s in
+    case last ps of
+      SVar "[]" -> "[" ++ intercalate ", " (map show $ init ps) ++ "]"
+      _ -> "(" ++ intercalate ", " (map show ps) ++ ")"
+  where
+    flattenPair :: STm -> [STm]
+    flattenPair (SPair a b) = a : flattenPair b
+    flattenPair (SPos _ s) = flattenPair s
+    flattenPair s = [s]
+
+showSTmProj :: STm -> String
+showSTmProj s =
+  let (s', ps) = flattenProj s in
+  showSTmS s' ++ intercalate "" (map show ps)
+  where
+    flattenProj :: STm -> (STm, [SProjType])
+    flattenProj s = go s []
+      where
+        go (SProj b p) ps = go b (p : ps)
+        go (SPos _ s) ps = go s ps
+        go s ps = (s, ps)
+
+showSTmSigma :: STm -> String
+showSTmSigma t =
+  let (ps, b) = go t in
+  intercalate " ** " (map showParam ps) ++ " ** " ++ showApp b
+  where
+    go :: STm -> ([(Name, STm)], STm)
+    go (SSigma x t b) = let (ps, b') = go b in ((x, t) : ps, b')
+    go t = ([], t)
+
+    showApp :: STm -> String
+    showApp t@(SApp _ _) = show t
+    showApp t@(SAppLvl _ _) = show t
+    showApp t = showSTmS t
+
+    showParam :: (Name, STm) -> String
+    showParam ("_", t) = showApp t
+    showParam (x, t) = "(" ++ x ++ " : " ++ show t ++ ")"
+
 instance Show STm where
+  show (SPos _ t) = show t
   show (SVar x) = x
+  show (SHole x) = "_" ++ fromMaybe "" x
   show t@(SApp _ _) = showSTmApp t
   show t@(SLam _ _) = showSTmLam t
   show t@SPi {} = showSTmPi t
   show t@(SAppLvl _ _) = showSTmApp t
   show t@(SLamLvl _ _) = showSTmLam t
   show t@(SPiLvl _ _) = showSTmPi t
+  show t@(SProj _ _) = showSTmProj t
+  show t@(SPair _ _) = showSTmPair t
+  show t@(SSigma _ _ _) = showSTmSigma t
   show (SLet x t v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (SType SLZ) = "Type"
   show (SType l) = "Type " ++ showSLevelS l
