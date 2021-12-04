@@ -1,9 +1,0 @@
-the : (A : Type) -> A -> A = \A x. x;
-
-id = \{A}. the A;
-
-const : {A B : Type} -> A -> B -> A
-  = \x y. x;
-
-compose : {A B C : Type} -> (B -> C) -> (A -> B) -> A -> C
-  = \f g x. f (g x);

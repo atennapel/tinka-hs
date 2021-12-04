@@ -1,2 +1,0 @@
-Eq : {A : Type} -> A -> A -> Type
-  = \{A} x y. HEq A A x y;
