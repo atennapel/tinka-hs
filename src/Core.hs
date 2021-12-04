@@ -2,6 +2,7 @@ module Core (ProjType(..), Level(..), Core(..), PrimName(..), PrimElimName(..), 
 
 import Common
 import Prims
+import Levels
 
 import qualified Data.Set as S
 import Data.Set (Set)
@@ -10,9 +11,6 @@ import Data.Maybe (fromJust)
 
 data ProjType = Fst | Snd | PNamed (Maybe Name) Ix
   deriving (Eq)
-
-data Level = Fin Core | Omega | OmegaSuc
-  deriving (Show)
 
 data Core
   = Var Ix
@@ -28,6 +26,9 @@ data Core
   | U Level
   | Let Name Core Core Core
   | Meta MetaVar
+  | AbsLevel Name Core
+  | PiLevel Name Core
+  | AppLevel Core Level
 
 showProjType :: ProjType -> String
 showProjType Fst = "._1"
@@ -87,12 +88,13 @@ instance Show Core where
       Prim (Left PUnit) -> "[" ++ intercalate ", " (map show $ init ps) ++ "]"
       _ -> "(" ++ intercalate ", " (map show ps) ++ ")"
   show (Proj s p) = show s ++ showProjType p
-  show (U (Fin c)) = "Type " ++ show c
-  show (U Omega) = "Type omega"
-  show (U OmegaSuc) = "Type omega^"
+  show (U c) = "Type " ++ show c
   show (Let x t v b) = "(let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b ++ ")"
   show (Meta x) = "?" ++ show x
   show (AppPruning x _) = show x ++ "*"
+  show (AbsLevel x b) = "(\\<" ++ x ++ ">. " ++ show b ++ ")"
+  show (PiLevel x b) = "(<" ++ x ++ "> -> " ++ show b ++ ")"
+  show (AppLevel f a) = "(" ++ show f ++ " " ++ show a ++ ")"
 
 showPi :: Core -> String
 showPi (Pi x i a ua b ub) = icit i "{" "(" ++ x ++ " : " ++ show a ++ " : " ++ show ua ++ icit i "}" ")" ++ " : " ++ show ub ++ " -> " ++ showPi b
@@ -129,6 +131,9 @@ expandMetas ms c = go 0 c
     go l (Pair a b) = Pair (go l a) (go l b)
     go l (Proj t p) = Proj (go l t) p
     go l (Let x t v b) = Let x (go l t) (go l v) (go (l + 1) b)
+    go l (AppLevel f a) = AppLevel (go l f) a
+    go l (AbsLevel x b) = AbsLevel x (go l b)
+    go l (PiLevel x b) = PiLevel x (go l b)
 
     goMeta :: Lvl -> MetaVar -> Core
     goMeta l x = let i = fromJust (elemIndex x ms) in Var (l + length ms - i - 1)

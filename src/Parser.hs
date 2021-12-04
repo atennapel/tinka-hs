@@ -40,6 +40,9 @@ braces p = char '{' *> p <* char '}'
 brackets :: Parser a -> Parser a
 brackets p = char '[' *> p <* char ']'
 
+angled :: Parser a -> Parser a
+angled p = char '<' *> p <* char '>'
+
 pArrow :: Parser String
 pArrow = symbol "→" <|> symbol "->"
 
@@ -50,7 +53,7 @@ pLambda :: Parser Char
 pLambda = char 'λ' <|> char '\\'
 
 keywords :: [String]
-keywords = ["let", "λ", "Type", "elim"]
+keywords = ["let", "λ", "Type"]
 
 keyword :: String -> Bool
 keyword x = x `elem` keywords
@@ -72,10 +75,29 @@ pKeyword kw = do
   C.string kw
   (takeWhile1P Nothing isAlphaNum *> empty) <|> ws
 
+pLevel :: Parser SLevel
+pLevel = suc <|> max <|> pLevelAtom
+  where
+    suc = do
+      symbol "S"
+      SLS <$> pLevelAtom
+    max = do
+      symbol "max"
+      SLMax <$> pLevelAtom <*> pLevelAtom
+
+pLevelAtom :: Parser SLevel
+pLevelAtom = nat <|> var <|> parens pLevel
+  where
+    var = SLVar <$> pIdent
+    nat = do
+      i <- L.decimal
+      ws
+      return $ SLNat i
+
 pType :: Parser Surface
 pType = do
   symbol "Type"
-  SU <$> pAtom
+  SU <$> pLevelAtom
 
 pCommaSeparated :: Parser [Surface]
 pCommaSeparated = do
@@ -111,7 +133,6 @@ pAtom =
     pNat <|>
     (SVar <$> pIdent))
   <|> try pType
-  <|> (SU (SVar "L0") <$ symbol "Type")
   <|> try (SVar "()" <$ parens ws)
   <|> try (SVar "[]" <$ brackets ws)
   <|> try pPair
@@ -132,14 +153,16 @@ pProj = do
     index = SIndex <$> L.decimal
     named = SNamed <$> pIdent
 
-pArg :: Parser (Either SProjType (Either Name Icit, Surface))
-pArg = proj <|> abs <|> try implByName <|> impl <|> arg
+pArg :: Parser (Either SProjType (Either SLevel (Either Name Icit, Surface)))
+pArg = proj <|> abs <|> level <|> try implByName <|> impl <|> arg
   where
-    impl = Right . (Right Impl,) <$> (char '{' *> pSurface <* char '}')
+    impl = Right . Right . (Right Impl,) <$> braces pSurface
 
-    arg = Right . (Right Expl,) <$> pAtom
+    level = Right . Left <$> angled pLevel
 
-    abs = Right . (Right Expl,) <$> pLam
+    arg = Right . Right . (Right Expl,) <$> pAtom
+
+    abs = Right . Right . (Right Expl,) <$> pLam
 
     proj = Left <$> pProj
 
@@ -147,7 +170,7 @@ pArg = proj <|> abs <|> try implByName <|> impl <|> arg
       x <- pIdent
       char '='
       t <- pSurface
-      return $ Right (Left x, t)
+      return $ Right $ Right (Left x, t)
 
 pSpine :: Parser Surface
 pSpine = do
@@ -155,31 +178,37 @@ pSpine = do
   args <- many pArg
   pure $ apps h args
   where
-    apps :: Surface -> [Either SProjType (Either Name Icit, Surface)] -> Surface
+    apps :: Surface -> [Either SProjType (Either SLevel (Either Name Icit, Surface))] -> Surface
     apps t [] = t
     apps t (Left p : as) = apps (SProj t p) as
-    apps t (Right (Right Expl, u) : Left p : as) = apps t (Right (Right Expl, SProj u p) : as)
-    apps t (Right (i, u) : as) = apps (SApp t u i) as
+    apps t (Right (Right (Right Expl, u)) : Left p : as) = apps t (Right (Right (Right Expl, SProj u p)) : as)
+    apps t (Right (Right (i, u)) : as) = apps (SApp t u i) as
+    apps t (Right (Left l) : as) = apps (SAppLevel t l) as
 
-pLamBinder :: Parser ([Name], Either Name Icit, Maybe Surface)
-pLamBinder = implBinder <|> binderWithType <|> justBinder
+pLamBinder :: Parser ([Name], Either () (Either Name Icit, Maybe Surface))
+pLamBinder = levels <|> implBinder <|> binderWithType <|> justBinder
   where
     -- \x
-    justBinder = (\x -> ([x], Right Expl, Nothing)) <$> pBinder
+    justBinder = (\x -> ([x], Right (Right Expl, Nothing))) <$> pBinder
+
+    -- \<x y z>
+    levels = angled $ do
+      xs <- some pIdent
+      return (xs, Left ())
 
     -- \(x y z : A)
     binderWithType = parens $ do
       xs <- some pBinder
       symbol ":"
       ty <- pSurface
-      return (xs, Right Expl, Just ty)
+      return (xs, Right (Right Expl, Just ty))
     
     -- \{x y z} | \{x y z : A} | \{x y z = b} | \{x y z : A = b}
     implBinder = braces $ do
       xs <- some pBinder
       ty <- optional (symbol ":" >> pSurface)
       b <- optional (symbol "=" >> pBinder)
-      return $ maybe (xs, Right Impl, ty) (\b -> (xs, Left b, ty)) b
+      return $ maybe (xs, Right (Right Impl, ty)) (\b -> (xs, Right (Left b, ty))) b
 
 pLam :: Parser Surface
 pLam = do
@@ -187,34 +216,48 @@ pLam = do
   xs <- some pLamBinder
   char '.'
   t <- pSurface
-  pure (foldr (\(xs, i, a) t -> foldr (\x t -> SAbs x i a t) t xs) t xs)
+  pure (foldr go t xs)
+  where
+    go :: ([Name], Either () (Either Name Icit, Maybe Surface)) -> Surface -> Surface
+    go (xs, Left ()) t = foldr SAbsLevel t xs
+    go (xs, Right (i, a)) t = foldr (\x t -> SAbs x i a t) t xs
 
 pArrowOrCross :: Parser Bool
 pArrowOrCross = (True <$ pArrow) <|> (False <$ pCross)
 
-pPiSigmaBinder :: Parser ([Name], Icit, Surface)
-pPiSigmaBinder = implBinder <|> binderWithType
+pPiSigmaBinder :: Parser ([Name], Either () (Icit, Surface))
+pPiSigmaBinder = levels <|> implBinder <|> binderWithType
   where
     -- (x y z : A)
     binderWithType = parens $ do
       xs <- some pBinder
       symbol ":"
       ty <- pSurface
-      return (xs, Expl, ty)
+      return (xs, Right (Expl, ty))
+
+    -- <x y z>
+    levels = angled $ do
+      xs <- some pIdent
+      return (xs, Left ())
     
     -- {x y z} | {x y z : A}
     implBinder = braces $ do
       xs <- some pBinder
       ty <- optional (symbol ":" >> pSurface)
-      return (xs, Impl, fromMaybe (SHole Nothing) ty)
+      return (xs, Right (Impl, fromMaybe (SHole Nothing) ty))
 
 pPiOrSigma :: Parser Surface
 pPiOrSigma = do
   dom <- some pPiSigmaBinder
   ty <- pArrowOrCross
   cod <- pSurface
-  let tyfun x i a b = if ty then SPi x i a b else SSigma x a b
-  pure $ foldr (\(xs, i, a) t -> foldr (\x t -> tyfun x i a t) t xs) cod dom
+  pure $ foldr (go ty) cod dom
+  where
+    tyfun ty x i a b = if ty then SPi x i a b else SSigma x a b
+
+    go :: Bool -> ([Name], Either () (Icit, Surface)) -> Surface -> Surface
+    go ty (xs, Left ()) t = foldr SPiLevel t xs
+    go ty (xs, Right (i, a)) t = foldr (\x t -> tyfun ty x i a t) t xs
 
 funOrSpine :: Parser Surface
 funOrSpine = do

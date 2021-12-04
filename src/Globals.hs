@@ -5,6 +5,7 @@ import Val
 import Common
 import Parser
 import Surface
+import Levels
 
 import Data.IORef
 import GHC.IO.Unsafe (unsafeDupablePerformIO)
