@@ -53,13 +53,14 @@ TODO:
   - [x] levels
   - [x] values
   - [x] verification
-- [ ] surface language
+- [x] surface language
   - [x] syntax
-  - [x] elaboration
   - [x] parser
-  - [ ] fix level lam/app/pi syntax
-  - [ ] lambdas and let with optional types
-  - [ ] sigma elaboration
+  - [x] elaboration
+  - [ ] primitives
+  - [ ] globals
+  - [ ] does let and lamlvl need a synth mode in verification?
+  - [ ] prettify nat levels coming from core
 - [ ] REPL
 - [ ] definitions
 - [ ] modules

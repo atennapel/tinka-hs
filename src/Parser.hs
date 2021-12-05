@@ -6,16 +6,13 @@ import Data.Char
 import Data.Void
 import System.Exit
 import Text.Megaparsec
-import Data.Maybe (fromMaybe, fromJust)
+import Data.Maybe (fromMaybe)
 
 import qualified Text.Megaparsec.Char       as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
 import Surface
 import Common
-
--- TODO: implicit functions
-data Icit = Expl | Impl
 
 type Parser = Parsec Void String
 
@@ -89,10 +86,11 @@ pLevel = suc <|> max <|> pLevelAtom
       SLMax <$> pLevelAtom <*> pLevelAtom
 
 pLevelAtom :: Parser SLevel
-pLevelAtom = lz <|> var <|> parens pLevel
+pLevelAtom = nat <|> lz <|> var <|> parens pLevel
   where
     var = SLVar <$> pIdent
     lz = SLZ <$ symbol "Z"
+    nat = SLNat <$> L.decimal
 
 pType :: Parser STm
 pType = do
@@ -176,7 +174,7 @@ pSpine = do
     apps t [] = t
     apps t (Left p : as) = apps (SProj t p) as
     apps t (Right (Right (Right Expl, u)) : Left p : as) = apps t (Right (Right (Right Expl, SProj u p)) : as)
-    apps t (Right (Right (i, u)) : as) = apps (SApp t u) as
+    apps t (Right (Right (i, u)) : as) = apps (SApp t u i) as
     apps t (Right (Left l) : as) = apps (SAppLvl t l) as
 
 pLamBinder :: Parser ([Name], Either () (Either Name Icit, Maybe STm))
@@ -214,7 +212,7 @@ pLam = do
   where
     go :: ([Name], Either () (Either Name Icit, Maybe STm)) -> STm -> STm
     go (xs, Left ()) t = foldr SLamLvl t xs
-    go (xs, Right (i, a)) t = foldr (\x t -> SLam x t) t xs
+    go (xs, Right (i, a)) t = foldr (\x t -> SLam x i a t) t xs
 
 pArrowOrCross :: Parser Bool
 pArrowOrCross = (True <$ pArrow) <|> (False <$ pCross)
@@ -247,7 +245,7 @@ pPiOrSigma = do
   cod <- pSurface
   pure $ foldr (go ty) cod dom
   where
-    tyfun ty x i a b = if ty then SPi x a b else SSigma x a b
+    tyfun ty x i a b = if ty then SPi x i a b else SSigma x a b
 
     go :: Bool -> ([Name], Either () (Icit, STm)) -> STm -> STm
     go ty (xs, Left ()) t = foldr SPiLvl t xs
@@ -258,7 +256,7 @@ funOrSpine = do
   sp <- pSpine
   optional pArrowOrCross >>= \case
     Nothing -> pure sp
-    Just b -> (if b then SPi "_" else SSigma "_") sp <$> pSurface
+    Just b -> (if b then SPi "_" Expl else SSigma "_") sp <$> pSurface
 
 pLet :: Parser STm
 pLet = do
@@ -270,7 +268,7 @@ pLet = do
   symbol "="
   t <- pSurface
   symbol ";"
-  SLet x (fromJust a) t <$> pSurface
+  SLet x a t <$> pSurface
 
 pSurface :: Parser STm
 pSurface = withPos (pLam <|> pLet <|> try pPiOrSigma <|> funOrSpine)

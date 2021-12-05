@@ -11,14 +11,17 @@ data SLevel
   | SLZ
   | SLS SLevel
   | SLMax SLevel SLevel
+  | SLNat Int
 
 showSLevelS :: SLevel -> String
 showSLevelS l@SLZ = show l
+showSLevelS l@(SLNat _) = show l
 showSLevelS l@(SLVar _) = show l
 showSLevelS l = "(" ++ show l ++ ")"
 
 instance Show SLevel where
   show (SLVar x) = x
+  show (SLNat i) = show i
   show SLZ = "Z"
   show (SLS l) = "S " ++ showSLevelS l
   show (SLMax a b) = "max " ++ showSLevelS a ++ " " ++ showSLevelS b
@@ -36,16 +39,16 @@ type STy = STm
 
 data STm
   = SVar Name
-  | SApp STm STm
-  | SLam Name STm
-  | SPi Name STm STm
+  | SApp STm STm (Either Name Icit)
+  | SLam Name (Either Name Icit) (Maybe STy) STm
+  | SPi Name Icit STm STm
   | SAppLvl STm SLevel
   | SLamLvl Name STm
   | SPiLvl Name STm
   | SProj STm SProjType
   | SPair STm STm
   | SSigma Name STm STm
-  | SLet Name STy STm STm
+  | SLet Name (Maybe STy) STm STm
   | SType SLevel
   | SHole (Maybe Name)
   | SPos SourcePos STm
@@ -53,6 +56,7 @@ data STm
 showSTmS :: STm -> String
 showSTmS t@(SVar _) = show t
 showSTmS t@(SType SLZ) = show t
+showSTmS t@(SType (SLNat _)) = show t
 showSTmS t@(SPair _ _) = show t
 showSTmS t@(SHole _) = show t
 showSTmS (SPos _ t) = showSTmS t
@@ -61,42 +65,62 @@ showSTmS t = "(" ++ show t ++ ")"
 showSTmApp :: STm -> String
 showSTmApp t =
   let (f, as) = go t in
-  showSTmS f ++ " " ++ unwords (map (either (\l -> "@" ++ showSLevelS l) showSTmS) as)
+  showSTmS f ++ " " ++ unwords (map showAppArgument as)
   where
-    go :: STm -> (STm, [Either SLevel STm])
-    go (SApp f a) = let (f', as) = go f in (f', Right a : as)
-    go (SAppLvl f a) =let (f', as) = go f in (f', Left a : as)
+    go :: STm -> (STm, [Either SLevel (STm, Either Name Icit)])
+    go (SApp f a i) = let (f', as) = go f in (f', Right (a, i) : as)
+    go (SAppLvl f a) = let (f', as) = go f in (f', Left a : as)
+    go (SPos _ s) = go s
     go t = (t, [])
+
+    showAppArgument :: Either SLevel (STm, Either Name Icit) -> String
+    showAppArgument (Right (a, Right Expl)) = showSTmS a
+    showAppArgument (Right (a, Right Impl)) = "{" ++ show a ++ "}"
+    showAppArgument (Right (a, Left x)) = "{" ++ x ++ " = " ++ show a ++ "}"
+    showAppArgument (Left a) = "<" ++ show a ++ ">"
 
 showSTmLam :: STm -> String
 showSTmLam t =
   let (xs, b) = go t in
-  "\\" ++ unwords (map (either ("@" ++) id) xs) ++ ". " ++ show b
+  "\\" ++ unwords (map showAbsParameter xs) ++ ". " ++ show b
   where
-    go :: STm -> ([Either Name Name], STm)
-    go (SLam x b) = let (as, b') = go b in (Right x : as, b')
-    go (SLamLvl x b) = let (as, b') = go b in (Left x : as, b')
+    go :: STm -> ([(Name, Maybe (Either Name Icit, Maybe STy))], STm)
+    go (SLam x i t b) = let (as, b') = go b in ((x, Just (i, t)) : as, b')
+    go (SLamLvl x b) = let (as, b') = go b in ((x, Nothing) : as, b')
+    go (SPos _ s) = go s
     go t = ([], t)
+
+    showAbsParameter :: (Name, Maybe (Either Name Icit, Maybe STy)) -> String
+    showAbsParameter (x, Just (Right Expl, Nothing)) = x
+    showAbsParameter (x, Just (Right Expl, Just t)) = "(" ++ x ++ " : " ++ show t ++ ")"
+    showAbsParameter (x, Just (Right Impl, Nothing)) = "{" ++ x ++ "}"
+    showAbsParameter (x, Just (Right Impl, Just t)) = "{" ++ x ++ " : " ++ show t ++ "}"
+    showAbsParameter (x, Just (Left y, Nothing)) = "{" ++ x ++ " = " ++ y ++ "}"
+    showAbsParameter (x, Just (Left y, Just t)) = "{" ++ x ++ " : " ++ show t ++ " = " ++ y ++ "}"
+    showAbsParameter (x, Nothing) = "<" ++ x ++ ">"
 
 showSTmPi :: STm -> String
 showSTmPi t =
   let (ps, b) = go t in
   intercalate " -> " (map showParam ps) ++ " -> " ++ showApp b
   where
-    go :: STm -> ([(Name, Maybe STm)], STm)
-    go (SPi x t b) = let (ps, b') = go b in ((x, Just t) : ps, b')
+    go :: STm -> ([(Name, Maybe (STm, Icit))], STm)
+    go (SPi x i t b) = let (ps, b') = go b in ((x, Just (t, i)) : ps, b')
     go (SPiLvl x b) = let (ps, b') = go b in ((x, Nothing) : ps, b')
+    go (SPos _ s) = go s
     go t = ([], t)
 
     showApp :: STm -> String
-    showApp t@(SApp _ _) = show t
+    showApp t@SApp {} = show t
     showApp t@(SAppLvl _ _) = show t
+    showApp (SPos _ s) = showApp s
     showApp t = showSTmS t
 
-    showParam :: (Name, Maybe STm) -> String
-    showParam ("_", Just t) = showApp t
-    showParam (x, Just t) = "(" ++ x ++ " : " ++ show t ++ ")"
-    showParam (x, Nothing) = "@" ++ x
+    showParam :: (Name, Maybe (STm, Icit)) -> String
+    showParam ("_", Just (t, Expl)) = showApp t
+    showParam (x, Just (t, Expl)) = "(" ++ x ++ " : " ++ show t ++ ")"
+    showParam (x, Just (t, Impl)) = "{" ++ x ++ " : " ++ show t ++ "}"
+    showParam (x, Nothing) = "<" ++ x ++ ">"
 
 showSTmPair :: STm -> String
 showSTmPair s =
@@ -129,11 +153,13 @@ showSTmSigma t =
   where
     go :: STm -> ([(Name, STm)], STm)
     go (SSigma x t b) = let (ps, b') = go b in ((x, t) : ps, b')
+    go (SPos _ s) = go s
     go t = ([], t)
 
     showApp :: STm -> String
-    showApp t@(SApp _ _) = show t
+    showApp t@SApp {} = show t
     showApp t@(SAppLvl _ _) = show t
+    showApp (SPos _ s) = showApp s
     showApp t = showSTmS t
 
     showParam :: (Name, STm) -> String
@@ -144,8 +170,8 @@ instance Show STm where
   show (SPos _ t) = show t
   show (SVar x) = x
   show (SHole x) = "_" ++ fromMaybe "" x
-  show t@(SApp _ _) = showSTmApp t
-  show t@(SLam _ _) = showSTmLam t
+  show t@SApp {} = showSTmApp t
+  show t@SLam {} = showSTmLam t
   show t@SPi {} = showSTmPi t
   show t@(SAppLvl _ _) = showSTmApp t
   show t@(SLamLvl _ _) = showSTmLam t
@@ -153,6 +179,8 @@ instance Show STm where
   show t@(SProj _ _) = showSTmProj t
   show t@(SPair _ _) = showSTmPair t
   show t@(SSigma _ _ _) = showSTmSigma t
-  show (SLet x t v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
+  show (SLet x (Just t) v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
+  show (SLet x Nothing v b) = "let " ++ x ++ " = " ++ show v ++ "; " ++ show b
   show (SType SLZ) = "Type"
+  show (SType (SLNat 0)) = "Type"
   show (SType l) = "Type " ++ showSLevelS l
