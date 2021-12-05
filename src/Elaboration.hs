@@ -12,6 +12,7 @@ import Evaluation
 import Ctx
 import Errors (Error(ElaborateError), throwUnless)
 import Surface
+import Prims
 
 checkOrInfer :: Ctx -> STm -> Maybe STm -> IO (Tm, Tm, Val)
 checkOrInfer ctx v Nothing = do
@@ -80,12 +81,18 @@ infer ctx tm = do
   case tm of
     SPos p t -> infer (enter p ctx) t
     t@(SVar x) ->
-      case lookupCtx ctx x of
-        Just (i, Just ty) -> do
-          -- putStrLn $ show t ++ " : " ++ showV ctx ty ++ " ~> '" ++ show i
-          return (Var i, ty)
-        Nothing -> throwIO $ ElaborateError $ "undefined var " ++ show t
-        Just (_, Nothing) -> throwIO $ ElaborateError $ "variable referes to universe level variable: " ++ show t
+      case toPrimName x of
+        Just prim -> return (Prim (Left prim), primType prim)
+        Nothing ->
+          case toPrimElimName x of
+            Just prim -> return (Prim (Right prim), primElimType prim)
+            Nothing -> do
+              case lookupCtx ctx x of
+                Just (i, Just ty) -> do
+                  -- putStrLn $ show t ++ " : " ++ showV ctx ty ++ " ~> '" ++ show i
+                  return (Var i, ty)
+                Nothing -> throwIO $ ElaborateError $ "undefined var " ++ show t
+                Just (_, Nothing) -> throwIO $ ElaborateError $ "variable referes to universe level variable: " ++ show t
     SType l -> do
       l' <- checkFinLevel ctx l
       return (Type (FinLevel l'), VType (VFinLevel (vFLS (finLevelCtx ctx l'))))

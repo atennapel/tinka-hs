@@ -22,6 +22,12 @@ instance Show FinLevel where
   show (FLS l) = "S " ++ showFinLevelS l
   show (FLMax a b) = "max " ++ showFinLevelS a ++ " " ++ showFinLevelS b
 
+flmax :: FinLevel -> FinLevel -> FinLevel
+flmax FLZ x = x
+flmax x FLZ = x
+flmax (FLS x) (FLS y) = flmax x y
+flmax x y = FLMax x y
+
 data Level = Omega | Omega1 | FinLevel FinLevel
 
 showLevelS :: Level -> String
@@ -66,6 +72,9 @@ addToFinLevel n i = go n i
   where
     go 0 i = i
     go n i = go (n - 1) (FLS i)
+
+vFLZ :: VLevel
+vFLZ = VFinLevel mempty
 
 vFLS :: VFinLevel -> VFinLevel
 vFLS = addToVFinLevel 1

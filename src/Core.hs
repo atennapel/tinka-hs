@@ -41,11 +41,11 @@ showTmS t = "(" ++ show t ++ ")"
 showTmApp :: Tm -> String
 showTmApp t =
   let (f, as) = go t in
-  showTmS f ++ " " ++ unwords (map showAppArgument as)
+  showTmS f ++ " " ++ unwords (map showAppArgument $ reverse as)
   where
     go :: Tm -> (Tm, [Either FinLevel (Tm, Icit)])
     go (App f a i) = let (f', as) = go f in (f', Right (a, i) : as)
-    go (AppLvl f a) =let (f', as) = go f in (f', Left a : as)
+    go (AppLvl f a) = let (f', as) = go f in (f', Left a : as)
     go t = (t, [])
 
     showAppArgument :: Either FinLevel (Tm, Icit) -> String
@@ -81,6 +81,7 @@ showTmPi t =
     showApp :: Tm -> String
     showApp t@(App _ _ _) = show t
     showApp t@(AppLvl _ _) = show t
+    showApp t@(Type _) = show t
     showApp t = showTmS t
 
     showParam :: (Name, Maybe (Icit, Tm)) -> String
@@ -123,6 +124,7 @@ showTmSigma t =
     showApp :: Tm -> String
     showApp t@App {} = show t
     showApp t@(AppLvl _ _) = show t
+    showApp t@(Type _) = show t
     showApp t = showTmS t
 
     showParam :: (Name, Tm) -> String

@@ -22,30 +22,9 @@ Currently supports:
 - pi-types
 - sigma-types
 - Void, Unit, Bool primitive types
+- heterogenous equality type with axiom K
 - predicative non-cumulative hierarchy of universes, with simple universe polymorphism
 - "Gentle art of Levitation"-style descriptions
-
-For example:
-```
-Sum : Type -> Type -> Type
-  = \A B. (b : Bool) ** (elim Bool 1) (\_. Type) A B b;
-
-Left : (A B : Type) -> A -> Sum A B
-  = \A B x. (True, x);
-
-Right : (A B : Type) -> B -> Sum A B
-  = \A B x. (False, x);
-
-indSum :
-  (A B : Type)
-  (P : Sum A B -> Type)
-  (left : (x : A) -> P (Left A B x))
-  (right : (x : B) -> P (Right A B x))
-  (sum : Sum A B)
-  -> P sum
-  = \A B P left right sum.
-    (elim Bool) (\b. (x : (elim Bool 1) (\_. Type) A B b) -> P (b, x)) left right (fst sum) (snd sum);
-```
 
 TODO:
 - [x] core language
@@ -57,8 +36,9 @@ TODO:
   - [x] syntax
   - [x] parser
   - [x] elaboration
-  - [ ] primitives
+  - [ ] primitives (TODO elimination of equality)
   - [ ] globals
+  - [ ] holes
 - [ ] REPL
 - [ ] definitions
 - [ ] modules

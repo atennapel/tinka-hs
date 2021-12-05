@@ -61,7 +61,7 @@ showSTmS t = "(" ++ show t ++ ")"
 showSTmApp :: STm -> String
 showSTmApp t =
   let (f, as) = go t in
-  showSTmS f ++ " " ++ unwords (map showAppArgument as)
+  showSTmS f ++ " " ++ unwords (map showAppArgument $ reverse as)
   where
     go :: STm -> (STm, [Either SLevel (STm, Either Name Icit)])
     go (SApp f a i) = let (f', as) = go f in (f', Right (a, i) : as)
@@ -109,6 +109,7 @@ showSTmPi t =
     showApp :: STm -> String
     showApp t@SApp {} = show t
     showApp t@(SAppLvl _ _) = show t
+    showApp t@(SType _) = show t
     showApp (SPos _ s) = showApp s
     showApp t = showSTmS t
 
@@ -155,6 +156,7 @@ showSTmSigma t =
     showApp :: STm -> String
     showApp t@SApp {} = show t
     showApp t@(SAppLvl _ _) = show t
+    showApp t@(SType _) = show t
     showApp (SPos _ s) = showApp s
     showApp t = showSTmS t
 

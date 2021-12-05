@@ -53,6 +53,8 @@ infer ctx = \case
       Just (Just ty) -> return ty
       Nothing -> throwIO $ VerifyError $ "undefined var " ++ show t
       Just Nothing -> throwIO $ VerifyError $ "variable referes to universe level variable: " ++ show t
+  Prim (Left x) -> return $ primType x
+  Prim (Right x) -> return $ primElimType x
   Type Omega -> return $ VType VOmega1
   Type (FinLevel l) -> do
     checkFinLevel ctx l
