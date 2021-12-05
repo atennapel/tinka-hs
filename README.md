@@ -36,7 +36,7 @@ TODO:
   - [x] syntax
   - [x] parser
   - [x] elaboration
-  - [ ] primitives (TODO elimination of equality)
+  - [x] primitives
   - [ ] globals
   - [ ] holes
 - [ ] REPL

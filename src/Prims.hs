@@ -15,6 +15,7 @@ data PrimElimName
   = PEAbsurd
   | PELower
   | PEIndBool
+  | PEElimHEq
   deriving (Eq)
 
 instance Show PrimName where
@@ -33,6 +34,7 @@ instance Show PrimElimName where
   show PEAbsurd = "absurd"
   show PELower = "lower"
   show PEIndBool = "indBool"
+  show PEElimHEq = "elimHEq"
 
 toPrimName :: String -> Maybe PrimName
 toPrimName "Void" = Just PVoid
@@ -51,6 +53,7 @@ toPrimElimName :: String -> Maybe PrimElimName
 toPrimElimName "absurd" = Just PEAbsurd
 toPrimElimName "lower" = Just PELower
 toPrimElimName "indBool" = Just PEIndBool
+toPrimElimName "elimHEq" = Just PEElimHEq
 toPrimElimName _ = Nothing
 
 data PrimElimPosition = PEPFirst | PEPLast

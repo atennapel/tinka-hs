@@ -72,6 +72,8 @@ vprimelim PELower _ (VLiftTerm _ _ v) = v
 vprimelim PEIndBool [_, _, Right (t, _), _] VTrue = t
 vprimelim PEIndBool [_, _, _, Right (f, _)] VFalse = f
 
+vprimelim PEElimHEq [_, _, _, _, _, Right (refl, _), _] (VHRefl _ _ _) = refl
+
 vprimelim x as (VNe h sp) = VNe h (EPrimElim x as : sp)
 vprimelim p as (VGlobal x sp v) = VGlobal x (EPrimElim p as : sp) (vprimelim p as v)
 vprimelim x as _ = undefined
@@ -120,6 +122,16 @@ evalprimelim PEIndBool =
   vlam "f" $ \f ->
   vlam "b" $ \b ->
   vprimelim PEIndBool [Left l, Right (p, Expl), Right (t, Expl), Right (f, Expl)] b
+evalprimelim PEElimHEq =
+  vlamlvl "l" $ \l ->
+  vlamlvl "k" $ \k ->
+  vlamimpl "A" $ \a ->
+  vlamimpl "x" $ \x ->
+  vlam "P" $ \p ->
+  vlam "refl" $ \refl ->
+  vlamimpl "y" $ \y ->
+  vlam "p" $ \pp ->
+  vprimelim PEElimHEq [Left l, Left k, Right (a, Impl), Right (x, Impl), Right (p, Expl), Right (refl, Expl), Right (y, Impl)] p
 
 -- quote
 quoteFinLevel :: Lvl -> VFinLevel -> FinLevel
@@ -244,19 +256,19 @@ primType PUnit = VUnitType
 primType PBool = VType vFLZ
 primType PTrue = VBool
 primType PFalse = VBool
--- {l : Level} -> Type l -> Type (S l)
+-- <l> -> Type l -> Type (S l)
 primType PLift = vpilvl "l" $ \l -> vfun (VTypeFin l) (VTypeFin $ vFLS l)
--- {l : Level} {A : Type l} -> A -> Lift {l} A
+-- <l> {A : Type l} -> A -> Lift {l} A
 primType PLiftTerm =
   vpilvl "l" $ \l -> vpimpl "A" (VTypeFin l) $ \a -> vfun a (VLift l a)
--- {l : Level} {A : Type l} {B : Type l} -> A -> B -> Type l
+-- <l> {A : Type l} {B : Type l} -> A -> B -> Type l
 primType PHEq =
   vpilvl "l" $ \l ->
   vpimpl "A" (VTypeFin l) $ \a ->
   vpimpl "B" (VTypeFin l) $ \b ->
   vfun a $
   vfun b (VTypeFin l)
--- {l : Level} {A : Type l} {x : A} -> HEq {l} {A} {A} x x
+-- <l> {A : Type l} {x : A} -> HEq {l} {A} {A} x x
 primType PHRefl =
   vpilvl "l" $ \l ->
   vpimpl "A" (VTypeFin l) $ \a ->
@@ -264,18 +276,18 @@ primType PHRefl =
   VHEq l a a x x
 
 primElimType :: PrimElimName -> Val
--- {l : Level} {A : Type l} -> Void -> A
+-- <l> {A : Type l} -> Void -> A
 primElimType PEAbsurd =
   vpilvl "l" $ \l -> vpimpl "A" (VTypeFin l) $ \a -> vfun VVoid a
 primElimType PELower =
   vpilvl "l" $ \l -> vpimpl "A" (VTypeFin l) $ \a -> vfun (VLift l a) a
 {-
-  {l : Level}
-  (P : Bool -> Type l)
-  (t : P True)
-  (f : P False)
-  (b : Bool)
-  -> P b
+<l>
+(P : Bool -> Type l)
+(t : P True)
+(f : P False)
+(b : Bool)
+-> P b
 -}
 primElimType PEIndBool =
   vpilvl "l" $ \l ->
@@ -283,3 +295,23 @@ primElimType PEIndBool =
   vfun (vapp p VTrue Expl) $
   vfun (vapp p VFalse Expl) $
   vpi "b" VBool $ \b -> vapp p b Expl
+{-
+<l k>
+{A : Type l}
+{x : A}
+(P : {y : A} -> HEq <l> {A} {A} x y -> Type k)
+(refl : P {x} (HRefl <l> {A} {x}))
+{y : A}
+(p : HEq <l> {A} {A} x y)
+P {y} p
+-}
+primElimType PEElimHEq =
+  vpilvl "l" $ \l ->
+  vpilvl "k" $ \k ->
+  vpimpl "A" (VTypeFin l) $ \a ->
+  vpimpl "x" a $ \x ->
+  vpi "P" (vpimpl "y" a $ \y -> vfun (VHEq l a a x y) $ VTypeFin k) $ \p ->
+  vfun (vapp (vapp p x Impl) (VHRefl l a x) Expl) $
+  vpimpl "y" a $ \y ->
+  vpi "p" (VHEq l a a x y) $ \pp ->
+  vapp (vapp p y Impl) pp Expl
