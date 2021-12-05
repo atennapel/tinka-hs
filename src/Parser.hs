@@ -86,10 +86,9 @@ pLevel = suc <|> max <|> pLevelAtom
       SLMax <$> pLevelAtom <*> pLevelAtom
 
 pLevelAtom :: Parser SLevel
-pLevelAtom = nat <|> lz <|> var <|> parens pLevel
+pLevelAtom = nat <|> var <|> parens pLevel
   where
     var = SLVar <$> pIdent
-    lz = SLZ <$ symbol "Z"
     nat = SLNat <$> L.decimal
 
 pType :: Parser STm
@@ -124,7 +123,7 @@ pAtom =
     pHole <|>
     (SVar <$> pIdent))
   <|> try pType
-  <|> (SType SLZ <$ symbol "Type")
+  <|> (SType (SLNat 0) <$ symbol "Type")
   <|> try (SVar "()" <$ parens ws)
   <|> try (SVar "[]" <$ brackets ws)
   <|> try pPair

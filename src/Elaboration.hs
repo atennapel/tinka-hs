@@ -70,7 +70,6 @@ checkFinLevel ctx = \case
       Just (i, Nothing) -> return $ FLVar i
       Nothing -> throwIO $ ElaborateError $ "undefined universe var " ++ show l
       Just (_, Just _) -> throwIO $ ElaborateError $ "universe level variable refers to non-universe value"
-  SLZ -> return FLZ
   SLS l -> FLS <$> checkFinLevel ctx l
   SLMax a b -> FLMax <$> checkFinLevel ctx a <*> checkFinLevel ctx b
   SLNat i -> return $ addToFinLevel i FLZ

@@ -60,7 +60,6 @@ TODO:
   - [ ] primitives
   - [ ] globals
   - [ ] does let and lamlvl need a synth mode in verification?
-  - [ ] prettify nat levels coming from core
 - [ ] REPL
 - [ ] definitions
 - [ ] modules

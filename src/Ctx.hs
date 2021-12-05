@@ -107,6 +107,9 @@ prettyCore ns tm = show (go ns tm)
       Type (FinLevel l) -> SType (goFinLevel ns l)
 
     goFinLevel ns (FLVar i) = SLVar (ns !! coerce i)
-    goFinLevel ns FLZ = SLZ
-    goFinLevel ns (FLS l) = SLS (goFinLevel ns l)
+    goFinLevel ns FLZ = SLNat 0
+    goFinLevel ns (FLS l) =
+      case goFinLevel ns l of
+        SLNat i -> SLNat (i + 1)
+        l -> SLS l
     goFinLevel ns (FLMax a b) = SLMax (goFinLevel ns a) (goFinLevel ns b)

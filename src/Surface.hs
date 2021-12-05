@@ -8,13 +8,11 @@ import Common
 
 data SLevel
   = SLVar Name
-  | SLZ
   | SLS SLevel
   | SLMax SLevel SLevel
   | SLNat Int
 
 showSLevelS :: SLevel -> String
-showSLevelS l@SLZ = show l
 showSLevelS l@(SLNat _) = show l
 showSLevelS l@(SLVar _) = show l
 showSLevelS l = "(" ++ show l ++ ")"
@@ -22,7 +20,6 @@ showSLevelS l = "(" ++ show l ++ ")"
 instance Show SLevel where
   show (SLVar x) = x
   show (SLNat i) = show i
-  show SLZ = "Z"
   show (SLS l) = "S " ++ showSLevelS l
   show (SLMax a b) = "max " ++ showSLevelS a ++ " " ++ showSLevelS b
 
@@ -55,8 +52,7 @@ data STm
 
 showSTmS :: STm -> String
 showSTmS t@(SVar _) = show t
-showSTmS t@(SType SLZ) = show t
-showSTmS t@(SType (SLNat _)) = show t
+showSTmS t@(SType (SLNat 0)) = show t
 showSTmS t@(SPair _ _) = show t
 showSTmS t@(SHole _) = show t
 showSTmS (SPos _ t) = showSTmS t
@@ -181,6 +177,5 @@ instance Show STm where
   show t@(SSigma _ _ _) = showSTmSigma t
   show (SLet x (Just t) v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (SLet x Nothing v b) = "let " ++ x ++ " = " ++ show v ++ "; " ++ show b
-  show (SType SLZ) = "Type"
   show (SType (SLNat 0)) = "Type"
   show (SType l) = "Type " ++ showSLevelS l
