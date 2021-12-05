@@ -55,3 +55,6 @@ TODO:
 - [ ] update unification
   - [ ] pruning
   - [ ] postponing
+
+BUGS:
+- `\<l>. Lift <l> <S l>`

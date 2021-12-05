@@ -1,6 +1,7 @@
 module Prims where
 
 import Common
+
 data PrimName
   = PVoid
   | PUnitType | PUnit
