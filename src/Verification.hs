@@ -73,9 +73,6 @@ infer ctx = \case
     let vt = evalCtx ctx t
     check ctx v vt
     infer (define x vt (evalCtx ctx v) ctx) b
-  LamLvl x b -> do
-    rty <- infer (bindLevel x ctx) b
-    return $ VPiLvl x (closeLevel ctx rty)
   s@(App f a i) -> do
     ty <- infer ctx f
     case force ty of

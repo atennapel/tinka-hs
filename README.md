@@ -59,7 +59,6 @@ TODO:
   - [x] elaboration
   - [ ] primitives
   - [ ] globals
-  - [ ] does let and lamlvl need a synth mode in verification?
 - [ ] REPL
 - [ ] definitions
 - [ ] modules

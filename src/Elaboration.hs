@@ -45,7 +45,7 @@ check ctx tm ty = do
       LamLvl x <$> check (bindLevelInsert x ctx) t (vinstLevel c (vFinLevelVar (lvl ctx)))
     (SPair a b, VSigma x ty b') -> do
       ta <- check ctx a ty
-      tb <- check ctx b (vinst b'(evalCtx ctx ta))
+      tb <- check ctx b (vinst b' (evalCtx ctx ta))
       return $ Pair ta tb
     (SLet x mt v b, _) -> do
       (cv, ct, vt) <- checkOrInfer ctx v mt
@@ -141,7 +141,8 @@ infer ctx tm = do
       return (Let "f" (quoteCtx ctx vt) (Lam x i cb) (Var 0), vt)
     SLamLvl x b -> do
       (cb, rty) <- infer (bindLevel x ctx) b
-      return (LamLvl x cb, VPiLvl x (closeLevel ctx rty))
+      let vt = VPiLvl x (closeLevel ctx rty)
+      return (Let "f" (quoteCtx ctx vt) (LamLvl x cb) (Var 0), vt)
     c@(SProj t p) -> do
       (tm, vt) <- infer ctx t
       case (force vt, p) of
