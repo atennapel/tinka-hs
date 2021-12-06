@@ -37,8 +37,8 @@ TODO:
   - [x] parser
   - [x] elaboration
   - [x] primitives
+  - [x] holes
   - [ ] globals
-  - [ ] holes
 - [ ] REPL
 - [ ] definitions
 - [ ] modules
@@ -46,10 +46,10 @@ TODO:
   - [ ] unification
   - [ ] holes
   - [ ] zonking
-- [ ] level metas
 - [ ] implicit functions
   - [ ] update syntax
   - [ ] update elaboration
+- [ ] level metas
 - [ ] update unification
   - [ ] pruning
   - [ ] postponing

@@ -3,6 +3,7 @@ module Verification (verify) where
 import Control.Exception (throwIO)
 import qualified Data.Set as S
 
+import Common
 import Core
 import Levels
 import Val
@@ -14,7 +15,7 @@ check :: Ctx -> Tm -> VTy -> IO ()
 check ctx tm ty = do
   let fty = force ty
   case (tm, fty) of
-    (Lam x i b, VPi _ i' t c) | i == i' -> check (bind x t ctx) b (vinst c (VVar (lvl ctx)))
+    (Lam x i b, VPi _ i' t c) | i == i' -> check (bind x i t ctx) b (vinst c (VVar (lvl ctx)))
     (LamLvl x b, VPiLvl _ c) -> check (bindLevel x ctx) b (vinstLevel c (vFinLevelVar (lvl ctx)))
     (Pair a b, VSigma x ty b') -> do
       check ctx a ty
@@ -61,14 +62,14 @@ infer ctx = \case
     return $ VType (VFinLevel (vFLS (finLevelCtx ctx l)))
   Pi x i t b -> do
     l1 <- checkTy ctx t
-    l2 <- checkTy (bind x (evalCtx ctx t) ctx) b
+    l2 <- checkTy (bind x i (evalCtx ctx t) ctx) b
     return $ VType (l1 <> l2)
   PiLvl x b -> do
     checkTy (bindLevel x ctx) b
     return $ VType VOmega
   Sigma x t b -> do
     l1 <- checkTy ctx t
-    l2 <- checkTy (bind x (evalCtx ctx t) ctx) b
+    l2 <- checkTy (bind x Expl (evalCtx ctx t) ctx) b
     return $ VType (l1 <> l2)
   Let x t v b -> do
     l <- checkTy ctx t

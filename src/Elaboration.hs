@@ -3,6 +3,7 @@ module Elaboration (elaborate) where
 import Control.Exception (throwIO)
 import Data.Bifunctor (first)
 import qualified Data.Set as S
+import Data.Maybe (fromJust)
 
 import Common
 import Core
@@ -31,16 +32,18 @@ check ctx tm ty = do
   -- putStrLn $ "check " ++ show tm ++ " : " ++ showV ctx ty
   case (tm, fty) of
     (SPos p tm, _) -> check (enter p ctx) tm ty
+    (SHole m, _) -> do
+      throwIO $ ElaborateError $ "hole _" ++ fromJust m ++ " : " ++ showV ctx ty ++ "\n\n" ++ show ctx
     (SLam x i ma b, VPi x' i' ty b') | either (\x -> x == x' && i' == Impl) (== i') i -> do
       case ma of
         Nothing -> return ()
         Just a -> do
           (ca, u') <- checkTy ctx a
           throwUnless (conv (lvl ctx) (evalCtx ctx ca) ty) $ ElaborateError $ "check failed " ++ show tm ++ " : " ++ showV ctx ty ++ " got " ++ showC ctx ca
-      cb <- check (bind x ty ctx) b (vinst b' (VVar (lvl ctx)))
+      cb <- check (bind x i' ty ctx) b (vinst b' (VVar (lvl ctx)))
       return $ Lam x i' cb
     (t, VPi x Impl a b) -> do
-      Lam x Impl <$> check (bindInsert x a ctx) t (vinst b (VVar (lvl ctx)))
+      Lam x Impl <$> check (bindInsert x Impl a ctx) t (vinst b (VVar (lvl ctx)))
     (SLamLvl x b, VPiLvl _ c) ->
       LamLvl x <$> check (bindLevel x ctx) b (vinstLevel c (vFinLevelVar (lvl ctx)))
     (t, VPiLvl x c) ->
@@ -99,11 +102,11 @@ infer ctx tm = do
       return (Type (FinLevel l'), VType (VFinLevel (vFLS (finLevelCtx ctx l'))))
     SPi x i t b -> do
       (ct, l1) <- checkTy ctx t
-      (cb, l2) <- checkTy (bind x (evalCtx ctx ct) ctx) b
+      (cb, l2) <- checkTy (bind x i (evalCtx ctx ct) ctx) b
       return (Pi x i ct cb, VType (l1 <> l2))
     SSigma x t b -> do
       (ct, l1) <- checkTy ctx t
-      (cb, l2) <- checkTy (bind x (evalCtx ctx ct) ctx) b
+      (cb, l2) <- checkTy (bind x Expl (evalCtx ctx ct) ctx) b
       return (Sigma x ct cb, VType (l1 <> l2))
     SPiLvl x b -> do
       (cb, _) <- checkTy (bindLevel x ctx) b
@@ -144,7 +147,7 @@ infer ctx tm = do
       (a, u1) <- first (evalCtx ctx) <$> case ma of
         Just a -> checkTy ctx a
         Nothing -> throwIO $ ElaborateError $ "cannot infer unannotated lambda: " ++ show s
-      (cb, rty) <- infer (bind x a ctx) b
+      (cb, rty) <- infer (bind x i a ctx) b
       let vt = VPi x i a (closeVal ctx rty)
       return (Let "f" (quoteCtx ctx vt) (Lam x i cb) (Var 0), vt)
     SLamLvl x b -> do
