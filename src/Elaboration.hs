@@ -15,6 +15,7 @@ import Errors (Error(ElaborateError), throwUnless)
 import Surface
 import Prims
 import Verification
+import Globals
 
 checkOrInfer :: Ctx -> STm -> Maybe STm -> IO (Tm, Tm, Val)
 checkOrInfer ctx v Nothing = do
@@ -95,8 +96,11 @@ infer ctx tm = do
                 Just (i, Just ty) -> do
                   -- putStrLn $ show t ++ " : " ++ showV ctx ty ++ " ~> '" ++ show i
                   return (Var i, ty)
-                Nothing -> throwIO $ ElaborateError $ "undefined var " ++ show t
                 Just (_, Nothing) -> throwIO $ ElaborateError $ "variable referes to universe level variable: " ++ show t
+                Nothing -> do
+                  case getGlobal x of
+                    Just e -> return (Global x, gTy e)
+                    Nothing -> throwIO $ ElaborateError $ "undefined var " ++ show t
     SType l -> do
       l' <- checkFinLevel ctx l
       return (Type (FinLevel l'), VType (VFinLevel (vFLS (finLevelCtx ctx l'))))

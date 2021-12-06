@@ -9,6 +9,7 @@ import Core
 import Levels
 import Val
 import Prims
+import Globals
 
 -- eval
 force :: Val -> Val
@@ -89,7 +90,10 @@ vprim x = VNe (HPrim x) []
 eval :: Env -> Tm -> Val
 eval e = \case
   Var i -> fromRight undefined (e !! coerce i)
-  Global x -> undefined -- TODO
+  Global x ->
+    case getGlobal x of
+      Just e -> gVal e
+      Nothing -> undefined
   Prim (Left x) -> vprim x
   Prim (Right x) -> evalprimelim x
   App a b i -> vapp (eval e a) (eval e b) i
@@ -135,6 +139,8 @@ evalprimelim PEElimHEq =
   vprimelim PEElimHEq [Left l, Left k, Right (a, Impl), Right (x, Impl), Right (p, Expl), Right (refl, Expl), Right (y, Impl)] p
 
 -- quote
+data QuoteLevel = Full | KeepGlobals
+
 quoteFinLevel :: Lvl -> VFinLevel -> FinLevel
 quoteFinLevel l (VFL n xs) =
   M.foldlWithKey
@@ -152,33 +158,41 @@ quoteHead :: Lvl -> Head -> Tm
 quoteHead l (HVar k) = Var (lvlToIx l k)
 quoteHead k (HPrim x) = Prim (Left x)
 
-quoteElim :: Lvl -> Elim -> Tm -> Tm
-quoteElim l (EApp v i) t = App t (quote l v) i
-quoteElim l (EAppLvl k) t = AppLvl t (quoteFinLevel l k)
-quoteElim l (EProj p) t = Proj t p
-quoteElim l (EPrimElim x as) t =
+quoteElim :: QuoteLevel -> Lvl -> Elim -> Tm -> Tm
+quoteElim ql l (EApp v i) t = App t (quoteWith ql l v) i
+quoteElim ql l (EAppLvl k) t = AppLvl t (quoteFinLevel l k)
+quoteElim ql l (EProj p) t = Proj t p
+quoteElim ql l (EPrimElim x as) t =
   case primElimPosition x of
     PEPLast -> App (foldl app (Prim (Right x)) as) t (primElimIcit x)
     PEPFirst -> foldl app (App (Prim (Right x)) t (primElimIcit x)) as
   where
     app :: Tm -> Either VFinLevel (Val, Icit) -> Tm
     app a (Left lv) = AppLvl a (quoteFinLevel l lv)
-    app a (Right (b, i)) = App a (quote l b) i
+    app a (Right (b, i)) = App a (quoteWith ql l b) i
+
+quoteWith :: QuoteLevel -> Lvl -> Val -> Tm
+quoteWith ql l = go l
+  where
+    go l = \case
+      VNe h sp -> foldr (quoteElim ql l) (quoteHead l h) sp
+      VGlobal h sp v ->
+        case ql of
+          Full -> go l v
+          KeepGlobals -> Global h
+      VLam x i b -> Lam x i (go (l + 1) (vinst b (VVar l)))
+      VPi x i t b -> Pi x i (go l t) (go (l + 1) (vinst b (VVar l)))
+      VLamLvl x b -> LamLvl x (go (l + 1) (vinstLevel b (vFinLevelVar l)))
+      VPiLvl x b -> PiLvl x (go (l + 1) (vinstLevel b (vFinLevelVar l)))
+      VPair a b -> Pair (go l a) (go l b)
+      VSigma x t b -> Sigma x (go l t) (go (l + 1) (vinst b (VVar l)))
+      VType i -> Type (quoteLevel l i)
 
 quote :: Lvl -> Val -> Tm
-quote l = \case
-  VNe h sp -> foldr (quoteElim l) (quoteHead l h) sp
-  VGlobal h sp v -> quote l v -- TODO
-  VLam x i b -> Lam x i (quote (l + 1) (vinst b (VVar l)))
-  VPi x i t b -> Pi x i (quote l t) (quote (l + 1) (vinst b (VVar l)))
-  VLamLvl x b -> LamLvl x (quote (l + 1) (vinstLevel b (vFinLevelVar l)))
-  VPiLvl x b -> PiLvl x (quote (l + 1) (vinstLevel b (vFinLevelVar l)))
-  VPair a b -> Pair (quote l a) (quote l b)
-  VSigma x t b -> Sigma x (quote l t) (quote (l + 1) (vinst b (VVar l)))
-  VType i -> Type (quoteLevel l i)
+quote = quoteWith KeepGlobals
 
 nf :: Tm -> Tm
-nf = quote 0 . eval []
+nf = quoteWith Full 0 . eval []
 
 -- conv
 eqvProj :: ProjType -> ProjType -> Bool

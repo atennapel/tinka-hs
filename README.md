@@ -38,7 +38,7 @@ TODO:
   - [x] elaboration
   - [x] primitives
   - [x] holes
-  - [ ] globals
+  - [x] globals
 - [ ] REPL
 - [ ] definitions
 - [ ] modules

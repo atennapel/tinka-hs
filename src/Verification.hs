@@ -10,6 +10,7 @@ import Val
 import Evaluation
 import Ctx
 import Errors (Error(VerifyError), throwUnless)
+import Globals
 
 check :: Ctx -> Tm -> VTy -> IO ()
 check ctx tm ty = do
@@ -54,6 +55,10 @@ infer ctx = \case
       Just (Just ty) -> return ty
       Nothing -> throwIO $ VerifyError $ "undefined var " ++ show t
       Just Nothing -> throwIO $ VerifyError $ "variable referes to universe level variable: " ++ show t
+  t@(Global x) ->
+    case getGlobal x of
+      Just e -> return $ gTy e
+      Nothing -> throwIO $ VerifyError $ "undefined global " ++ show t
   Prim (Left x) -> return $ primType x
   Prim (Right x) -> return $ primElimType x
   Type Omega -> return $ VType VOmega1
