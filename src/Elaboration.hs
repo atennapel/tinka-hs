@@ -1,4 +1,4 @@
-module Elaboration (elaborate) where
+module Elaboration (elaborate, elaborateDecls) where
 
 import Control.Exception (throwIO)
 import Data.Bifunctor (first)
@@ -193,3 +193,26 @@ elaborate ctx tm = do
   ty' <- verify ctx tm
   throwUnless (ty == ty') $ ElaborateError $ "elaborated type did not match verified type: " ++ show ty ++ " ~ " ++ show ty'
   return (tm, ty)
+
+elaborateDef :: Maybe String -> Name -> Maybe STy -> STm -> IO GlobalEntry
+elaborateDef mod x ty tm =
+  case getGlobal x of
+    Just e | x /= "_" ->
+      error $ "cannot redefine global " ++ maybe "" (++ ".") (gModule e) ++ x ++ " as " ++ maybe "" (++ ".") mod ++ x
+    _ -> do
+      (etm, ety) <- elaborate empty (SLet x ty tm (SVar x))
+      return $ GlobalEntry x (eval [] ety) (eval [] etm) ety etm mod
+
+elaborateDecl :: Maybe String -> Decl -> IO Decls
+elaborateDecl _ (Import x) = return []
+elaborateDecl mod d@(Def x ty tm) = do
+  entry <- elaborateDef mod x ty tm
+  addGlobal entry
+  return [d]
+
+elaborateDecls :: Maybe String -> Decls -> IO Decls
+elaborateDecls mod [] = return []
+elaborateDecls mod (hd : tl) = do
+  ds <- elaborateDecl mod hd
+  nextds <- elaborateDecls mod tl
+  return (ds ++ nextds)

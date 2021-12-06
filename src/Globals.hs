@@ -5,11 +5,15 @@ import GHC.IO.Unsafe (unsafeDupablePerformIO)
 
 import Common
 import Val
+import Core
 
 data GlobalEntry = GlobalEntry {
   gName :: Name,
   gTy :: VTy,
-  gVal :: Val
+  gVal :: Val,
+  gCoreTy :: Ty,
+  gCoreVal :: Tm,
+  gModule :: Maybe String
 }
 
 type GlobalCtx = [GlobalEntry]

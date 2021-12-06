@@ -1,4 +1,4 @@
-module Parser (parseStr, parseStrIO, parseStdin) where
+module Parser (parseStr, parseStrIO, parseStdin, parseStdinDecls, parseStrDeclsIO) where
 
 import Control.Applicative hiding (many, some)
 import Control.Monad
@@ -298,4 +298,58 @@ parseStdin :: IO (STm, String)
 parseStdin = do
   src <- getContents
   t <- parseStr src
+  pure (t, src)
+
+pDef :: Parser [Decl]
+pDef = do
+  x <- pBinder
+  a <- optional (do
+    symbol ":"
+    pSurface)
+  symbol "="
+  body <- pSurface
+  return [Def x a body]
+
+pImport :: Parser [Decl]
+pImport = do
+  symbol "import"
+  names <- many (lexeme $ takeWhile1P Nothing (\x -> isAlphaNum x || x == '/' || x == '\\' || x == '.'))
+  return $ Import <$> names
+
+pDecl :: Parser [Decl]
+pDecl = pImport <|> pDef
+
+pDecls :: Parser Decls
+pDecls = do
+  ws
+  ds <- pDecl
+  ws
+  symbol ";"
+  ws
+  dsrest <- pDecls <|> ([] <$ eof)
+  return (ds ++ dsrest)
+
+parseStrDecls :: String -> IO Decls
+parseStrDecls src =
+  case parse pDecls "(stdin)" src of
+    Left e -> do
+      putStrLn $ errorBundlePretty e
+      exitFailure
+    Right t ->
+      pure t
+
+parseStrDeclsEither :: String -> Either String Decls
+parseStrDeclsEither src = case parse pDecls "(stdin)" src of
+  Left e -> Left (errorBundlePretty e)
+  Right t -> return t
+
+parseStrDeclsIO :: String -> IO Decls
+parseStrDeclsIO src = case parseStrDeclsEither src of
+  Left e -> error e
+  Right t -> return t
+
+parseStdinDecls :: IO (Decls, String)
+parseStdinDecls = do
+  src <- getContents
+  t <- parseStrDecls src
   pure (t, src)

@@ -181,3 +181,31 @@ instance Show STm where
   show (SLet x Nothing v b) = "let " ++ x ++ " = " ++ show v ++ "; " ++ show b
   show (SType (SLNat 0)) = "Type"
   show (SType l) = "Type " ++ showSLevelS l
+
+data Decl
+  = Def Name (Maybe STy) STm
+  | Import String
+
+instance Show Decl where
+  show (Def x (Just ty) tm) = x ++ " : " ++ show ty ++ " = " ++ show tm
+  show (Def x Nothing tm) = x ++ " = " ++ show tm
+  show (Import x) = "import " ++ x
+
+type Decls = [Decl]
+
+showDecls :: Decls -> String
+showDecls [] = ""
+showDecls (hd : tl) = show hd ++ "\n" ++ showDecls tl
+
+declNames :: Decls -> [String]
+declNames [] = []
+declNames (Def x _ _ : t) = x : declNames t
+declNames (_ : t) = declNames t
+
+countNames :: Decls -> Int
+countNames = length . declNames
+
+imports :: Decls -> [String]
+imports [] = []
+imports (Import x : t) = x : imports t
+imports (_ : t) = imports t

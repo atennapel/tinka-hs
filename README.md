@@ -39,8 +39,7 @@ TODO:
   - [x] primitives
   - [x] holes
   - [x] globals
-- [ ] REPL
-- [ ] definitions
+- [x] definitions
 - [ ] modules
 - [ ] metas
   - [ ] unification
@@ -56,3 +55,5 @@ TODO:
 - [ ] add more syntax
   - [ ] if syntax
   - [ ] equality syntax
+- [ ] improve error message
+  - [ ] use source position
