@@ -32,9 +32,13 @@ data Tm
   | Sigma Name Tm Tm
   | Let Name Ty Tm Tm
   | Type Level
+  deriving (Eq)
 
 showTmS :: Tm -> String
 showTmS t@(Var _) = show t
+showTmS t@(Pair _ _) = show t
+showTmS t@(Global _) = show t
+showTmS t@(Prim _) = show t
 showTmS t@(Type (FinLevel FLZ)) = show t
 showTmS t = "(" ++ show t ++ ")"
 

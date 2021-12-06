@@ -106,7 +106,7 @@ infer ctx = \case
         _ -> throwIO $ VerifyError $ "verify: not a sigma type in " ++ show s ++ ", got " ++ showV ctx ty
   tm -> throwIO $ VerifyError $ "cannot infer: " ++ show tm
 
-verify :: Tm -> IO Tm
-verify tm = do
-  ty <- infer empty tm
-  return $ quote 0 ty
+verify :: Ctx -> Tm -> IO Tm
+verify ctx tm = do
+  ty <- infer ctx tm
+  return $ quoteCtx ctx ty

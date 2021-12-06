@@ -13,6 +13,7 @@ import Ctx
 import Errors (Error(ElaborateError), throwUnless)
 import Surface
 import Prims
+import Verification
 
 checkOrInfer :: Ctx -> STm -> Maybe STm -> IO (Tm, Tm, Val)
 checkOrInfer ctx v Nothing = do
@@ -181,4 +182,7 @@ infer ctx tm = do
 elaborate :: Ctx -> STm -> IO (Tm, Ty)
 elaborate ctx tm = do
   (tm, vty) <- infer ctx tm
-  return (tm, quoteCtx ctx vty)
+  let ty = quoteCtx ctx vty
+  ty' <- verify ctx tm
+  throwUnless (ty == ty') $ ElaborateError $ "elaborated type did not match verified type: " ++ show ty ++ " ~ " ++ show ty'
+  return (tm, ty)

@@ -10,6 +10,7 @@ data FinLevel
   | FLZ
   | FLS FinLevel
   | FLMax FinLevel FinLevel
+  deriving (Eq)
 
 showFinLevelS :: FinLevel -> String
 showFinLevelS l@FLZ = show l
@@ -25,10 +26,11 @@ instance Show FinLevel where
 flmax :: FinLevel -> FinLevel -> FinLevel
 flmax FLZ x = x
 flmax x FLZ = x
-flmax (FLS x) (FLS y) = flmax x y
+flmax (FLS x) (FLS y) = FLS (flmax x y)
 flmax x y = FLMax x y
 
 data Level = Omega | Omega1 | FinLevel FinLevel
+  deriving (Eq)
 
 showLevelS :: Level -> String
 showLevelS l@Omega = show l

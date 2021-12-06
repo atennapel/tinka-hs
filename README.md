@@ -42,8 +42,6 @@ TODO:
 - [ ] REPL
 - [ ] definitions
 - [ ] modules
-- [ ] sigmas
-- [ ] primitives
 - [ ] metas
   - [ ] unification
   - [ ] holes
@@ -55,6 +53,6 @@ TODO:
 - [ ] update unification
   - [ ] pruning
   - [ ] postponing
-
-BUGS:
-- `\<l>. Lift <l> <S l>`
+- [ ] add more syntax
+  - [ ] if syntax
+  - [ ] equality syntax
