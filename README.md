@@ -40,7 +40,7 @@ TODO:
   - [x] holes
   - [x] globals
 - [x] definitions
-- [ ] modules
+- [x] modules
 - [ ] metas
   - [ ] unification
   - [ ] holes
@@ -49,6 +49,7 @@ TODO:
   - [ ] update syntax
   - [ ] update elaboration
 - [ ] level metas
+- [ ] descriptions
 - [ ] update unification
   - [ ] pruning
   - [ ] postponing

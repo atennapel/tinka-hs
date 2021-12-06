@@ -15,6 +15,7 @@ import Parser
 import Core
 import Evaluation
 import Globals
+import Modules
 
 main :: IO ()
 main = do
@@ -65,11 +66,11 @@ repl = do
     decls | ":let " `isPrefixOf` decls || ":import " `isPrefixOf` decls -> try $ do
       let prefixN = if ":let " `isPrefixOf` decls then 5 else 1
       ds <- parseStrDeclsIO (drop prefixN decls)
-      -- let xs = imports ds
-      -- ids <- loadModules xs
+      let xs = imports ds
+      ids <- loadModules xs
       nds <- elaborateDecls Nothing ds
       gs <- getGlobals
-      putStrLn $ showElabDecls $ take (countNames nds{- + countNames ids -}) gs
+      putStrLn $ showElabDecls $ take (countNames nds + countNames ids) gs
     ":globals" -> do
       gs <- getGlobals
       putStrLn $ showElabDecls gs
@@ -111,8 +112,8 @@ elab getSurface = do
 elabDecls :: IO (Decls, String) -> IO ()
 elabDecls getDecls = do
   (ds, file) <- getDecls
-  -- let xs = imports ds
-  -- ids <- loadModules xs
+  let xs = imports ds
+  ids <- loadModules xs
   elaborateDecls Nothing ds
   return ()
 
