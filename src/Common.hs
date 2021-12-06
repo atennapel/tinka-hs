@@ -2,6 +2,7 @@ module Common where
 
 import Data.Coerce (coerce)
 
+newtype MetaVar = MetaVar { unMetaVar :: Int } deriving (Eq, Show, Num, Ord) via Int
 newtype Ix = Ix Int deriving (Eq, Show, Ord, Num) via Int
 newtype Lvl = Lvl Int deriving (Eq, Show, Ord, Num) via Int
 
@@ -15,3 +16,7 @@ data Icit = Impl | Expl deriving (Show, Eq)
 icit :: Icit -> a -> a -> a
 icit Impl a _ = a
 icit Expl _ b = b
+
+onlyIf :: Bool -> IO () -> IO ()
+onlyIf True action = action
+onlyIf False _ = return ()

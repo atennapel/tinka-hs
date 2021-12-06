@@ -10,12 +10,9 @@ import Levels
 import Val
 import Prims
 import Globals
+import Metas
 
 -- eval
-force :: Val -> Val
-force (VGlobal _ _ v) = force v
-force v = v
-
 vinst :: Clos Val -> Val -> Val
 vinst (Clos e t) v = eval (Right v : e) t
 vinst (Fun f) v = f v
@@ -48,6 +45,21 @@ vappLevel (VLamLvl _ b) v = vinstLevel b v
 vappLevel (VNe h sp) v = VNe h (EAppLvl v : sp)
 vappLevel (VGlobal x sp w) v = VGlobal x (EAppLvl v : sp) (vappLevel w v)
 vappLevel _ _ = undefined
+
+velim :: Val -> Elim -> Val
+velim v (EApp a i) = vapp v a i
+velim v (EAppLvl a) = vappLevel v a
+velim v (EProj p) = vproj v p
+velim v (EPrimElim x as) = vprimelim x as v
+
+velimSp :: Val -> Sp -> Val
+velimSp v [] = v
+velimSp v (e : as) = velim (velimSp v as) e
+
+force :: Val -> Val
+force (VNe (HMeta m) sp) | Solved t _ <- lookupMeta m = force (velimSp t sp)
+force (VGlobal _ _ v) = force v
+force v = v
 
 vproj :: Val -> ProjType -> Val
 vproj (VPair a b) Fst = a
@@ -87,6 +99,20 @@ vprim PLiftTerm =
   vlamlvl "l" $ \l -> vlamlvl "k" $ \k -> vlamimpl "A" $ \a -> vlam "x" $ \x -> vliftterm l k a x
 vprim x = VNe (HPrim x) []
 
+vmeta :: MetaVar -> Val
+vmeta m = case lookupMeta m of
+  Solved v _ -> v
+  Unsolved -> VMeta m
+
+vinsertedmeta :: Env -> MetaVar -> [Maybe Icit] -> Val
+vinsertedmeta env m bds = go env bds
+  where
+    go [] [] = vmeta m
+    go (Right t : env) (Just i : bds) = vapp (go env bds) t i
+    go (Left l : env) (Just i : bds) = vappLevel (go env bds) l
+    go (_ : env) (Nothing : bds) = go env bds
+    go _ _ = undefined
+
 eval :: Env -> Tm -> Val
 eval e = \case
   Var i -> fromRight undefined (e !! coerce i)
@@ -107,6 +133,8 @@ eval e = \case
   Sigma x t b -> VSigma x (eval e t) (Clos e b)
   Let x _ v b -> eval (Right (eval e v) : e) b
   Type l -> VType (level e l)
+  Meta m -> vmeta m
+  InsertedMeta m bds -> vinsertedmeta e m bds
 
 evalprimelim :: PrimElimName -> Val
 evalprimelim PEAbsurd =
@@ -157,6 +185,7 @@ quoteLevel l = \case
 quoteHead :: Lvl -> Head -> Tm
 quoteHead l (HVar k) = Var (lvlToIx l k)
 quoteHead k (HPrim x) = Prim (Left x)
+quoteHead k (HMeta x) = Meta x
 
 quoteElim :: QuoteLevel -> Lvl -> Elim -> Tm -> Tm
 quoteElim ql l (EApp v i) t = App t (quoteWith ql l v) i

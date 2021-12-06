@@ -10,6 +10,7 @@ import Core
 import Val
 import Evaluation
 import Surface
+import Zonking
 
 data BinderEntry = BinderEntry {
   bName :: Name,
@@ -24,26 +25,27 @@ data Ctx = Ctx {
   lvl :: Lvl,
   env :: Env,
   binders :: Binders,
+  bds :: [Maybe Icit],
   pos :: Maybe SourcePos
 }
 
 empty :: Ctx
-empty = Ctx 0 [] [] Nothing
+empty = Ctx 0 [] [] [] Nothing
 
 define :: Name -> VTy -> Val -> Ctx -> Ctx
-define x t v (Ctx l e b pos) = Ctx (l + 1) (Right v : e) (BinderEntry x Expl False (Just t) : b) pos
+define x t v (Ctx l e b bds pos) = Ctx (l + 1) (Right v : e) (BinderEntry x Expl False (Just t) : b) (Nothing : bds) pos
 
 bind :: Name -> Icit -> VTy -> Ctx -> Ctx
-bind x i t (Ctx l e b pos) = Ctx (l + 1) (Right (VVar l) : e) (BinderEntry x i False (Just t) : b) pos
+bind x i t (Ctx l e b bds pos) = Ctx (l + 1) (Right (VVar l) : e) (BinderEntry x i False (Just t) : b) (Just i : bds) pos
 
 bindInsert :: Name -> Icit -> VTy -> Ctx -> Ctx
-bindInsert x i t (Ctx l e b pos) = Ctx (l + 1) (Right (VVar l) : e) (BinderEntry x i True (Just t) : b) pos
+bindInsert x i t (Ctx l e b bds pos) = Ctx (l + 1) (Right (VVar l) : e) (BinderEntry x i True (Just t) : b) (Just i : bds) pos
 
 bindLevel :: Name -> Ctx -> Ctx
-bindLevel x (Ctx l e b pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) (BinderEntry x Impl False Nothing : b) pos
+bindLevel x (Ctx l e b bds pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) (BinderEntry x Impl False Nothing : b) (Just Expl : bds) pos
 
 bindLevelInsert :: Name -> Ctx -> Ctx
-bindLevelInsert x (Ctx l e b pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) (BinderEntry x Impl True Nothing : b) pos
+bindLevelInsert x (Ctx l e b bds pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) (BinderEntry x Impl True Nothing : b) (Just Expl : bds) pos
 
 enter :: SourcePos -> Ctx -> Ctx
 enter p ctx = ctx { pos = Just p }
@@ -73,11 +75,17 @@ closeLevel ctx v = Clos (env ctx) (quote (lvl ctx + 1) v)
 showV :: Ctx -> Val -> String
 showV ctx v = showC ctx (quote (lvl ctx) v)
 
+showVZ :: Ctx -> Val -> String
+showVZ ctx v = showC ctx (zonkCtx ctx $ quote (lvl ctx) v)
+
 names :: Ctx -> [Name]
 names ctx = map bName (binders ctx)
 
 showC :: Ctx -> Tm -> String
 showC ctx tm = prettyCore (names ctx) tm
+
+showCZ :: Ctx -> Tm -> String
+showCZ ctx tm = prettyCore (names ctx) (zonkCtx ctx tm)
 
 evalCtx :: Ctx -> Tm -> Val
 evalCtx ctx tm = eval (env ctx) tm
@@ -87,6 +95,9 @@ finLevelCtx ctx l = finLevel (env ctx) l
 
 quoteCtx :: Ctx -> Val -> Tm
 quoteCtx ctx v = quote (lvl ctx) v
+
+zonkCtx :: Ctx -> Tm -> Tm
+zonkCtx ctx = zonk (lvl ctx) (env ctx)
 
 prettyCore :: [Name] -> Tm -> String
 prettyCore ns tm = show (go ns tm)
@@ -114,6 +125,8 @@ prettyCore ns tm = show (go ns tm)
       Type Omega -> SVar "Type omega"
       Type Omega1 -> SVar "Type omega1"
       Type (FinLevel l) -> SType (finLevelToSurface ns l)
+      Meta m -> SVar $ "?" ++ show m
+      InsertedMeta m _ -> SVar $ "?*" ++ show m
 
 finLevelToSurface :: [Name] -> FinLevel -> SLevel
 finLevelToSurface ns (FLVar i) = SLVar (ns !! coerce i)
@@ -131,7 +144,7 @@ prettyFinLevelCtx :: Ctx -> FinLevel -> String
 prettyFinLevelCtx ctx l = prettyFinLevel (names ctx) l
 
 instance Show Ctx where
-  show ctx@(Ctx l env bs _) =
+  show ctx@(Ctx l env bs _ _) =
     let vs = zipWith var bs env in
     intercalate "\n" (map showVar vs)
     where
@@ -142,8 +155,8 @@ instance Show Ctx where
 
       showVar :: (Name, Icit, Either VFinLevel (VTy, Val)) -> String
       showVar (x, _, Left l') = "<" ++ x ++ ">" ++ showValue x (prettyFinLevelCtx ctx (quoteFinLevel l l'))
-      showVar (x, Expl, Right (ty, v)) = x ++ " : " ++ showV ctx ty ++ showValue x (showV ctx v)
-      showVar (x, Impl, Right (ty, v)) = "{" ++ x ++ "} : " ++ showV ctx ty ++ showValue x (showV ctx v)
+      showVar (x, Expl, Right (ty, v)) = x ++ " : " ++ showVZ ctx ty ++ showValue x (showVZ ctx v)
+      showVar (x, Impl, Right (ty, v)) = "{" ++ x ++ "} : " ++ showVZ ctx ty ++ showValue x (showVZ ctx v)
 
       showValue :: Name -> String -> String
       showValue x v | x == v = ""

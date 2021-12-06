@@ -32,6 +32,8 @@ data Tm
   | Sigma Name Tm Tm
   | Let Name Ty Tm Tm
   | Type Level
+  | Meta MetaVar
+  | InsertedMeta MetaVar [Maybe Icit]
   deriving (Eq)
 
 showTmS :: Tm -> String
@@ -152,3 +154,5 @@ instance Show Tm where
   show (Let x t v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (Type (FinLevel FLZ)) = "Type"
   show (Type l) = "Type " ++ showLevelS l
+  show (Meta m) = "?" ++ show m
+  show (InsertedMeta m _) = "?*" ++ show m

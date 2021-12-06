@@ -41,14 +41,14 @@ TODO:
   - [x] globals
 - [x] definitions
 - [x] modules
-- [ ] metas
-  - [ ] unification
-  - [ ] holes
-  - [ ] zonking
-- [ ] implicit functions
-  - [ ] update syntax
-  - [ ] update elaboration
+- [x] metas
+  - [x] unification
+  - [x] zonking
+  - [x] update elaboration
+  - [x] named holes
+  - [x] implicit functions
 - [ ] level metas
+  - [ ] lam and app with level renaming
 - [ ] descriptions
 - [ ] update unification
   - [ ] pruning

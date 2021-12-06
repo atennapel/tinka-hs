@@ -14,7 +14,7 @@ data Clos v
   = Clos Env Tm
   | Fun (v -> Val)
 
-data Head = HVar Lvl | HPrim PrimName
+data Head = HVar Lvl | HPrim PrimName | HMeta MetaVar
   deriving (Eq)
 
 data Elim
@@ -36,6 +36,8 @@ data Val
 
 pattern VTypeFin l = VType (VFinLevel l)
 pattern VVar l = VNe (HVar l) []
+pattern VMeta m = VNe (HMeta m) []
+
 pattern VVoid = VNe (HPrim PVoid) []
 pattern VUnitType = VNe (HPrim PUnitType) []
 pattern VUnit = VNe (HPrim PUnit) []
