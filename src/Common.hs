@@ -3,6 +3,7 @@ module Common where
 import Data.Coerce (coerce)
 
 newtype MetaVar = MetaVar { unMetaVar :: Int } deriving (Eq, Show, Num, Ord) via Int
+newtype LMetaVar = LMetaVar { unLMetaVar :: Int } deriving (Eq, Show, Num, Ord) via Int
 newtype Ix = Ix Int deriving (Eq, Show, Ord, Num) via Int
 newtype Lvl = Lvl Int deriving (Eq, Show, Ord, Num) via Int
 

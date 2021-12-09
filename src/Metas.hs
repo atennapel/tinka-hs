@@ -3,10 +3,12 @@ module Metas where
 import System.IO.Unsafe
 import Data.IORef
 import qualified Data.IntMap as IM
+import qualified Data.Set as S
 
 import Common
 import Core
 import Val
+import Levels
 
 data MetaEntry = Solved Val Tm | Unsolved
 
@@ -52,7 +54,54 @@ lookupMeta (MetaVar m) = unsafeDupablePerformIO $ do
     Just e  -> pure e
     Nothing -> error "impossible"
 
+-- level metas
+data LMetaEntry = LSolved VFinLevel FinLevel | LUnsolved (S.Set Lvl)
+
+type LMetaMap = IM.IntMap LMetaEntry
+
+nextLMeta :: IORef Int
+nextLMeta = unsafeDupablePerformIO $ newIORef 0
+{-# noinline nextLMeta #-}
+
+lmctx :: IORef LMetaMap
+lmctx = unsafeDupablePerformIO $ newIORef mempty
+{-# noinline lmctx #-}
+
+getLMetas :: IO LMetaMap
+getLMetas = readIORef lmctx
+
+isLSolved :: LMetaEntry -> Bool
+isLSolved (LSolved {}) = True
+isLSolved _ = False
+
+allLSolved :: IO Bool
+allLSolved = do
+  ms <- getLMetas
+  return $ all isLSolved $ IM.elems ms
+
+writeLMeta :: LMetaVar -> LMetaEntry -> IO ()
+writeLMeta (LMetaVar m) e = modifyIORef lmctx $ IM.insert m e
+
+solveLMeta :: LMetaVar -> VFinLevel -> FinLevel -> IO ()
+solveLMeta m v c = writeLMeta m (LSolved v c)
+
+newLMeta :: S.Set Lvl -> IO LMetaVar
+newLMeta scope = do
+  m <- readIORef nextLMeta
+  writeIORef nextLMeta $! m + 1
+  modifyIORef lmctx $ IM.insert m (LUnsolved scope)
+  return $ LMetaVar m
+
+lookupLMeta :: LMetaVar -> LMetaEntry
+lookupLMeta (LMetaVar m) = unsafeDupablePerformIO $ do
+  ms <- readIORef lmctx
+  case IM.lookup m ms of
+    Just e  -> pure e
+    Nothing -> error "impossible"
+
 resetMetas :: IO ()
 resetMetas = do
   writeIORef nextMeta 0
   writeIORef mctx mempty
+  writeIORef nextLMeta 0
+  writeIORef lmctx mempty

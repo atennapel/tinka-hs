@@ -47,6 +47,7 @@ checkFinLevel ctx = \case
   FLZ -> return ()
   FLS l -> checkFinLevel ctx l
   FLMax a b -> checkFinLevel ctx a >> checkFinLevel ctx b
+  FLMeta m -> throwIO $ VerifyError $ "meta found ?l" ++ show m
 
 infer :: Ctx -> Tm -> IO VTy
 infer ctx = \case

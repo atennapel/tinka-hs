@@ -44,6 +44,11 @@ freshMeta ctx = do
   m <- newMeta
   return $ InsertedMeta m (bds ctx)
 
+freshLMeta :: Ctx -> IO FinLevel
+freshLMeta ctx = do
+  m <- newLMeta (levelVars ctx)
+  return $ FLMeta m
+
 insert' :: Ctx -> IO (Tm, Val) -> IO (Tm, Val)
 insert' ctx act = go =<< act where
   go (t, va) = case force va of
@@ -51,6 +56,19 @@ insert' ctx act = go =<< act where
       m <- freshMeta ctx
       let mv = eval (env ctx) m
       go (App t m Impl, vinst b mv)
+    VPiLvl x b -> do
+      m <- freshLMeta ctx
+      let mv = finLevel (env ctx) m
+      go (AppLvl t m, vinstLevel b mv)
+    va -> pure (t, va)
+
+insertLvl :: Ctx -> IO (Tm, Val) -> IO (Tm, Val)
+insertLvl ctx act = go =<< act where
+  go (t, va) = case force va of
+    VPiLvl x b -> do
+      m <- freshLMeta ctx
+      let mv = finLevel (env ctx) m
+      go (AppLvl t m, vinstLevel b mv)
     va -> pure (t, va)
 
 insert :: Ctx -> IO (Tm, Val) -> IO (Tm, Val)
@@ -68,6 +86,10 @@ insertUntilName ctx name act = go =<< act where
         m <- freshMeta ctx
         let mv = eval (env ctx) m
         go (App t m Impl, vinst b mv)
+    VPiLvl x b -> do
+      m <- freshLMeta ctx
+      let mv = finLevel (env ctx) m
+      go (AppLvl t m, vinstLevel b mv)
     _ -> error $ "name " ++ name ++ " not found in pi"
 
 checkOrInfer :: Ctx -> STm -> Maybe STm -> IO (Tm, Tm, Val)
@@ -83,7 +105,7 @@ checkOrInfer ctx v (Just t) = do
 check :: Ctx -> STm -> VTy -> IO Tm
 check ctx tm ty = do
   let fty = force ty
-  -- putStrLn $ "check " ++ show tm ++ " : " ++ showV ctx ty
+  putStrLn $ "check " ++ show tm ++ " : " ++ showV ctx ty
   case (tm, fty) of
     (SPos p tm, _) -> check (enter p ctx) tm ty
     (SHole x, _) -> do
@@ -139,7 +161,7 @@ checkFinLevel ctx = \case
 
 infer :: Ctx -> STm -> IO (Tm, VTy)
 infer ctx tm = do
-  -- putStrLn $ "infer " ++ show tm
+  putStrLn $ "infer " ++ show tm
   case tm of
     SPos p t -> infer (enter p ctx) t
     t@(SVar x) ->
@@ -187,7 +209,7 @@ infer ctx tm = do
           (t, tty) <- insertUntilName ctx name $ infer ctx f
           return (Impl, t, tty)
         Right Impl -> do
-          (t, tty) <- infer ctx f
+          (t, tty) <- insertLvl ctx $ infer ctx f
           return (Impl, t, tty)
         Right Expl -> do
           (t, tty) <- insert' ctx $ infer ctx f
@@ -288,6 +310,8 @@ elaborate ctx tm = do
   throwUnless (null hs) $ ElaborateError $ "\nholes found:\n" ++ showCZ ctx tm ++ "\n" ++ showCZ ctx ty ++ "\nholes: " ++ show (map fst $ reverse hs)
   solved <- allSolved
   throwUnless solved $ ElaborateError $ "not all metas are solved:\n" ++ showC ctx tm ++ "\n" ++ showC ctx ty
+  solvedL <- allLSolved
+  throwUnless solvedL $ ElaborateError $ "not all level metas are solved" 
   ty' <- verify ctx tm
   throwUnless (ty == ty') $ ElaborateError $ "elaborated type did not match verified type: " ++ show ty ++ " ~ " ++ show ty'
   return (tm, ty)

@@ -3,6 +3,7 @@ module Ctx where
 import Data.Coerce (coerce)
 import Text.Megaparsec (SourcePos)
 import Data.List (intercalate)
+import qualified Data.Set as S
 
 import Common
 import Levels
@@ -65,6 +66,13 @@ lookupCtx ctx x = go (binders ctx) 0
     go [] _ = Nothing
     go (BinderEntry y _ False mty : _) i | x == y = Just (Ix i, mty)
     go (_ : bs) i = go bs (i + 1)
+
+levelVars :: Ctx -> S.Set Lvl
+levelVars ctx = S.fromList $ levels 0 $ binders ctx
+  where
+    levels i (BinderEntry _ _ _ Nothing : rest) = (lvl ctx - i - 1) : levels (i + 1) rest
+    levels i (_ : rest) = levels (i + 1) rest
+    levels i [] = []
 
 closeVal :: Ctx -> Val -> Clos Val
 closeVal ctx v = Clos (env ctx) (quote (lvl ctx + 1) v)
@@ -136,6 +144,7 @@ finLevelToSurface ns (FLS l) =
     SLNat i -> SLNat (i + 1)
     l -> SLS l
 finLevelToSurface ns (FLMax a b) = SLMax (finLevelToSurface ns a) (finLevelToSurface ns b)
+finLevelToSurface _ (FLMeta m) = SLVar $ "?l" ++ show m
 
 prettyFinLevel :: [Name] -> FinLevel -> String
 prettyFinLevel ns l = show (finLevelToSurface ns l)

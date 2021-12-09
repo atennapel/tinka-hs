@@ -27,6 +27,7 @@ finLevel e = \case
   FLS i -> addToVFinLevel 1 (finLevel e i)
   FLMax i j -> finLevel e i <> finLevel e j
   FLVar i -> fromLeft undefined (e !! coerce i)
+  FLMeta m -> vFinMeta m
 
 level :: Env -> Level -> VLevel
 level e = \case
@@ -170,7 +171,7 @@ evalprimelim PEElimHEq =
 data QuoteLevel = Full | KeepGlobals
 
 quoteFinLevel :: Lvl -> VFinLevel -> FinLevel
-quoteFinLevel l (VFL n xs) =
+quoteFinLevel l (VFL n xs ys) =
   M.foldlWithKey
     (\i x n -> flmax i (addToFinLevel n (FLVar (lvlToIx l (Lvl x)))))
     (addToFinLevel n FLZ)

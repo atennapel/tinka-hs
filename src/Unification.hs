@@ -36,10 +36,10 @@ invert gamma sp = do
         VVar (Lvl x) | IM.notMember x ren -> return (dom + 1, IM.insert x dom ren)
         VVar x -> throwIO $ UnifyError $ "duplicate var in spine: " ++ show x
         _ -> throwIO $ UnifyError $ "non-var application in spine"
-    go (EAppLvl (VFL 0 xs) : sp) = do
+    go (EAppLvl (VFL 0 xs ys) : sp) = do
       (dom, ren) <- go sp
       let lvls = IM.keys xs
-      if length lvls == 1 then do
+      if IM.null ys && length lvls == 1 then do
         let x = head lvls
         if IM.notMember x ren then
           return (dom + 1, IM.insert x dom ren)
@@ -58,7 +58,7 @@ rename m pren v = go pren v
       Just x' -> return $ lvlToIx (dom pren) x'
 
     goFinLevel :: PR -> VFinLevel -> IO FinLevel
-    goFinLevel pren (VFL n xs) =
+    goFinLevel pren (VFL n xs ys) =
       IM.foldlWithKey
         (\i x n -> do
           i' <- i
@@ -134,11 +134,12 @@ solve gamma m sp rhs = do
 
 unifyElim :: Lvl -> Elim -> Elim -> IO ()
 unifyElim k (EApp v _) (EApp v' _) = unify k v v'
+unifyElim k (EAppLvl l) (EAppLvl l') = unifyFinLevel k l l'
 unifyElim k (EProj p) (EProj p') | eqvProj p p' = return ()
 unifyElim k (EPrimElim x1 as1) (EPrimElim x2 as2) | x1 == x2 =
   zipWithM_ (go k) as1 as2
   where
-    go _ (Left l) (Left l') | l == l' = return ()
+    go _ (Left l) (Left l') = unifyFinLevel k l l'
     go k (Right (v, _)) (Right (v', _)) = unify k v v'
     go _ _ _ = throwIO $ UnifyError $ "prim elim spine mismatch: " ++ show x1
 unifyElim k _ _ = throwIO $ UnifyError $ "elim mismatch"
@@ -163,7 +164,7 @@ unifyClosLevel l b b' = let v = vFinLevelVar l in unify (l + 1) (vinstLevel b v)
 
 unify :: Lvl -> Val -> Val -> IO ()
 unify l a b = case (a, b) of
-  (VType i, VType i') | i == i' -> return ()
+  (VType i, VType i') -> unifyLevel l i i'
 
   (VPi _ i t b, VPi _ i' t' b') | i == i' -> unify l t t' >> unifyClos l b b'
   (VPiLvl _ b, VPiLvl _ b') -> unifyClosLevel l b b'
@@ -197,3 +198,13 @@ unify l a b = case (a, b) of
   (VGlobal _ _ v, v') -> unify l v v'
   (v, VGlobal _ _ v') -> unify l v v'
   _ -> throwIO $ UnifyError $ "failed to unify " ++ show (quote l a) ++ " ~ " ++ show (quote l b)
+
+unifyFinLevel :: Lvl -> VFinLevel -> VFinLevel -> IO ()
+unifyFinLevel l a b | a == b = return ()
+unifyFinLevel l a b = throwIO $ UnifyError $ "failed to unify " ++ show (quoteFinLevel l a) ++ " ~ " ++ show (quoteFinLevel l b)
+
+unifyLevel :: Lvl -> VLevel -> VLevel -> IO ()
+unifyLevel l VOmega1 VOmega1 = return ()
+unifyLevel l VOmega VOmega = return ()
+unifyLevel l (VFinLevel f) (VFinLevel f') = unifyFinLevel l f f'
+unifyLevel l a b = throwIO $ UnifyError $ "failed to unify " ++ show (quoteLevel l a) ++ " ~ " ++ show (quoteLevel l b)
