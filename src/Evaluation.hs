@@ -21,6 +21,10 @@ vinstLevel :: Clos VFinLevel -> VFinLevel -> Val
 vinstLevel (Clos e t) v = eval (Left v : e) t
 vinstLevel (Fun f) v = f v
 
+vinstCL :: ClosLvl -> VFinLevel -> VLevel
+vinstCL (ClosLvl e t) v = level (Left v : e) t
+vinstCL (FunLvl f) v = f v
+
 finLevel :: Env -> FinLevel -> VFinLevel
 finLevel e = \case
   FLZ -> mempty
@@ -125,13 +129,13 @@ eval e = \case
   Prim (Right x) -> evalprimelim x
   App a b i -> vapp (eval e a) (eval e b) i
   Lam x i b -> VLam x i (Clos e b)
-  Pi x i t b -> VPi x i (eval e t) (Clos e b)
+  Pi x i t u1 b u2 -> VPi x i (eval e t) (level e u1) (Clos e b) (level e u2)
   AppLvl t l -> vappLevel (eval e t) (finLevel e l)
   LamLvl x b -> VLamLvl x (Clos e b)
-  PiLvl x b -> VPiLvl x (Clos e b)
+  PiLvl x b u -> VPiLvl x (Clos e b) (ClosLvl e u)
   Proj t p -> vproj (eval e t) p
   Pair a b -> VPair (eval e a) (eval e b)
-  Sigma x t b -> VSigma x (eval e t) (Clos e b)
+  Sigma x t u1 b u2 -> VSigma x (eval e t) (level e u1) (Clos e b) (level e u2)
   Let x _ v b -> eval (Right (eval e v) : e) b
   Type l -> VType (level e l)
   Meta m -> vmeta m
@@ -213,11 +217,11 @@ quoteWith ql l = go l
           Full -> go l v
           KeepGlobals -> Global h
       VLam x i b -> Lam x i (go (l + 1) (vinst b (VVar l)))
-      VPi x i t b -> Pi x i (go l t) (go (l + 1) (vinst b (VVar l)))
+      VPi x i t u1 b u2 -> Pi x i (go l t) (quoteLevel l u1) (go (l + 1) (vinst b (VVar l))) (quoteLevel l u2)
       VLamLvl x b -> LamLvl x (go (l + 1) (vinstLevel b (vFinLevelVar l)))
-      VPiLvl x b -> PiLvl x (go (l + 1) (vinstLevel b (vFinLevelVar l)))
+      VPiLvl x b u -> let v = vFinLevelVar l in PiLvl x (go (l + 1) (vinstLevel b v)) (quoteLevel (l + 1) (vinstCL u v))
       VPair a b -> Pair (go l a) (go l b)
-      VSigma x t b -> Sigma x (go l t) (go (l + 1) (vinst b (VVar l)))
+      VSigma x t u1 b u2 -> Sigma x (go l t) (quoteLevel l u1) (go (l + 1) (vinst b (VVar l))) (quoteLevel l u2)
       VType i -> Type (quoteLevel l i)
 
 quote :: Lvl -> Val -> Tm
@@ -266,9 +270,12 @@ conv :: Lvl -> Val -> Val -> Bool
 conv l a b = case (a, b) of
   (VType i, VType i') -> i == i'
 
-  (VPi _ i t b, VPi _ i' t' b') | i == i' -> conv l t t' && convClos l b b'
-  (VPiLvl _ b, VPiLvl _ b') -> convClosLevel l b b'
-  (VSigma _ t b, VSigma _ t' b') -> conv l t t' && convClos l b b'
+  (VPi _ i t u1 b u2, VPi _ i' t' u1' b' u2') | i == i' && u1 == u1' && u2 == u2' ->
+    conv l t t' && convClos l b b'
+  (VPiLvl _ b u, VPiLvl _ b' u') ->
+    let v = vFinLevelVar l in convClosLevel l b b' && vinstCL u v == vinstCL u' v
+  (VSigma _ t u1 b u2, VSigma _ t' u1' b' u2') | u1 == u1' && u2 == u2' ->
+    conv l t t' && convClos l b b'
 
   (VLam _ _ b, VLam _ _ b') -> convClos l b b'
   (VLam _ i b, b') -> let v = VVar l in conv (l + 1) (vinst b v) (vapp b' v i)
@@ -296,39 +303,55 @@ conv l a b = case (a, b) of
   _ -> False
 
 -- prim types
-primType :: PrimName -> Val
-primType PVoid = VType vFLZ
-primType PUnitType = VType vFLZ
-primType PUnit = VUnitType
-primType PBool = VType vFLZ
-primType PTrue = VBool
-primType PFalse = VBool
+primType :: PrimName -> (Val, VLevel)
+primType PVoid = (VType vFLZ, VFinLevel (vFLS mempty))
+primType PUnitType = (VType vFLZ, VFinLevel (vFLS mempty))
+primType PUnit = (VUnitType, VFinLevel mempty)
+primType PBool = (VType vFLZ, VFinLevel (vFLS mempty))
+primType PTrue = (VBool, VFinLevel mempty)
+primType PFalse = (VBool, VFinLevel mempty)
 -- <l k> -> Type l -> Type (max l k)
-primType PLift = vpilvl "l" $ \l -> vpilvl "k" $ \k -> vfun (VTypeFin l) (VTypeFin $ l <> k)
+primType PLift =
+  (vpilvl "l" (const VOmega) $ \l ->
+  vpilvl "k" (\k -> VFinLevel (vFLS (l <> k))) $ \k ->
+  vfun (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS (l <> k))) $
+  VTypeFin $ l <> k, VOmega)
 -- <l k> {A : Type l} -> A -> Lift <l> <k> A
 primType PLiftTerm =
-  vpilvl "l" $ \l -> vpilvl "k" $ \k -> vpimpl "A" (VTypeFin l) $ \a -> vfun a (VLift l k a)
+  (vpilvl "l" (const VOmega) $ \l ->
+  vpilvl "k" (\k -> VFinLevel (vFLS l <> k)) $ \k ->
+  vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (l <> k)) $ \a ->
+  vfun a (VFinLevel l) (VFinLevel (l <> k)) $
+  VLift l k a, VOmega)
 -- <l> {A : Type l} {B : Type l} -> A -> B -> Type l
 primType PHEq =
-  vpilvl "l" $ \l ->
-  vpimpl "A" (VTypeFin l) $ \a ->
-  vpimpl "B" (VTypeFin l) $ \b ->
-  vfun a $
-  vfun b (VTypeFin l)
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \a ->
+  vpimpl "B" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \b ->
+  vfun a (VFinLevel l) (VFinLevel (vFLS l)) $
+  vfun b (VFinLevel l) (VFinLevel (vFLS l)) $
+  VTypeFin l, VOmega)
 -- <l> {A : Type l} {x : A} -> HEq {l} {A} {A} x x
 primType PHRefl =
-  vpilvl "l" $ \l ->
-  vpimpl "A" (VTypeFin l) $ \a ->
-  vpimpl "x" a $ \x ->
-  VHEq l a a x x
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel l) $ \a ->
+  vpimpl "x" a (VFinLevel l) (VFinLevel l) $ \x ->
+  VHEq l a a x x, VOmega)
 
-primElimType :: PrimElimName -> Val
+primElimType :: PrimElimName -> (Val, VLevel)
 -- <l> {A : Type l} -> Void -> A
 primElimType PEAbsurd =
-  vpilvl "l" $ \l -> vpimpl "A" (VTypeFin l) $ \a -> vfun VVoid a
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel l) $ \a ->
+  vfun VVoid vFLZ (VFinLevel l) $
+  a, VOmega)
 -- <l> <k> {A : Type l} -> Lift <l> <k> A -> A
 primElimType PELower =
-  vpilvl "l" $ \l -> vpilvl "k" $ \k -> vpimpl "A" (VTypeFin l) $ \a -> vfun (VLift l k a) a
+  (vpilvl "l" (const VOmega) $ \l ->
+  vpilvl "k" (\k -> VFinLevel (vFLS l <> k)) $ \k ->
+  vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (l <> k)) $ \a ->
+  vfun (VLift l k a) (VFinLevel (l <> k)) (VFinLevel l) $
+  a, VOmega)
 {-
 <l>
 (P : Bool -> Type l)
@@ -338,11 +361,12 @@ primElimType PELower =
 -> P b
 -}
 primElimType PEIndBool =
-  vpilvl "l" $ \l ->
-  vpi "P" (vfun VBool (VTypeFin l)) $ \p ->
-  vfun (vapp p VTrue Expl) $
-  vfun (vapp p VFalse Expl) $
-  vpi "b" VBool $ \b -> vapp p b Expl
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpi "P" (vfun VBool vFLZ (VFinLevel (vFLS l)) (VTypeFin l)) (VFinLevel (vFLS l)) (VFinLevel l) $ \p ->
+  vfun (vapp p VTrue Expl) (VFinLevel l) (VFinLevel l) $
+  vfun (vapp p VFalse Expl) (VFinLevel l) (VFinLevel l) $
+  vpi "b" VBool vFLZ (VFinLevel l) $ \b ->
+  vapp p b Expl, VOmega)
 {-
 <l k>
 {A : Type l}
@@ -354,12 +378,12 @@ primElimType PEIndBool =
 P {y} p
 -}
 primElimType PEElimHEq =
-  vpilvl "l" $ \l ->
-  vpilvl "k" $ \k ->
-  vpimpl "A" (VTypeFin l) $ \a ->
-  vpimpl "x" a $ \x ->
-  vpi "P" (vpimpl "y" a $ \y -> vfun (VHEq l a a x y) $ VTypeFin k) $ \p ->
-  vfun (vapp (vapp p x Impl) (VHRefl l a x) Expl) $
-  vpimpl "y" a $ \y ->
-  vpi "p" (VHEq l a a x y) $ \pp ->
-  vapp (vapp p y Impl) pp Expl
+  (vpilvl "l" (const VOmega) $ \l ->
+  vpilvl "k" (\k -> VFinLevel (vFLS (l <> k))) $ \k ->
+  vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (l <> vFLS k)) $ \a ->
+  vpimpl "x" a (VFinLevel l) (VFinLevel (l <> vFLS k)) $ \x ->
+  vpi "P" (vpimpl "y" a (VFinLevel l) (VFinLevel (l <> vFLS k)) $ \y -> vfun (VHEq l a a x y) (VFinLevel l) (VFinLevel (vFLS k)) $ VTypeFin k) (VFinLevel (vFLS k)) (VFinLevel (l <> k)) $ \p ->
+  vfun (vapp (vapp p x Impl) (VHRefl l a x) Expl) (VFinLevel k) (VFinLevel (l <> k)) $
+  vpimpl "y" a (VFinLevel l) (VFinLevel (l <> k)) $ \y ->
+  vpi "p" (VHEq l a a x y) (VFinLevel l) (VFinLevel k) $ \pp ->
+  vapp (vapp p y Impl) pp Expl, VOmega)

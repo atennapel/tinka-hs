@@ -96,7 +96,7 @@ try a = tryIO a $ \_ -> return ()
 
 elabSurface :: String -> STm -> IO (Tm, Tm)
 elabSurface file t = do
-  (tm, ty) <- elaborate (enter (initialPos file) empty) t
+  (tm, ty, _) <- elaborate (enter (initialPos file) empty) t
   return (tm, ty)
 
 parseAndElabSurface :: String -> String -> IO (Tm, Tm)
@@ -122,7 +122,7 @@ reduceGlobalLet x (Let y _ v (Var 0)) | x == y = v
 reduceGlobalLet _ t = t
 
 showElabDef :: GlobalEntry -> String
-showElabDef (GlobalEntry x _ _ ety etm file) =
+showElabDef (GlobalEntry x _ _ _ ety _ etm file) =
   maybe "" (++ ".") file ++ x ++ " : " ++ showC empty ety ++ " = " ++ showC empty (reduceGlobalLet x etm)
 
 showElabDecls :: GlobalCtx -> String

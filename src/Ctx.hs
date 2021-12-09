@@ -17,7 +17,7 @@ data BinderEntry = BinderEntry {
   bName :: Name,
   bIcit :: Icit,
   bInserted :: Bool,
-  bTy :: Maybe VTy
+  bTy :: Maybe (VTy, VLevel)
 }
 
 type Binders = [BinderEntry]
@@ -33,14 +33,14 @@ data Ctx = Ctx {
 empty :: Ctx
 empty = Ctx 0 [] [] [] Nothing
 
-define :: Name -> VTy -> Val -> Ctx -> Ctx
-define x t v (Ctx l e b bds pos) = Ctx (l + 1) (Right v : e) (BinderEntry x Expl False (Just t) : b) (Nothing : bds) pos
+define :: Name -> VTy -> VLevel -> Val -> Ctx -> Ctx
+define x t u v (Ctx l e b bds pos) = Ctx (l + 1) (Right v : e) (BinderEntry x Expl False (Just (t, u)) : b) (Nothing : bds) pos
 
-bind :: Name -> Icit -> VTy -> Ctx -> Ctx
-bind x i t (Ctx l e b bds pos) = Ctx (l + 1) (Right (VVar l) : e) (BinderEntry x i False (Just t) : b) (Just i : bds) pos
+bind :: Name -> Icit -> VTy -> VLevel -> Ctx -> Ctx
+bind x i t u (Ctx l e b bds pos) = Ctx (l + 1) (Right (VVar l) : e) (BinderEntry x i False (Just (t, u)) : b) (Just i : bds) pos
 
-bindInsert :: Name -> Icit -> VTy -> Ctx -> Ctx
-bindInsert x i t (Ctx l e b bds pos) = Ctx (l + 1) (Right (VVar l) : e) (BinderEntry x i True (Just t) : b) (Just i : bds) pos
+bindInsert :: Name -> Icit -> VTy -> VLevel -> Ctx -> Ctx
+bindInsert x i t u (Ctx l e b bds pos) = Ctx (l + 1) (Right (VVar l) : e) (BinderEntry x i True (Just (t, u)) : b) (Just i : bds) pos
 
 bindLevel :: Name -> Ctx -> Ctx
 bindLevel x (Ctx l e b bds pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) (BinderEntry x Impl False Nothing : b) (Just Expl : bds) pos
@@ -51,18 +51,18 @@ bindLevelInsert x (Ctx l e b bds pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) 
 enter :: SourcePos -> Ctx -> Ctx
 enter p ctx = ctx { pos = Just p }
 
-indexCtx :: Ctx -> Ix -> Maybe (Maybe VTy)
+indexCtx :: Ctx -> Ix -> Maybe (Maybe (VTy, VLevel))
 indexCtx ctx i = go (binders ctx) (coerce i)
   where
-    go :: Binders -> Int -> Maybe (Maybe VTy)
+    go :: Binders -> Int -> Maybe (Maybe (VTy, VLevel))
     go [] _ = Nothing
     go (e : _) 0 = Just $ bTy e
     go (_ : bs) i = go bs (i - 1)
-  
-lookupCtx :: Ctx -> Name -> Maybe (Ix, Maybe VTy)
+
+lookupCtx :: Ctx -> Name -> Maybe (Ix, Maybe (VTy, VLevel))
 lookupCtx ctx x = go (binders ctx) 0
   where
-    go :: Binders -> Int -> Maybe (Ix, Maybe VTy)
+    go :: Binders -> Int -> Maybe (Ix, Maybe (VTy, VLevel))
     go [] _ = Nothing
     go (BinderEntry y _ False mty : _) i | x == y = Just (Ix i, mty)
     go (_ : bs) i = go bs (i + 1)
@@ -79,6 +79,9 @@ closeVal ctx v = Clos (env ctx) (quote (lvl ctx + 1) v)
 
 closeLevel :: Ctx -> Val -> Clos VFinLevel
 closeLevel ctx v = Clos (env ctx) (quote (lvl ctx + 1) v)
+
+closeCL :: Ctx -> VLevel -> ClosLvl
+closeCL ctx v = ClosLvl (env ctx) (quoteLevel (lvl ctx + 1) v)
 
 showV :: Ctx -> Val -> String
 showV ctx v = showC ctx (quote (lvl ctx) v)
@@ -104,8 +107,14 @@ finLevelCtx ctx l = finLevel (env ctx) l
 quoteCtx :: Ctx -> Val -> Tm
 quoteCtx ctx v = quote (lvl ctx) v
 
+quoteLevelCtx :: Ctx -> VLevel -> Level
+quoteLevelCtx ctx l = quoteLevel (lvl ctx) l
+
 zonkCtx :: Ctx -> Tm -> Tm
 zonkCtx ctx = zonk (lvl ctx) (env ctx)
+
+zonkLevelCtx :: Ctx -> Level -> Level
+zonkLevelCtx ctx = zonkLevel (lvl ctx) (env ctx)
 
 prettyCore :: [Name] -> Tm -> String
 prettyCore ns tm = show (go ns tm)
@@ -117,11 +126,11 @@ prettyCore ns tm = show (go ns tm)
       Prim (Right x) -> SVar (show x)
       App f a i -> SApp (go ns f) (go ns a) (Right i)
       Lam x i b -> SLam x (Right i) Nothing (go (x : ns) b)
-      Pi x i t b -> SPi x i (go ns t) (go (x : ns) b)
+      Pi x i t _ b _ -> SPi x i (go ns t) (go (x : ns) b)
       AppLvl f l -> SAppLvl (go ns f) (finLevelToSurface ns l)
       LamLvl x b -> SLamLvl x (go (x : ns) b)
-      PiLvl x b -> SPiLvl x (go (x : ns) b)
-      Sigma x t b -> SSigma x (go ns t) (go (x : ns) b)
+      PiLvl x b _ -> SPiLvl x (go (x : ns) b)
+      Sigma x t _ b _ -> SSigma x (go ns t) (go (x : ns) b)
       Pair a b -> SPair (go ns a) (go ns b)
       Let x t v b -> SLet x (Just $ go ns t) (go ns v) (go (x : ns) b)
       Proj s p -> SProj (go ns s) (goProj p)
@@ -152,6 +161,14 @@ prettyFinLevel ns l = show (finLevelToSurface ns l)
 prettyFinLevelCtx :: Ctx -> FinLevel -> String
 prettyFinLevelCtx ctx l = prettyFinLevel (names ctx) l
 
+prettyLevelCtx :: Ctx -> Level -> String
+prettyLevelCtx ctx Omega = "omega"
+prettyLevelCtx ctx Omega1 = "omega1"
+prettyLevelCtx ctx (FinLevel l) = prettyFinLevelCtx ctx l
+
+prettyVLevelCtx :: Ctx -> VLevel -> String
+prettyVLevelCtx ctx l = prettyLevelCtx ctx (quoteLevel (lvl ctx) l)
+
 instance Show Ctx where
   show ctx@(Ctx l env bs _ _) =
     let vs = zipWith var bs env in
@@ -159,7 +176,7 @@ instance Show Ctx where
     where
       var :: BinderEntry -> Either VFinLevel Val -> (Name, Icit, Either VFinLevel (VTy, Val))
       var (BinderEntry x i _ Nothing) (Left l) = (x, i, Left l)
-      var (BinderEntry x i _ (Just ty)) (Right v) = (x, i, Right (ty, v))
+      var (BinderEntry x i _ (Just (ty, _))) (Right v) = (x, i, Right (ty, v))
       var _ _ = undefined
 
       showVar :: (Name, Icit, Either VFinLevel (VTy, Val)) -> String

@@ -86,3 +86,8 @@ vFLZ = VFinLevel mempty
 
 vFLS :: VFinLevel -> VFinLevel
 vFLS = addToVFinLevel 1
+
+vLS :: VLevel -> VLevel
+vLS VOmega1 = error "cannot increment omega1"
+vLS VOmega = VOmega1
+vLS (VFinLevel l) = VFinLevel (vFLS l)

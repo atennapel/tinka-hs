@@ -4,6 +4,7 @@ import Control.Exception (throwIO, catch)
 import qualified Data.Set as S
 import System.IO.Unsafe
 import Data.IORef
+import Data.Bifunctor (first)
 
 import Common
 import Core
@@ -17,7 +18,7 @@ import Prims
 import Verification
 import Globals
 import Metas
-import Unification (unify)
+import Unification
 
 -- holes
 data HoleEntry = HoleEntry Ctx Tm Val
@@ -49,101 +50,105 @@ freshLMeta ctx = do
   m <- newLMeta (levelVars ctx)
   return $ FLMeta m
 
-insert' :: Ctx -> IO (Tm, Val) -> IO (Tm, Val)
+insert' :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insert' ctx act = go =<< act where
-  go (t, va) = case force va of
-    VPi x Impl a b -> do
+  go (t, va, lv) = case force va of
+    VPi x Impl a _ b u2 -> do
       m <- freshMeta ctx
       let mv = eval (env ctx) m
-      go (App t m Impl, vinst b mv)
-    VPiLvl x b -> do
+      go (App t m Impl, vinst b mv, u2)
+    VPiLvl x b u -> do
       m <- freshLMeta ctx
       let mv = finLevel (env ctx) m
-      go (AppLvl t m, vinstLevel b mv)
-    va -> pure (t, va)
+      go (AppLvl t m, vinstLevel b mv, vinstCL u mv)
+    va -> pure (t, va, lv)
 
-insertLvl :: Ctx -> IO (Tm, Val) -> IO (Tm, Val)
+insertLvl :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insertLvl ctx act = go =<< act where
-  go (t, va) = case force va of
-    VPiLvl x b -> do
+  go (t, va, lv) = case force va of
+    VPiLvl x b u -> do
       m <- freshLMeta ctx
       let mv = finLevel (env ctx) m
-      go (AppLvl t m, vinstLevel b mv)
-    va -> pure (t, va)
+      go (AppLvl t m, vinstLevel b mv, vinstCL u mv)
+    va -> pure (t, va, lv)
 
-insert :: Ctx -> IO (Tm, Val) -> IO (Tm, Val)
+insert :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insert ctx act = act >>= \case
-  (t@(Lam _ Impl _), va) -> return (t, va)
-  (t, va) -> insert' ctx (return (t, va))
+  (t@(Lam _ Impl _), va, lv) -> return (t, va, lv)
+  (t, va, lv) -> insert' ctx (return (t, va, lv))
 
-insertUntilName :: Ctx -> Name -> IO (Tm, Val) -> IO (Tm, Val)
+insertUntilName :: Ctx -> Name -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insertUntilName ctx name act = go =<< act where
-  go (t, va) = case force va of
-    va@(VPi x Impl a b) -> do
+  go (t, va, lv) = case force va of
+    va@(VPi x Impl a _ b u2) -> do
       if x == name then
-        return (t, va)
+        return (t, va, lv)
       else do
         m <- freshMeta ctx
         let mv = eval (env ctx) m
-        go (App t m Impl, vinst b mv)
-    VPiLvl x b -> do
+        go (App t m Impl, vinst b mv, u2)
+    VPiLvl x b u -> do
       m <- freshLMeta ctx
       let mv = finLevel (env ctx) m
-      go (AppLvl t m, vinstLevel b mv)
+      go (AppLvl t m, vinstLevel b mv, vinstCL u mv)
     _ -> error $ "name " ++ name ++ " not found in pi"
 
-checkOrInfer :: Ctx -> STm -> Maybe STm -> IO (Tm, Tm, Val)
+checkOrInfer :: Ctx -> STm -> Maybe STm -> IO (Tm, Tm, Val, VLevel)
 checkOrInfer ctx v Nothing = do
-  (cv, ty) <- infer ctx v
-  return (cv, quoteCtx ctx ty, ty)
+  (cv, ty, u) <- infer ctx v
+  return (cv, quoteCtx ctx ty, ty, u)
 checkOrInfer ctx v (Just t) = do
   (ct, u) <- checkTy ctx t
   let ty = evalCtx ctx ct
-  cv <- check ctx v ty
-  return (cv, ct, ty)
+  cv <- check ctx v ty u
+  return (cv, ct, ty, u)
 
-check :: Ctx -> STm -> VTy -> IO Tm
-check ctx tm ty = do
+check :: Ctx -> STm -> VTy -> VLevel -> IO Tm
+check ctx tm ty lv = do
   let fty = force ty
-  putStrLn $ "check " ++ show tm ++ " : " ++ showV ctx ty
+  putStrLn $ "check " ++ show tm ++ " : " ++ showV ctx ty ++ " : " ++ prettyVLevelCtx ctx lv
   case (tm, fty) of
-    (SPos p tm, _) -> check (enter p ctx) tm ty
+    (SPos p tm, _) -> check (enter p ctx) tm ty lv
     (SHole x, _) -> do
       tm <- freshMeta ctx
       maybe (return ()) (\x -> addHole x ctx tm ty) x
       return tm
-    (SLam x i ma b, VPi x' i' ty b') | either (\x -> x == x' && i' == Impl) (== i') i -> do
+    (SLam x i ma b, VPi x' i' ty u1 b' u2) | either (\x -> x == x' && i' == Impl) (== i') i -> do
       case ma of
         Nothing -> return ()
         Just a -> do
           (ca, u') <- checkTy ctx a
           catch (unify (lvl ctx) (evalCtx ctx ca) ty) $ \(err :: Error) ->
             throwIO $ ElaborateError $ "check failed " ++ show tm ++ " : " ++ showV ctx ty ++ " got " ++ showC ctx ca ++ ": " ++ show err
-      cb <- check (bind x i' ty ctx) b (vinst b' (VVar (lvl ctx)))
+      cb <- check (bind x i' ty u1 ctx) b (vinst b' (VVar (lvl ctx))) u2
       return $ Lam x i' cb
-    (t, VPi x Impl a b) -> do
-      Lam x Impl <$> check (bindInsert x Impl a ctx) t (vinst b (VVar (lvl ctx)))
-    (SLamLvl x b, VPiLvl _ c) ->
-      LamLvl x <$> check (bindLevel x ctx) b (vinstLevel c (vFinLevelVar (lvl ctx)))
-    (t, VPiLvl x c) ->
-      LamLvl x <$> check (bindLevelInsert x ctx) t (vinstLevel c (vFinLevelVar (lvl ctx)))
-    (SPair a b, VSigma x ty b') -> do
-      ta <- check ctx a ty
-      tb <- check ctx b (vinst b' (evalCtx ctx ta))
+    (t, VPi x Impl a u1 b u2) -> do
+      Lam x Impl <$> check (bindInsert x Impl a u1 ctx) t (vinst b (VVar (lvl ctx))) u2
+    (SLamLvl x b, VPiLvl _ c u) -> do
+      let v = vFinLevelVar (lvl ctx)
+      LamLvl x <$> check (bindLevel x ctx) b (vinstLevel c v) (vinstCL u v)
+    (t, VPiLvl x c u) -> do
+      let v = vFinLevelVar (lvl ctx)
+      LamLvl x <$> check (bindLevelInsert x ctx) t (vinstLevel c v) (vinstCL u v)
+    (SPair a b, VSigma x ty u1 b' u2) -> do
+      ta <- check ctx a ty u1
+      tb <- check ctx b (vinst b' (evalCtx ctx ta)) u2
       return $ Pair ta tb
     (SLet x mt v b, _) -> do
-      (cv, ct, vt) <- checkOrInfer ctx v mt
-      cb <- check (define x vt (evalCtx ctx cv) ctx) b ty
+      (cv, ct, vt, u) <- checkOrInfer ctx v mt
+      cb <- check (define x vt u (evalCtx ctx cv) ctx) b ty lv
       return $ Let x ct cv cb
     (tm, ty) -> do
-      (ctm, ty') <- insert ctx $ infer ctx tm
+      (ctm, ty', lv') <- insert ctx $ infer ctx tm
+      catch (unifyLevel (lvl ctx) lv' lv) $ \(err :: Error) ->
+        throwIO $ ElaborateError $ "level check failed " ++ show tm ++ " : " ++ showV ctx ty ++ " : " ++ prettyVLevelCtx ctx lv ++ " got " ++ showV ctx ty' ++ " : " ++ prettyVLevelCtx ctx lv' ++ ": " ++ show err
       catch (unify (lvl ctx) ty' ty) $ \(err :: Error) ->
         throwIO $ ElaborateError $ "check failed " ++ show tm ++ " : " ++ showV ctx ty ++ " got " ++ showV ctx ty' ++ ": " ++ show err
       return ctm
 
 checkTy :: Ctx -> STm -> IO (Tm, VLevel)
 checkTy ctx tm = do
-  (ctm, ty) <- infer ctx tm
+  (ctm, ty, _) <- infer ctx tm
   case force ty of
     VType l -> return (ctm, l)
     _ -> throwIO $ ElaborateError $ "expected Type in " ++ show tm ++ " but got " ++ showV ctx ty
@@ -159,135 +164,153 @@ checkFinLevel ctx = \case
   SLMax a b -> FLMax <$> checkFinLevel ctx a <*> checkFinLevel ctx b
   SLNat i -> return $ addToFinLevel i FLZ
 
-infer :: Ctx -> STm -> IO (Tm, VTy)
+infer :: Ctx -> STm -> IO (Tm, VTy, VLevel)
 infer ctx tm = do
   putStrLn $ "infer " ++ show tm
   case tm of
     SPos p t -> infer (enter p ctx) t
     t@(SVar x) ->
       case toPrimName x of
-        Just prim -> return (Prim (Left prim), primType prim)
+        Just prim ->
+          let (ty, u) = primType prim in
+          return (Prim (Left prim), ty, u)
         Nothing ->
           case toPrimElimName x of
-            Just prim -> return (Prim (Right prim), primElimType prim)
+            Just prim ->
+              let (ty, u) = primElimType prim in
+              return (Prim (Right prim), ty, u)
             Nothing -> do
               case lookupCtx ctx x of
-                Just (i, Just ty) -> do
+                Just (i, Just (ty, u)) -> do
                   -- putStrLn $ show t ++ " : " ++ showV ctx ty ++ " ~> '" ++ show i
-                  return (Var i, ty)
+                  return (Var i, ty, u)
                 Just (_, Nothing) -> throwIO $ ElaborateError $ "variable referes to universe level variable: " ++ show t
                 Nothing -> do
                   case getGlobal x of
-                    Just e -> return (Global x, gTy e)
+                    Just e -> return (Global x, gTy e, gUniv e)
                     Nothing -> throwIO $ ElaborateError $ "undefined var " ++ show t
     SType l -> do
       l' <- checkFinLevel ctx l
-      return (Type (FinLevel l'), VType (VFinLevel (vFLS (finLevelCtx ctx l'))))
+      let vl = finLevelCtx ctx l'
+      return (Type (FinLevel l'), VType (VFinLevel (vFLS vl)), VFinLevel (vFLS (vFLS vl)))
     SPi x i t b -> do
       (ct, l1) <- checkTy ctx t
-      (cb, l2) <- checkTy (bind x i (evalCtx ctx ct) ctx) b
-      return (Pi x i ct cb, VType (l1 <> l2))
+      (cb, l2) <- checkTy (bind x i (evalCtx ctx ct) l1 ctx) b
+      return (Pi x i ct (quoteLevelCtx ctx l1) cb (quoteLevelCtx ctx l2), VType (l1 <> l2), vLS (l1 <> l2))
     SSigma x t b -> do
       (ct, l1) <- checkTy ctx t
-      (cb, l2) <- checkTy (bind x Expl (evalCtx ctx ct) ctx) b
-      return (Sigma x ct cb, VType (l1 <> l2))
+      (cb, l2) <- checkTy (bind x Expl (evalCtx ctx ct) l1 ctx) b
+      return (Sigma x ct (quoteLevelCtx ctx l1) cb (quoteLevelCtx ctx l2), VType (l1 <> l2), vLS (l1 <> l2))
     SPiLvl x b -> do
-      (cb, _) <- checkTy (bindLevel x ctx) b
-      return (PiLvl x cb, VType VOmega)
+      (cb, l) <- checkTy (bindLevel x ctx) b
+      return (PiLvl x cb (quoteLevelCtx ctx l), VType VOmega, VOmega1)
     SLet x mt v b -> do
-      (cv, ct, vt) <- checkOrInfer ctx v mt
-      (cb, ty) <- infer (define x vt (evalCtx ctx cv) ctx) b
-      return (Let x ct cv cb, ty)
+      (cv, ct, vt, l) <- checkOrInfer ctx v mt
+      (cb, ty, u) <- infer (define x vt l (evalCtx ctx cv) ctx) b
+      return (Let x ct cv cb, ty, u)
     SPair a b -> do
-      (ta, va) <- infer ctx a
-      (tb, vb) <- infer ctx b
-      let vt = VSigma "_" va (Fun $ const vb)
-      return (Let "p" (quoteCtx ctx vt) (Pair ta tb) (Var 0), vt)
+      (ta, va, u1) <- infer ctx a
+      (tb, vb, u2) <- infer ctx b
+      let vt = VSigma "_" va u1 (Fun $ const vb) u2
+      return (Let "p" (quoteCtx ctx vt) (Pair ta tb) (Var 0), vt, u1 <> u2)
     c@(SApp f a i) -> do
-      (i, cf, tty) <- case i of
+      (i, cf, tty, l1) <- case i of
         Left name -> do
-          (t, tty) <- insertUntilName ctx name $ infer ctx f
-          return (Impl, t, tty)
+          (t, tty, l1) <- insertUntilName ctx name $ infer ctx f
+          return (Impl, t, tty, l1)
         Right Impl -> do
-          (t, tty) <- insertLvl ctx $ infer ctx f
-          return (Impl, t, tty)
+          (t, tty, l1) <- insertLvl ctx $ infer ctx f
+          return (Impl, t, tty, l1)
         Right Expl -> do
-          (t, tty) <- insert' ctx $ infer ctx f
-          return (Expl, t, tty)
-      (pt, rt) <- case force tty of
-        VPi x i' a b -> do
+          (t, tty, l1) <- insert' ctx $ infer ctx f
+          return (Expl, t, tty, l1)
+      (pt, u1, rt, u2) <- case force tty of
+        VPi x i' a u1 b u2 -> do
           throwUnless (i == i') $ ElaborateError $ "app icit mismatch in " ++ show c ++ ": " ++ showV ctx tty
-          return (a, b)
+          return (a, u1, b, u2)
         tty -> do
+          u1 <- VFinLevel . finLevel (env ctx) <$> freshLMeta ctx
+          u2 <- VFinLevel . finLevel (env ctx) <$> freshLMeta ctx
           a <- eval (env ctx) <$> freshMeta ctx
-          b <- Clos (env ctx) <$> freshMeta (bind "x" i a ctx)
-          catch (unify (lvl ctx) tty (VPi "x" i a b)) $ \(err :: Error) ->
+          b <- Clos (env ctx) <$> freshMeta (bind "x" i a u1 ctx)
+          catch (unify (lvl ctx) tty (VPi "x" i a u1 b u2)) $ \(err :: Error) ->
             throwIO $ ElaborateError $ "pi expected in " ++ show c ++ " but got " ++ showV ctx tty ++ ": " ++ show err
-          return (a, b)
-      ca <- check ctx a pt
-      return (App cf ca i, vinst rt (evalCtx ctx ca))
+          return (a, u1, b, u2)
+      ca <- check ctx a pt u1
+      return (App cf ca i, vinst rt (evalCtx ctx ca), u2)
     c@(SAppLvl f l) -> do
-      (cf, fty) <- infer ctx f
+      (cf, fty, _) <- infer ctx f
       l' <- checkFinLevel ctx l
       let ffty = force fty
       case ffty of
-        VPiLvl x c -> return (AppLvl cf l', vinstLevel c (finLevelCtx ctx l'))
+        VPiLvl x c u -> do
+          let v = finLevelCtx ctx l'
+          return (AppLvl cf l', vinstLevel c v, vinstCL u v)
         tty -> do
           b <- Clos (env ctx) <$> freshMeta (bindLevel "x" ctx)
-          catch (unify (lvl ctx) tty (VPiLvl "x" b)) $ \(err :: Error) ->
+          u <- ClosLvl (env ctx) . FinLevel <$> freshLMeta (bindLevel "x" ctx)
+          catch (unify (lvl ctx) tty (VPiLvl "x" b u)) $ \(err :: Error) ->
             throwIO $ ElaborateError $ "expected a level pi in " ++ show c ++ " but got " ++ showV ctx fty ++ ": " ++ show err
-          return (AppLvl cf l', vinstLevel b (finLevelCtx ctx l'))
+          let v = finLevelCtx ctx l'
+          return (AppLvl cf l', vinstLevel b v, vinstCL u v)
     s@(SLam x (Right i) ma b) -> do
-      a <- evalCtx ctx <$> case ma of
-        Just a -> fst <$> checkTy ctx a
-        Nothing -> freshMeta ctx
-      (cb, rty) <- insert ctx $ infer (bind x i a ctx) b
-      let vt = VPi x i a (closeVal ctx rty)
-      return (Let "f" (quoteCtx ctx vt) (Lam x i cb) (Var 0), vt)
+      (a, u1) <- first (evalCtx ctx) <$> case ma of
+        Just a -> checkTy ctx a
+        Nothing -> do
+          u1 <- VFinLevel . finLevel (env ctx) <$> freshLMeta ctx
+          m <- freshMeta ctx
+          return (m, u1)
+      (cb, rty, u2) <- insert ctx $ infer (bind x i a u1 ctx) b
+      let vt = VPi x i a u1 (closeVal ctx rty) u2
+      return (Let "f" (quoteCtx ctx vt) (Lam x i cb) (Var 0), vt, u1 <> u2)
     SLamLvl x b -> do
-      (cb, rty) <- infer (bindLevel x ctx) b
-      let vt = VPiLvl x (closeLevel ctx rty)
-      return (Let "f" (quoteCtx ctx vt) (LamLvl x cb) (Var 0), vt)
+      (cb, rty, u) <- infer (bindLevel x ctx) b
+      let vt = VPiLvl x (closeLevel ctx rty) (closeCL ctx u)
+      return (Let "f" (quoteCtx ctx vt) (LamLvl x cb) (Var 0), vt, VOmega)
     c@(SProj t p) -> do
-      (tm, vt) <- infer ctx t
+      (tm, vt, _) <- infer ctx t
       case (force vt, p) of
-        (VSigma x ty c, SFst) -> return (Proj tm Fst, ty)
-        (VSigma x ty c, SSnd) -> return (Proj tm Snd, vinst c (vfst (evalCtx ctx tm)))
+        (VSigma x ty u1 c _, SFst) -> return (Proj tm Fst, ty, u1)
+        (VSigma x ty _ c u2, SSnd) -> return (Proj tm Snd, vinst c (vfst (evalCtx ctx tm)), u2)
         (tty, SIndex i) -> do
-          a <- go (evalCtx ctx tm) tty i 0
-          return (Proj tm (PNamed Nothing i), a)
+          (a, u) <- go (evalCtx ctx tm) tty i 0
+          return (Proj tm (PNamed Nothing i), a, u)
           where
-            go :: Val -> Val -> Ix -> Ix -> IO Val
+            go :: Val -> Val -> Ix -> Ix -> IO (Val, VLevel)
             go tm ty j j2 = case (force ty, j) of
-              (VSigma x ty c, 0) -> return ty
-              (VSigma x ty c, j) -> go tm (vinst c (vproj tm (PNamed Nothing j2))) (j - 1) (j2 + 1)
+              (VSigma x ty u c _, 0) -> return (ty, u)
+              (VSigma x ty _ c _, j) -> go tm (vinst c (vproj tm (PNamed Nothing j2))) (j - 1) (j2 + 1)
               _ -> error $ "not a sigma type in " ++ show c ++ ": " ++ showV ctx vt
         (tty, SNamed x) -> do
-          (a, i) <- go (evalCtx ctx tm) tty 0 S.empty
-          return (Proj tm (PNamed (Just x) i), a)
+          (a, u, i) <- go (evalCtx ctx tm) tty 0 S.empty
+          return (Proj tm (PNamed (Just x) i), a, u)
           where
-            go :: Val -> Val -> Ix -> S.Set Name -> IO (Val, Ix)
+            go :: Val -> Val -> Ix -> S.Set Name -> IO (Val, VLevel, Ix)
             go tm ty i xs = case force ty of
-              VSigma y ty c | x == y -> return (ty, i)
-              VSigma y ty c -> do
+              VSigma y ty u c _ | x == y -> return (ty, u, i)
+              VSigma y ty _ c _ -> do
                 let name = if x == "_" || S.member x xs then Nothing else Just y
                 go tm (vinst c (vproj tm (PNamed name i))) (i + 1) (S.insert y xs)
               _ -> error $ "name not found " ++ show c ++ ": " ++ showV ctx vt
         (tty, _) | p == SFst || p == SSnd -> do
+          u1 <- VFinLevel . finLevel (env ctx) <$> freshLMeta ctx
+          u2 <- VFinLevel . finLevel (env ctx) <$> freshLMeta ctx
           a <- eval (env ctx) <$> freshMeta ctx
-          b <- Clos (env ctx) <$> freshMeta (bind "x" Expl a ctx)
-          catch (unify (lvl ctx) tty (VSigma "x" a b)) $ \(err :: Error) ->
+          b <- Clos (env ctx) <$> freshMeta (bind "x" Expl a u1 ctx)
+          catch (unify (lvl ctx) tty (VSigma "x" a u1 b u2)) $ \(err :: Error) ->
             throwIO $ ElaborateError $ "not a sigma type in " ++ show c ++ ": " ++ showV ctx vt ++ ": " ++ show err
           case p of
-            SFst -> return (Proj tm Fst, a)
-            SSnd -> return (Proj tm Snd, vinst b (vfst (evalCtx ctx tm)))
+            SFst -> return (Proj tm Fst, a, u1)
+            SSnd -> return (Proj tm Snd, vinst b (vfst (evalCtx ctx tm)), u2)
             _ -> undefined
         _ -> error $ "not a sigma type in " ++ show c ++ ": " ++ showV ctx vt
     SHole x -> do
+      l <- freshLMeta ctx
+      let u = VFinLevel $ finLevel (env ctx) l
       a <- eval (env ctx) <$> freshMeta ctx
       t <- freshMeta ctx
       maybe (return ()) (\x -> addHole x ctx t a) x
-      return (t, a)
+      return (t, a, u)
     tm -> throwIO $ ElaborateError $ "cannot infer: " ++ show tm
 
 showHoles :: HoleMap -> IO ()
@@ -298,13 +321,14 @@ showHoles ((x, HoleEntry ctx tm ty) : t) = do
   putStrLn $ "hole\n_" ++ x ++ " : " ++ showVZ ctx ty ++ " = " ++ showCZ ctx tm
   print ctx
 
-elaborate :: Ctx -> STm -> IO (Tm, Ty)
+elaborate :: Ctx -> STm -> IO (Tm, Ty, Level)
 elaborate ctx tm = do
   resetMetas
   resetHoles
-  (tm', vty) <- infer ctx tm
+  (tm', vty, vlv) <- infer ctx tm
   let tm = zonkCtx ctx tm'
   let ty = zonkCtx ctx $ quoteCtx ctx vty
+  let lv = zonkLevelCtx ctx $ quoteLevelCtx ctx vlv
   hs <- readIORef holes
   onlyIf (not $ null hs) $ showHoles hs
   throwUnless (null hs) $ ElaborateError $ "\nholes found:\n" ++ showCZ ctx tm ++ "\n" ++ showCZ ctx ty ++ "\nholes: " ++ show (map fst $ reverse hs)
@@ -314,7 +338,7 @@ elaborate ctx tm = do
   throwUnless solvedL $ ElaborateError $ "not all level metas are solved" 
   ty' <- verify ctx tm
   throwUnless (ty == ty') $ ElaborateError $ "elaborated type did not match verified type: " ++ show ty ++ " ~ " ++ show ty'
-  return (tm, ty)
+  return (tm, ty, lv)
 
 elaborateDef :: Maybe String -> Name -> Maybe STy -> STm -> IO GlobalEntry
 elaborateDef mod x ty tm =
@@ -322,8 +346,8 @@ elaborateDef mod x ty tm =
     Just e | x /= "_" ->
       error $ "cannot redefine global " ++ maybe "" (++ ".") (gModule e) ++ x ++ " as " ++ maybe "" (++ ".") mod ++ x
     _ -> do
-      (etm, ety) <- elaborate empty (SLet x ty tm (SVar x))
-      return $ GlobalEntry x (eval [] ety) (eval [] etm) ety etm mod
+      (etm, ety, elv) <- elaborate empty (SLet x ty tm (SVar x))
+      return $ GlobalEntry x (eval [] ety) (level [] elv) (eval [] etm) ety elv etm mod
 
 elaborateDecl :: Maybe String -> Decl -> IO Decls
 elaborateDecl _ (Import x) = return []

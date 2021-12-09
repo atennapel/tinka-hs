@@ -49,9 +49,8 @@ TODO:
   - [x] implicit functions
 - [ ] level metas
   - [x] basic level metas
-  - [ ] simplify primitive typing
-  - [ ] levels in pi/sigma
-  - [ ] update elaboration
+  - [x] levels in pi/sigma
+  - [x] update elaboration
   - [ ] lam and app with level renaming
   - [ ] improve level unification
 - [ ] descriptions

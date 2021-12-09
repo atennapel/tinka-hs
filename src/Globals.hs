@@ -6,12 +6,15 @@ import GHC.IO.Unsafe (unsafeDupablePerformIO)
 import Common
 import Val
 import Core
+import Levels
 
 data GlobalEntry = GlobalEntry {
   gName :: Name,
   gTy :: VTy,
+  gUniv :: VLevel,
   gVal :: Val,
   gCoreTy :: Ty,
+  gCoreUniv :: Level,
   gCoreVal :: Tm,
   gModule :: Maybe String
 }

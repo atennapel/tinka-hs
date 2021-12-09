@@ -1,4 +1,4 @@
-module Zonking (zonk) where
+module Zonking (zonk, zonkLevel) where
 
 import Common
 import Levels
@@ -71,8 +71,8 @@ zonk = go
       Prim x -> Prim x
       Proj c p -> Proj (go k vs c) p
       Lam x i b -> Lam x i (goUnder k vs b)
-      Pi x i t b -> Pi x i (go k vs t) (goUnder k vs b)
-      Sigma x t b -> Sigma x (go k vs t) (goUnder k vs b)
+      Pi x i t u1 b u2 -> Pi x i (go k vs t) (zonkLevel k vs u1) (goUnder k vs b) (zonkLevel k vs u2)
+      Sigma x t u1 b u2 -> Sigma x (go k vs t) (zonkLevel k vs u1) (goUnder k vs b) (zonkLevel k vs u2)
       Let x t v b -> Let x (go k vs t) (go k vs v) (goUnder k vs b)
       LamLvl x b -> LamLvl x (goUnderLevel k vs b)
-      PiLvl x b -> PiLvl x (goUnderLevel k vs b)
+      PiLvl x b u -> PiLvl x (goUnderLevel k vs b) (zonkLevel (k + 1) (Left (vFinLevelVar k) : vs) u)

@@ -1,4 +1,4 @@
-module Unification (unify) where
+module Unification (unify, unifyLevel) where
 
 import qualified Data.IntMap as IM
 import qualified Data.Set as S
@@ -114,11 +114,11 @@ rename m pren v = go pren v
       VNe (HPrim x) sp -> goSp pren (Prim (Left x)) sp
       VGlobal x sp _ -> goSp pren (Global x) sp
       VLam x i b -> Lam x i <$> goLift pren b
-      VPi x i t b -> Pi x i <$> go pren t <*> goLift pren b
+      VPi x i t u1 b u2 -> Pi x i <$> go pren t <*> goLevel pren u1 <*> goLift pren b <*> goLevel pren u2
       VLamLvl x b -> LamLvl x <$> goLiftLevel pren b
-      VPiLvl x b -> PiLvl x <$> goLiftLevel pren b
+      VPiLvl x b u -> PiLvl x <$> goLiftLevel pren b <*> goLevel (lift pren) (vinstCL u (vFinLevelVar (cod pren)))
       VPair a b -> Pair <$> go pren a <*> go pren b
-      VSigma x t b -> Sigma x <$> go pren t <*> goLift pren b
+      VSigma x t u1 b u2 -> Sigma x <$> go pren t <*> goLevel pren u1 <*> goLift pren b <*> goLevel pren u2
       VType i -> Type <$> goLevel pren i
 
 lams :: Sp -> Tm -> Tm
@@ -171,9 +171,12 @@ unify :: Lvl -> Val -> Val -> IO ()
 unify l a b = case (a, b) of
   (VType i, VType i') -> unifyLevel l i i'
 
-  (VPi _ i t b, VPi _ i' t' b') | i == i' -> unify l t t' >> unifyClos l b b'
-  (VPiLvl _ b, VPiLvl _ b') -> unifyClosLevel l b b'
-  (VSigma _ t b, VSigma _ t' b') -> unify l t t' >> unifyClos l b b'
+  (VPi _ i t u1 b u2, VPi _ i' t' u1' b' u2') | i == i' ->
+    unifyLevel l u1 u1' >> unify l t t' >> unifyLevel l u2 u2' >> unifyClos l b b'
+  (VPiLvl _ b u, VPiLvl _ b' u') ->
+    (let v = vFinLevelVar l in unifyLevel (l + 1) (vinstCL u v) (vinstCL u' v)) >> unifyClosLevel l b b'
+  (VSigma _ t u1 b u2, VSigma _ t' u1' b' u2') ->
+    unifyLevel l u1 u1' >> unify l t t' >> unifyLevel l u2 u2' >> unifyClos l b b'
 
   (VLam _ _ b, VLam _ _ b') -> unifyClos l b b'
   (VLam _ i b, b') -> let v = VVar l in unify (l + 1) (vinst b v) (vapp b' v i)

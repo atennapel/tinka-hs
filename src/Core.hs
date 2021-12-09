@@ -23,13 +23,13 @@ data Tm
   | Prim (Either PrimName PrimElimName)
   | App Tm Tm Icit
   | Lam Name Icit Tm
-  | Pi Name Icit Tm Tm
+  | Pi Name Icit Tm Level Tm Level
   | AppLvl Tm FinLevel
   | LamLvl Name Tm
-  | PiLvl Name Tm
+  | PiLvl Name Tm Level
   | Proj Tm ProjType
   | Pair Tm Tm
-  | Sigma Name Tm Tm
+  | Sigma Name Tm Level Tm Level
   | Let Name Ty Tm Tm
   | Type Level
   | Meta MetaVar
@@ -80,8 +80,8 @@ showTmPi t =
   intercalate " -> " (map showParam ps) ++ " -> " ++ showApp b
   where
     go :: Tm -> ([(Name, Maybe (Icit, Tm))], Tm)
-    go (Pi x i t b) = let (ps, b') = go b in ((x, Just (i, t)) : ps, b')
-    go (PiLvl x b) = let (ps, b') = go b in ((x, Nothing) : ps, b')
+    go (Pi x i t _ b _) = let (ps, b') = go b in ((x, Just (i, t)) : ps, b')
+    go (PiLvl x b _) = let (ps, b') = go b in ((x, Nothing) : ps, b')
     go t = ([], t)
 
     showApp :: Tm -> String
@@ -124,7 +124,7 @@ showTmSigma t =
   intercalate " ** " (map showParam ps) ++ " ** " ++ showApp b
   where
     go :: Tm -> ([(Name, Tm)], Tm)
-    go (Sigma x t b) = let (ps, b') = go b in ((x, t) : ps, b')
+    go (Sigma x t _ b _) = let (ps, b') = go b in ((x, t) : ps, b')
     go t = ([], t)
 
     showApp :: Tm -> String
@@ -147,10 +147,10 @@ instance Show Tm where
   show t@Pi {} = showTmPi t
   show t@(AppLvl _ _) = showTmApp t
   show t@(LamLvl _ _) = showTmLam t
-  show t@(PiLvl _ _) = showTmPi t
+  show t@PiLvl {} = showTmPi t
   show t@(Proj _ _) = showTmProj t
   show t@(Pair _ _) = showTmPair t
-  show t@(Sigma _ _ _) = showTmSigma t
+  show t@Sigma {} = showTmSigma t
   show (Let x t v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (Type (FinLevel FLZ)) = "Type"
   show (Type l) = "Type " ++ showLevelS l

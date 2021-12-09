@@ -14,6 +14,10 @@ data Clos v
   = Clos Env Tm
   | Fun (v -> Val)
 
+data ClosLvl
+  = ClosLvl Env Level
+  | FunLvl (VFinLevel -> VLevel)
+
 data Head = HVar Lvl | HPrim PrimName | HMeta MetaVar
   deriving (Eq)
 
@@ -27,11 +31,11 @@ data Val
   = VNe Head Sp
   | VGlobal Name Sp Val
   | VLam Name Icit (Clos Val)
-  | VPi Name Icit Val (Clos Val)
+  | VPi Name Icit Val VLevel (Clos Val) VLevel
   | VLamLvl Name (Clos VFinLevel)
-  | VPiLvl Name (Clos VFinLevel)
+  | VPiLvl Name (Clos VFinLevel) ClosLvl
   | VPair Val Val
-  | VSigma Name Val (Clos Val)
+  | VSigma Name Val VLevel (Clos Val) VLevel
   | VType VLevel
 
 pattern VTypeFin l = VType (VFinLevel l)
@@ -49,23 +53,23 @@ pattern VLiftTerm l k a x = VNe (HPrim PLiftTerm) [EApp x Expl, EApp a Impl, EAp
 pattern VHEq l a b x y = VNe (HPrim PHEq) [EApp y Expl, EApp x Expl, EApp b Impl, EApp a Impl, EAppLvl l]
 pattern VHRefl l a x = VNe (HPrim PHRefl) [EApp x Impl, EApp a Impl, EAppLvl l]
 
-vpi :: Name -> Val -> (Val -> Val) -> Val
-vpi x a b = VPi x Expl a (Fun b)
+vpi :: Name -> Val -> VLevel -> VLevel -> (Val -> Val) -> Val
+vpi x a u1 u2 b = VPi x Expl a u1 (Fun b) u2
 
-vpimpl :: Name -> Val -> (Val -> Val) -> Val
-vpimpl x a b = VPi x Impl a (Fun b)
+vpimpl :: Name -> Val -> VLevel -> VLevel -> (Val -> Val) -> Val
+vpimpl x a u1 u2 b = VPi x Impl a u1 (Fun b) u2
 
-vpilvl :: Name -> (VFinLevel -> Val) -> Val
-vpilvl x b = VPiLvl x (Fun b)
+vpilvl :: Name -> (VFinLevel -> VLevel) -> (VFinLevel -> Val) -> Val
+vpilvl x u b = VPiLvl x (Fun b) (FunLvl u)
 
-vsigma :: Name -> Val -> (Val -> Val) -> Val
-vsigma x a b = VSigma x a (Fun b)
+vsigma :: Name -> Val -> VLevel -> VLevel -> (Val -> Val) -> Val
+vsigma x a u1 u2 b = VSigma x a u1 (Fun b) u2
 
-vfun :: Val -> Val -> Val
-vfun a b = VPi "_" Expl a (Fun $ const b)
+vfun :: Val -> VLevel -> VLevel -> Val -> Val
+vfun a u1 u2 b = VPi "_" Expl a u1 (Fun $ const b) u2
 
-vpairty :: Val -> Val -> Val
-vpairty a b = VSigma "_" a (Fun $ const b)
+vpairty :: Val -> VLevel -> VLevel -> Val -> Val
+vpairty a u1 u2 b = VSigma "_" a u1 (Fun $ const b) u2
 
 vlam :: Name -> (Val -> Val) -> Val
 vlam x b = VLam x Expl (Fun b)
