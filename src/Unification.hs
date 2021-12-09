@@ -1,6 +1,7 @@
 module Unification (unify) where
 
 import qualified Data.IntMap as IM
+import qualified Data.Set as S
 import Data.Coerce (coerce)
 import Control.Exception (throwIO, catch)
 import Control.Monad (zipWithM_)
@@ -58,14 +59,18 @@ rename m pren v = go pren v
       Just x' -> return $ lvlToIx (dom pren) x'
 
     goFinLevel :: PR -> VFinLevel -> IO FinLevel
-    goFinLevel pren (VFL n xs ys) =
-      IM.foldlWithKey
-        (\i x n -> do
-          i' <- i
-          v <- FLVar <$> goVar pren (Lvl x)
-          return $ flmax i' (addToFinLevel n v))
-        (return $ addToFinLevel n FLZ)
-        xs
+    goFinLevel pren (VFL n xs ys) = do
+      IM.foldlWithKey (\i x n -> do
+        i' <- i
+        return $ flmax i' (addToFinLevel n (FLMeta (LMetaVar x)))) vars ys
+      where
+        vars = IM.foldlWithKey
+          (\i x n -> do
+            i' <- i
+            v <- FLVar <$> goVar pren (Lvl x)
+            return $ flmax i' (addToFinLevel n v))
+          (return $ addToFinLevel n FLZ)
+          xs
 
     goLevel :: PR -> VLevel -> IO Level
     goLevel pren VOmega = return Omega
@@ -199,9 +204,33 @@ unify l a b = case (a, b) of
   (v, VGlobal _ _ v') -> unify l v v'
   _ -> throwIO $ UnifyError $ "failed to unify " ++ show (quote l a) ++ " ~ " ++ show (quote l b)
 
+-- level unification
+solveFinLevel :: Lvl -> LMetaVar -> VFinLevel -> IO ()
+solveFinLevel l m b@(VFL n xs ys) =
+  case lookupLMeta m of
+    LSolved a _ -> unifyFinLevel l a b
+    LUnsolved scope -> do
+      throwUnless (IM.notMember (coerce m) ys) $ UnifyError $ "occurs check failed in level: " ++ show m ++ " := " ++ show (quoteFinLevel l b)
+      throwUnless (all (\x -> S.member (coerce x) scope) (IM.keys xs)) $ UnifyError $ "scope check failed in level: " ++ show m ++ " := " ++ show (quoteFinLevel l b)
+      solveLMeta m b (quoteFinLevel l b)
+
 unifyFinLevel :: Lvl -> VFinLevel -> VFinLevel -> IO ()
 unifyFinLevel l a b | a == b = return ()
-unifyFinLevel l a b = throwIO $ UnifyError $ "failed to unify " ++ show (quoteFinLevel l a) ++ " ~ " ++ show (quoteFinLevel l b)
+unifyFinLevel l a b =
+  case (isMeta a, isMeta b) of
+    (Just m, Just m') | m == m' -> return ()
+    (Just m, _) -> solveFinLevel l m b
+    (_, Just m) -> solveFinLevel l m a
+    _ -> throwIO $ UnifyError $ "failed to unify " ++ show (quoteFinLevel l a) ++ " ~ " ++ show (quoteFinLevel l b)
+  where
+    isMeta :: VFinLevel -> Maybe LMetaVar
+    isMeta (VFL 0 xs ys) | IM.null xs =
+      let ks = IM.keys ys in
+      if length ks == 1 then
+        Just (LMetaVar (head ks))
+      else
+        Nothing
+    isMeta _ = Nothing
 
 unifyLevel :: Lvl -> VLevel -> VLevel -> IO ()
 unifyLevel l VOmega1 VOmega1 = return ()

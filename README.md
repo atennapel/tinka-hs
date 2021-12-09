@@ -48,7 +48,12 @@ TODO:
   - [x] named holes
   - [x] implicit functions
 - [ ] level metas
+  - [x] basic level metas
+  - [ ] simplify primitive typing
+  - [ ] levels in pi/sigma
+  - [ ] update elaboration
   - [ ] lam and app with level renaming
+  - [ ] improve level unification
 - [ ] descriptions
 - [ ] update unification
   - [ ] pruning

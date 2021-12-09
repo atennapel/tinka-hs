@@ -172,10 +172,12 @@ data QuoteLevel = Full | KeepGlobals
 
 quoteFinLevel :: Lvl -> VFinLevel -> FinLevel
 quoteFinLevel l (VFL n xs ys) =
-  M.foldlWithKey
-    (\i x n -> flmax i (addToFinLevel n (FLVar (lvlToIx l (Lvl x)))))
-    (addToFinLevel n FLZ)
-    xs
+  M.foldlWithKey (\i x n -> flmax i (addToFinLevel n (FLMeta (LMetaVar x)))) vars ys
+  where
+    vars = M.foldlWithKey
+      (\i x n -> flmax i (addToFinLevel n (FLVar (lvlToIx l (Lvl x)))))
+      (addToFinLevel n FLZ)
+      xs
 
 quoteLevel :: Lvl -> VLevel -> Level
 quoteLevel l = \case

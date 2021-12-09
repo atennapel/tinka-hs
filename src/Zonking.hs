@@ -7,6 +7,20 @@ import Val
 import Evaluation
 import Metas
 
+zonkFinLevel :: Lvl -> Env -> FinLevel -> FinLevel
+zonkFinLevel l vs FLZ = FLZ
+zonkFinLevel l vs (FLS f) = FLS (zonkFinLevel l vs f)
+zonkFinLevel l vs (FLVar x) = FLVar x
+zonkFinLevel l vs (FLMax a b) = flmax (zonkFinLevel l vs a) (zonkFinLevel l vs b)
+zonkFinLevel l vs f@(FLMeta m) =
+  case lookupLMeta m of
+    LUnsolved {} -> f
+    LSolved _ f -> zonkFinLevel l vs f
+
+zonkLevel :: Lvl -> Env -> Level -> Level
+zonkLevel l vs (FinLevel f) = FinLevel (zonkFinLevel l vs f)
+zonkLevel _ _ l = l
+
 zonk :: Lvl -> Env -> Tm -> Tm
 zonk = go
   where
@@ -33,7 +47,7 @@ zonk = go
       AppLvl t l ->
         case goSp k vs t of
           Left t -> Left (vappLevel t (finLevel vs l))
-          Right t -> Right (AppLvl t l)
+          Right t -> Right (AppLvl t (zonkFinLevel k vs l))
       t -> Right (go k vs t)
 
     go :: Lvl -> Env -> Tm -> Tm
@@ -49,9 +63,9 @@ zonk = go
       AppLvl t l ->
         case goSp k vs t of
           Left t -> go k vs $ quote k (vappLevel t (finLevel vs l))
-          Right t -> AppLvl t l
+          Right t -> AppLvl t (zonkFinLevel k vs l)
       Var x -> Var x
-      t@(Type u) -> t
+      Type u -> Type (zonkLevel k vs u)
       Pair a b -> Pair (go k vs a) (go k vs b)
       Global x -> Global x
       Prim x -> Prim x

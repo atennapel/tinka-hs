@@ -115,5 +115,6 @@ infer ctx = \case
 
 verify :: Ctx -> Tm -> IO Tm
 verify ctx tm = do
+  -- print tm
   ty <- infer ctx tm
   return $ quoteCtx ctx ty
