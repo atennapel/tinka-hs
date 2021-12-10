@@ -241,6 +241,7 @@ eqvProj p p' = p == p'
 
 convElim :: Lvl -> Elim -> Elim -> Bool
 convElim k (EApp v _) (EApp v' _) = conv k v v'
+convElim k (EAppLvl v) (EAppLvl v') = v == v'
 convElim k (EProj p) (EProj p') = eqvProj p p'
 convElim k (EPrimElim x1 as1) (EPrimElim x2 as2) =
   x1 == x2 && and (zipWith (go k) as1 as2)

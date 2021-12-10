@@ -1,0 +1,16 @@
+if : <l> {A : Type l} -> Bool -> A -> A -> A
+  = \{A} b t f. indBool (\_. A) t f b;
+
+not : Bool -> Bool = \b. if b False True;
+
+and : Bool -> Bool -> Bool
+  = \a b. if a b False;
+
+or : Bool -> Bool -> Bool
+  = \a b. if a True b;
+
+xor : Bool -> Bool -> Bool
+  = \a b. if a (not b) b;
+
+neqBool = xor;
+eqBool : Bool -> Bool -> Bool = \a b. not (neqBool a b);

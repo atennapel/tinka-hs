@@ -55,7 +55,7 @@ lookupMeta (MetaVar m) = unsafeDupablePerformIO $ do
     Nothing -> error "impossible"
 
 -- level metas
-data LMetaEntry = LSolved VFinLevel FinLevel | LUnsolved (S.Set Lvl)
+data LMetaEntry = LSolved VFinLevel FinLevel | LUnsolved Lvl (S.Set Lvl)
 
 type LMetaMap = IM.IntMap LMetaEntry
 
@@ -85,11 +85,11 @@ writeLMeta (LMetaVar m) e = modifyIORef lmctx $ IM.insert m e
 solveLMeta :: LMetaVar -> VFinLevel -> FinLevel -> IO ()
 solveLMeta m v c = writeLMeta m (LSolved v c)
 
-newLMeta :: S.Set Lvl -> IO LMetaVar
-newLMeta scope = do
+newLMeta :: Lvl -> S.Set Lvl -> IO LMetaVar
+newLMeta k scope = do
   m <- readIORef nextLMeta
   writeIORef nextLMeta $! m + 1
-  modifyIORef lmctx $ IM.insert m (LUnsolved scope)
+  modifyIORef lmctx $ IM.insert m (LUnsolved k scope)
   return $ LMetaVar m
 
 lookupLMeta :: LMetaVar -> LMetaEntry

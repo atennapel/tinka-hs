@@ -1,0 +1,9 @@
+the : <l> (A : Type l) -> A -> A = \A x. x;
+
+id = \<l> {A}. the <l> A;
+
+const : <l> {A B : Type l} -> A -> B -> A
+  = \x y. x;
+
+compose : <l> {A B C : Type l} -> (B -> C) -> (A -> B) -> A -> C
+  = \f g x. f (g x);

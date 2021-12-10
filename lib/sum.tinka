@@ -1,0 +1,4 @@
+import lib/bool;
+
+Sum : <l> (A B : Type l) -> Type l
+  = \<l> A B. (b : Bool) ** if <S l> b A B;

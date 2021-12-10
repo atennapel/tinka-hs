@@ -103,14 +103,14 @@ infer ctx = \case
       (VSigma x ty _ c _, Fst) -> return ty
       (VSigma x ty _ c _, Snd) -> return $ vinst c (vproj (evalCtx ctx t) Fst)
       (_, PNamed _ i) -> go S.empty (evalCtx ctx t) vt i 0
-      _ -> throwIO $ VerifyError $ "verify: not a sigma type in " ++ show s ++ ", got " ++ showV ctx vt
+      _ -> throwIO $ VerifyError $ "not a sigma type in " ++ show s ++ ", got " ++ showV ctx vt
     where
       go xs t ty i j = case (force ty, i) of
         (VSigma _ ty _ _ _, 0) -> return ty
         (VSigma x ty _ c _, i) ->
           let name = if x == "_" || S.member x xs then Nothing else Just x in
           go (S.insert x xs) t (vinst c (vproj t (PNamed name j))) (i - 1) (j + 1)
-        _ -> throwIO $ VerifyError $ "verify: not a sigma type in " ++ show s ++ ", got " ++ showV ctx ty
+        _ -> throwIO $ VerifyError $ "not a sigma type in " ++ show s ++ ", got " ++ showV ctx ty
   tm -> throwIO $ VerifyError $ "cannot infer: " ++ show tm
 
 verify :: Ctx -> Tm -> IO Tm

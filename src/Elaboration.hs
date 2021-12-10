@@ -47,7 +47,7 @@ freshMeta ctx = do
 
 freshLMeta :: Ctx -> IO FinLevel
 freshLMeta ctx = do
-  m <- newLMeta (levelVars ctx)
+  m <- newLMeta (lvl ctx) (levelVars ctx)
   return $ FLMeta m
 
 insert' :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
@@ -106,7 +106,7 @@ checkOrInfer ctx v (Just t) = do
 check :: Ctx -> STm -> VTy -> VLevel -> IO Tm
 check ctx tm ty lv = do
   let fty = force ty
-  -- putStrLn $ "check " ++ show tm ++ " : " ++ showV ctx ty ++ " : " ++ prettyVLevelCtx ctx lv
+  -- putStrLn $ "check " ++ show tm ++ " : " ++ showVZ ctx ty ++ " : " ++ prettyVLevelCtx ctx lv
   case (tm, fty) of
     (SPos p tm, _) -> check (enter p ctx) tm ty lv
     (SHole x, _) -> do
@@ -141,9 +141,9 @@ check ctx tm ty lv = do
     (tm, ty) -> do
       (ctm, ty', lv') <- insert ctx $ infer ctx tm
       catch (unifyLevel (lvl ctx) lv' lv) $ \(err :: Error) ->
-        throwIO $ ElaborateError $ "level check failed " ++ show tm ++ " : " ++ showV ctx ty ++ " : " ++ prettyVLevelCtx ctx lv ++ " got " ++ showV ctx ty' ++ " : " ++ prettyVLevelCtx ctx lv' ++ ": " ++ show err
+        throwIO $ ElaborateError $ "level check failed " ++ show tm ++ " : " ++ showVZ ctx ty ++ " : " ++ prettyVLevelCtx ctx lv ++ " got " ++ showVZ ctx ty' ++ " : " ++ prettyVLevelCtx ctx lv' ++ ": " ++ show err
       catch (unify (lvl ctx) ty' ty) $ \(err :: Error) ->
-        throwIO $ ElaborateError $ "check failed " ++ show tm ++ " : " ++ showV ctx ty ++ " got " ++ showV ctx ty' ++ ": " ++ show err
+        throwIO $ ElaborateError $ "check failed " ++ show tm ++ " : " ++ showVZ ctx ty ++ " got " ++ showVZ ctx ty' ++ ": " ++ show err
       return ctm
 
 checkTy :: Ctx -> STm -> IO (Tm, VLevel)
@@ -166,7 +166,7 @@ checkFinLevel ctx = \case
 
 infer :: Ctx -> STm -> IO (Tm, VTy, VLevel)
 infer ctx tm = do
-  -- putStrLn $ "infer " ++ show tm ++ "(" ++ show (lvl ctx) ++ ")"
+  -- putStrLn $ "infer " ++ show tm
   case tm of
     SPos p t -> infer (enter p ctx) t
     t@(SVar x) ->
@@ -337,7 +337,7 @@ elaborate ctx tm = do
   solvedL <- allLSolved
   throwUnless solvedL $ ElaborateError $ "not all level metas are solved" 
   ty' <- verify ctx tm
-  throwUnless (ty == ty') $ ElaborateError $ "elaborated type did not match verified type: " ++ show ty ++ " ~ " ++ show ty'
+  -- throwUnless (ty == ty') $ ElaborateError $ "elaborated type did not match verified type: " ++ show ty ++ " ~ " ++ show ty'
   return (tm, ty, lv)
 
 elaborateDef :: Maybe String -> Name -> Maybe STy -> STm -> IO GlobalEntry

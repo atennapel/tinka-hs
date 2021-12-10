@@ -1,6 +1,5 @@
 .stack-work/
 *~
 *.txt
-*.tinka
 .vscode
 .metals
