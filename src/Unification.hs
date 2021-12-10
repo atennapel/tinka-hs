@@ -224,7 +224,9 @@ unifyFinLevel l a b =
     (Just m, Just m') | m == m' -> return ()
     (Just m, _) -> solveFinLevel l m b
     (_, Just m) -> solveFinLevel l m a
-    _ -> throwIO $ UnifyError $ "failed to unify " ++ show (quoteFinLevel l a) ++ " ~ " ++ show (quoteFinLevel l b)
+    _ -> case (a, b) of
+      (VFL n xs ys, VFL n' xs' ys') | n > 0 && n' > 0 -> unifyFinLevel l (VFL (n - 1) xs ys) (VFL (n' - 1) xs' ys')
+      _ -> throwIO $ UnifyError $ "failed to unify " ++ show (quoteFinLevel l a) ++ " ~ " ++ show (quoteFinLevel l b)
   where
     isMeta :: VFinLevel -> Maybe LMetaVar
     isMeta (VFL 0 xs ys) | IM.null xs =

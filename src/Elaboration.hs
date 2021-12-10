@@ -106,7 +106,7 @@ checkOrInfer ctx v (Just t) = do
 check :: Ctx -> STm -> VTy -> VLevel -> IO Tm
 check ctx tm ty lv = do
   let fty = force ty
-  putStrLn $ "check " ++ show tm ++ " : " ++ showV ctx ty ++ " : " ++ prettyVLevelCtx ctx lv
+  -- putStrLn $ "check " ++ show tm ++ " : " ++ showV ctx ty ++ " : " ++ prettyVLevelCtx ctx lv
   case (tm, fty) of
     (SPos p tm, _) -> check (enter p ctx) tm ty lv
     (SHole x, _) -> do
@@ -166,7 +166,7 @@ checkFinLevel ctx = \case
 
 infer :: Ctx -> STm -> IO (Tm, VTy, VLevel)
 infer ctx tm = do
-  putStrLn $ "infer " ++ show tm
+  -- putStrLn $ "infer " ++ show tm ++ "(" ++ show (lvl ctx) ++ ")"
   case tm of
     SPos p t -> infer (enter p ctx) t
     t@(SVar x) ->
@@ -203,7 +203,7 @@ infer ctx tm = do
       return (Sigma x ct (quoteLevelCtx ctx l1) cb (quoteLevelCtx ctx l2), VType (l1 <> l2), vLS (l1 <> l2))
     SPiLvl x b -> do
       (cb, l) <- checkTy (bindLevel x ctx) b
-      return (PiLvl x cb (quoteLevelCtx ctx l), VType VOmega, VOmega1)
+      return (PiLvl x cb (quoteLevel (lvl ctx + 1) l), VType VOmega, VOmega1)
     SLet x mt v b -> do
       (cv, ct, vt, l) <- checkOrInfer ctx v mt
       (cb, ty, u) <- infer (define x vt l (evalCtx ctx cv) ctx) b
@@ -293,10 +293,10 @@ infer ctx tm = do
                 go tm (vinst c (vproj tm (PNamed name i))) (i + 1) (S.insert y xs)
               _ -> error $ "name not found " ++ show c ++ ": " ++ showV ctx vt
         (tty, _) | p == SFst || p == SSnd -> do
-          u1 <- VFinLevel . finLevel (env ctx) <$> freshLMeta ctx
-          u2 <- VFinLevel . finLevel (env ctx) <$> freshLMeta ctx
           a <- eval (env ctx) <$> freshMeta ctx
+          u1 <- VFinLevel . finLevel (env ctx) <$> freshLMeta ctx
           b <- Clos (env ctx) <$> freshMeta (bind "x" Expl a u1 ctx)
+          u2 <- VFinLevel . finLevel (env ctx) <$> freshLMeta ctx
           catch (unify (lvl ctx) tty (VSigma "x" a u1 b u2)) $ \(err :: Error) ->
             throwIO $ ElaborateError $ "not a sigma type in " ++ show c ++ ": " ++ showV ctx vt ++ ": " ++ show err
           case p of

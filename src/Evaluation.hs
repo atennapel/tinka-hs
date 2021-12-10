@@ -27,10 +27,11 @@ vinstCL (FunLvl f) v = f v
 
 finLevel :: Env -> FinLevel -> VFinLevel
 finLevel e = \case
+  FLVar i | i < 0 || coerce i >= length e -> error $ "level var out of range: " ++ show i
+  FLVar i -> fromLeft undefined (e !! coerce i)
   FLZ -> mempty
   FLS i -> addToVFinLevel 1 (finLevel e i)
   FLMax i j -> finLevel e i <> finLevel e j
-  FLVar i -> fromLeft undefined (e !! coerce i)
   FLMeta m -> vFinMeta m
 
 level :: Env -> Level -> VLevel
@@ -120,6 +121,7 @@ vinsertedmeta env m bds = go env bds
 
 eval :: Env -> Tm -> Val
 eval e = \case
+  Var i | i < 0 || coerce i >= length e -> error $ "var out of range: " ++ show i
   Var i -> fromRight undefined (e !! coerce i)
   Global x ->
     case getGlobal x of
