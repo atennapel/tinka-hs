@@ -1,4 +1,29 @@
 import lib/bool;
 
 Sum : <l> (A B : Type l) -> Type l
-  = \<l> A B. (b : Bool) ** if <S l> b A B;
+  = \A B. (b : Bool) ** if b A B;
+
+Left : <l> {A B : Type l} -> A -> Sum A B = \x. (True, x);
+Right : <l> {A B : Type l} -> B -> Sum A B = \x. (False, x);
+
+indSum :
+  <l k> {A B : Type l}
+  (P : Sum A B -> Type k)
+  (left : (x : A) -> P (Left x))
+  (right : (x : B) -> P (Right x))
+  (sum : Sum A B)
+  -> P sum
+  = \{A} {B} P left right sum. indBool (\b. (x : if b A B) -> P (b, x)) left right sum._1 sum._2;
+
+sum :
+  <l k> {A B : Type l} {R : Type k}
+  -> (A -> R)
+  -> (B -> R)
+  -> Sum A B
+  -> R
+  = \<l k> {R = R} left right x. indSum <l> <k> (\_. R) left right x;
+
+swapSum : <l> {A B : Type l} -> Sum A B -> Sum B A = \<l>. sum <l> <l> Right Left;
+
+mapSum : <l> {X A B : Type l} -> (A -> B) -> Sum X A -> Sum X B
+  = \<l> fn. sum <l> <l> Left (\x. Right (fn x));

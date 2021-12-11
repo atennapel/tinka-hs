@@ -1,0 +1,21 @@
+import lib/sum;
+
+Maybe : Type -> Type = \A. Sum A ();
+
+Just : {A : Type} -> A -> Maybe A = Left;
+Nothing : {A : Type} -> Maybe A = Right [];
+
+indMaybe :
+  <k> {A : Type}
+  (P : Maybe A -> Type k)
+  (just : (x : A) -> P (Just x))
+  (nothing : P Nothing)
+  (m : Maybe A)
+  -> P m
+  = \{A} P just nothing m. indSum <0> P just (\_. nothing) m;
+
+maybe : {A R : Type} -> (A -> R) -> R -> Maybe A -> R
+  = \{R = R} j n m. indMaybe (\_. R) j n m;
+
+mapMaybe : {A B : Type} -> (A -> B) -> Maybe A -> Maybe B
+  = \fn s. maybe (\x. Just (fn x)) Nothing s;

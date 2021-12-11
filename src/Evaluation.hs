@@ -67,6 +67,22 @@ force (VNe (HMeta m) sp) | Solved t _ <- lookupMeta m = force (velimSp t sp)
 force (VGlobal _ _ v) = force v
 force v = v
 
+forceMetas :: Val -> Val
+forceMetas (VNe (HMeta m) sp) | Solved t _ <- lookupMeta m = forceMetas (velimSp t sp)
+forceMetas v = v
+
+forceLevel :: VLevel -> VLevel
+forceLevel (VFinLevel l) = VFinLevel (forceFinLevel l)
+forceLevel l = l
+
+forceFinLevel :: VFinLevel -> VFinLevel
+forceFinLevel (VFL n xs ys) = foldr (<>) (VFL n xs mempty) $ map go $ M.assocs ys
+  where
+    go :: (Int, Int) -> VFinLevel
+    go (m, n) = case lookupLMeta (coerce m) of
+      LUnsolved {} -> addToVFinLevel n (vFinMeta $ coerce m)
+      LSolved v _ -> forceFinLevel (addToVFinLevel n v)
+
 vproj :: Val -> ProjType -> Val
 vproj (VPair a b) Fst = a
 vproj (VPair a b) Snd = b
@@ -125,7 +141,7 @@ eval e = \case
   Var i -> fromRight undefined (e !! coerce i)
   Global x ->
     case getGlobal x of
-      Just e -> gVal e
+      Just e -> VGlobal x [] (gVal e)
       Nothing -> undefined
   Prim (Left x) -> vprim x
   Prim (Right x) -> evalprimelim x
@@ -177,16 +193,17 @@ evalprimelim PEElimHEq =
 data QuoteLevel = Full | KeepGlobals
 
 quoteFinLevel :: Lvl -> VFinLevel -> FinLevel
-quoteFinLevel l (VFL n xs ys) =
-  M.foldlWithKey (\i x n -> flmax i (addToFinLevel n (FLMeta (LMetaVar x)))) vars ys
-  where
-    vars = M.foldlWithKey
-      (\i x n -> flmax i (addToFinLevel n (FLVar (lvlToIx l (Lvl x)))))
-      (addToFinLevel n FLZ)
-      xs
+quoteFinLevel l lv = case forceFinLevel lv of
+  VFL n xs ys ->
+    M.foldlWithKey (\i x n -> flmax i (addToFinLevel n (FLMeta (LMetaVar x)))) vars ys
+    where
+      vars = M.foldlWithKey
+        (\i x n -> flmax i (addToFinLevel n (FLVar (lvlToIx l (Lvl x)))))
+        (addToFinLevel n FLZ)
+        xs
 
 quoteLevel :: Lvl -> VLevel -> Level
-quoteLevel l = \case
+quoteLevel l lv = case forceLevel lv of
   VOmega -> Omega
   VOmega1 -> Omega1
   VFinLevel i -> FinLevel (quoteFinLevel l i)
@@ -212,12 +229,12 @@ quoteElim ql l (EPrimElim x as) t =
 quoteWith :: QuoteLevel -> Lvl -> Val -> Tm
 quoteWith ql l = go l
   where
-    go l = \case
+    go l v = case forceMetas v of
       VNe h sp -> foldr (quoteElim ql l) (quoteHead l h) sp
       VGlobal h sp v ->
         case ql of
           Full -> go l v
-          KeepGlobals -> Global h
+          KeepGlobals -> foldr (quoteElim ql l) (Global h) sp
       VLam x i b -> Lam x i (go (l + 1) (vinst b (VVar l)))
       VPi x i t u1 b u2 -> Pi x i (go l t) (quoteLevel l u1) (go (l + 1) (vinst b (VVar l))) (quoteLevel l u2)
       VLamLvl x b -> LamLvl x (go (l + 1) (vinstLevel b (vFinLevelVar l)))

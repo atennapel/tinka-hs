@@ -106,7 +106,7 @@ rename m pren v = go pren v
     goLiftLevel pren b = go (lift pren) (vinstLevel b (vFinLevelVar (cod pren)))
 
     go :: PR -> Val -> IO Tm
-    go pren t = case force t of
+    go pren t = case forceMetas t of
       VNe (HMeta m') sp | m == m' -> throwIO $ UnifyError $ "occurs check failed ?" ++ show m
       VNe (HMeta m') sp -> goSp pren (Meta m') sp
       VNe (HVar x) sp -> do
@@ -123,7 +123,7 @@ rename m pren v = go pren v
       VType i -> Type <$> goLevel pren i
 
 lams :: Sp -> Tm -> Tm
-lams sp t = go 0 sp
+lams sp t = go 0 (reverse sp)
   where
     go :: Int -> Sp -> Tm
     go _ [] = t
@@ -133,10 +133,11 @@ lams sp t = go 0 sp
 
 solve :: Lvl -> MetaVar -> Sp -> Val -> IO ()
 solve gamma m sp rhs = do
-  -- putStrLn $ "solve ?" ++ show m ++ "[...] := " ++ show (quote gamma rhs)
+  debug $ "solve ?" ++ show m ++ "[...] := " ++ show (quote gamma rhs)
   pren <- invert gamma sp
   rhs <- rename m pren rhs
   let solution = lams sp rhs
+  debug $ "solution: " ++ show solution
   solveMeta m (eval [] solution) solution
 
 unifyElim :: Lvl -> Elim -> Elim -> IO ()
@@ -171,8 +172,8 @@ unifyClosLevel l b b' = let v = vFinLevelVar l in unify (l + 1) (vinstLevel b v)
 
 unify :: Lvl -> Val -> Val -> IO ()
 unify l a b = do
-  -- putStrLn $ "unify " ++ show (quote l a) ++ " ~ " ++ show (quote l b)
-  case (a, b) of
+  debug $ "unify " ++ show (quote l a) ++ " ~ " ++ show (quote l b)
+  case (forceMetas a, forceMetas b) of
     (VType i, VType i') -> unifyLevel l i i'
 
     (VPi _ i t u1 b u2, VPi _ i' t' u1' b' u2') | i == i' ->
@@ -204,31 +205,32 @@ unify l a b = do
     (t, VNe (HMeta m) sp) -> solve l m sp t
 
     (VNe h sp, VNe h' sp') | h == h' -> unifySp l sp sp'
+
     (VGlobal x sp v, VGlobal x' sp' v') | x == x' ->
       catch (unifySp l sp sp') $ \(_ :: Error) -> unify l v v'
     (VGlobal _ _ v, VGlobal _ _ v') -> unify l v v'
     (VGlobal _ _ v, v') -> unify l v v'
     (v, VGlobal _ _ v') -> unify l v v'
+
     _ -> throwIO $ UnifyError $ "failed to unify " ++ show (quote l a) ++ " ~ " ++ show (quote l b)
 
 -- level unification
 solveFinLevel :: Lvl -> LMetaVar -> VFinLevel -> IO ()
 solveFinLevel l m b@(VFL n xs ys) = do
-  -- putStrLn $ "solveLevel ?l" ++ show m ++ " := " ++ show (quoteFinLevel l b)
-  -- print b
+  debug $ "solveLevel ?l" ++ show m ++ " := " ++ show (quoteFinLevel l b)
   case lookupLMeta m of
     LSolved a _ -> unifyFinLevel l a b
     LUnsolved gamma scope -> do
-      throwUnless (IM.notMember (coerce m) ys) $ UnifyError $ "occurs check failed in level: " ++ show m ++ " := " ++ show (quoteFinLevel l b)
-      throwUnless (all (\x -> S.member (coerce x) scope) (IM.keys xs)) $ UnifyError $ "scope check failed in level: " ++ show m ++ " := " ++ show (quoteFinLevel l b)
-      let q = (quoteFinLevel gamma b)
+      throwUnless (IM.notMember (coerce m) ys) $ UnifyError $ "occurs check failed in level: ?l" ++ show m ++ " := " ++ show (quoteFinLevel l b)
+      throwUnless (all (\x -> S.member (coerce x) scope) (IM.keys xs)) $ UnifyError $ "scope check failed in level: ?l" ++ show m ++ " := " ++ show (quoteFinLevel l b)
+      let q = quoteFinLevel gamma b
+      debug $ "solution: " ++ show q
       solveLMeta m b q
 
 unifyFinLevel :: Lvl -> VFinLevel -> VFinLevel -> IO ()
 unifyFinLevel l a b = do
-  -- putStrLn $ "unifyFinLevel " ++ show (quoteFinLevel l a) ++ " ~ " ++ show (quoteFinLevel l b)
-  -- putStrLn $ show a ++ " ~ " ++ show b
-  case (a, b) of
+  debug $ "unifyFinLevel " ++ show (quoteFinLevel l a) ++ " ~ " ++ show (quoteFinLevel l b)
+  case (forceFinLevel a, forceFinLevel b) of
     (a, b) | a == b -> return ()
     (a, b) ->
       case (isMeta a, isMeta b, a, b) of
@@ -269,8 +271,8 @@ unifyFinLevel l a b = do
 
 unifyLevel :: Lvl -> VLevel -> VLevel -> IO ()
 unifyLevel l a b = do
-  -- putStrLn $ "unifyLevel " ++ show (quoteLevel l a) ++ " ~ " ++ show (quoteLevel l b)
-  case (a, b) of
+  debug $ "unifyLevel " ++ show (quoteLevel l a) ++ " ~ " ++ show (quoteLevel l b)
+  case (forceLevel a, forceLevel b) of
     (VOmega1, VOmega1) -> return ()
     (VOmega, VOmega) -> return ()
     (VFinLevel f, VFinLevel f') -> unifyFinLevel l f f'

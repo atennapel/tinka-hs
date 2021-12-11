@@ -21,3 +21,9 @@ icit Expl _ b = b
 onlyIf :: Bool -> IO () -> IO ()
 onlyIf True action = action
 onlyIf False _ = return ()
+
+doDebug :: Bool
+doDebug = False
+
+debug :: String -> IO ()
+debug = if doDebug then putStrLn else (\_ -> return ())

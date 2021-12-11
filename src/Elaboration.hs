@@ -106,7 +106,7 @@ checkOrInfer ctx v (Just t) = do
 check :: Ctx -> STm -> VTy -> VLevel -> IO Tm
 check ctx tm ty lv = do
   let fty = force ty
-  -- putStrLn $ "check " ++ show tm ++ " : " ++ showVZ ctx ty ++ " : " ++ prettyVLevelCtx ctx lv
+  debug $ "check " ++ show tm ++ " : " ++ showVZ ctx ty ++ " : " ++ prettyVLevelCtx ctx lv
   case (tm, fty) of
     (SPos p tm, _) -> check (enter p ctx) tm ty lv
     (SHole x, _) -> do
@@ -148,7 +148,9 @@ check ctx tm ty lv = do
 
 checkTy :: Ctx -> STm -> IO (Tm, VLevel)
 checkTy ctx tm = do
+  debug $ "checkTy " ++ show tm
   (ctm, ty, _) <- infer ctx tm
+  debug $ "checkTy done: " ++ show ctm
   case force ty of
     VType l -> return (ctm, l)
     _ -> throwIO $ ElaborateError $ "expected Type in " ++ show tm ++ " but got " ++ showV ctx ty
@@ -166,7 +168,7 @@ checkFinLevel ctx = \case
 
 infer :: Ctx -> STm -> IO (Tm, VTy, VLevel)
 infer ctx tm = do
-  -- putStrLn $ "infer " ++ show tm
+  debug $ "infer " ++ show tm
   case tm of
     SPos p t -> infer (enter p ctx) t
     t@(SVar x) ->
@@ -182,7 +184,7 @@ infer ctx tm = do
             Nothing -> do
               case lookupCtx ctx x of
                 Just (i, Just (ty, u)) -> do
-                  -- putStrLn $ show t ++ " : " ++ showV ctx ty ++ " ~> '" ++ show i
+                  debug $ show t ++ " : " ++ showV ctx ty ++ " ~> '" ++ show i
                   return (Var i, ty, u)
                 Just (_, Nothing) -> throwIO $ ElaborateError $ "variable referes to universe level variable: " ++ show t
                 Nothing -> do
@@ -347,6 +349,7 @@ elaborateDef mod x ty tm =
       error $ "cannot redefine global " ++ maybe "" (++ ".") (gModule e) ++ x ++ " as " ++ maybe "" (++ ".") mod ++ x
     _ -> do
       (etm, ety, elv) <- elaborate empty (SLet x ty tm (SVar x))
+      debug $ "finished elaboration of " ++ x
       return $ GlobalEntry x (eval [] ety) (level [] elv) (eval [] etm) ety elv etm mod
 
 elaborateDecl :: Maybe String -> Decl -> IO Decls
