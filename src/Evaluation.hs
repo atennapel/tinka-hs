@@ -96,11 +96,6 @@ vfst, vsnd :: Val -> Val
 vfst v = vproj v Fst
 vsnd v = vproj v Snd
 
-vliftterm :: VFinLevel -> VFinLevel -> Val -> Val -> Val
-vliftterm l k a (VNe h (EPrimElim PELower _ : sp)) = VNe h sp
-vliftterm l k a (VGlobal x (EPrimElim PELower _ : sp) v) = VGlobal x sp (vliftterm l k a v)
-vliftterm l k a v = VLiftTerm l k a v
-
 vprimelim :: PrimElimName -> [Either VFinLevel (Val, Icit)] -> Val -> Val
 vprimelim PELower _ (VLiftTerm _ _ _ v) = v
 
@@ -113,12 +108,17 @@ vprimelim x as (VNe h sp) = VNe h (EPrimElim x as : sp)
 vprimelim p as (VGlobal x sp v) = VGlobal x (EPrimElim p as : sp) (vprimelim p as v)
 vprimelim x as _ = undefined
 
+vliftterm :: VFinLevel -> VFinLevel -> Val -> Val -> Val
+vliftterm k l a (VNe h (EPrimElim PELower _ : sp)) = VNe h sp
+vliftterm k l a (VGlobal x (EPrimElim PELower _ : sp) v) = VGlobal x sp (vliftterm k l a v)
+vliftterm k l a v = VLiftTerm k l a v
+
 vlower :: VFinLevel -> VFinLevel -> Val -> Val -> Val
-vlower l k a = vprimelim PELower [Left l, Left k, Right (a, Impl)]
+vlower k l a = vprimelim PELower [Left k, Left l, Right (a, Impl)]
 
 vprim :: PrimName -> Val
 vprim PLiftTerm =
-  vlamlvl "l" $ \l -> vlamlvl "k" $ \k -> vlamimpl "A" $ \a -> vlam "x" $ \x -> vliftterm l k a x
+  vlamlvl "k" $ \k -> vlamlvl "l" $ \l -> vlamimpl "A" $ \a -> vlam "x" $ \x -> vliftterm k l a x
 vprim x = VNe (HPrim x) []
 
 vmeta :: MetaVar -> Val
@@ -166,11 +166,11 @@ evalprimelim PEAbsurd =
   vlam "v" $ \v ->
   vprimelim PEAbsurd [Left l, Right (a, Impl)] v
 evalprimelim PELower =
-  vlamlvl "l" $ \l ->
   vlamlvl "k" $ \k ->
+  vlamlvl "l" $ \l ->
   vlamimpl "A" $ \a ->
   vlam "x" $ \x ->
-  vlower l k a x
+  vlower k l a x
 evalprimelim PEIndBool =
   vlamlvl "l" $ \l ->
   vlam "P" $ \p ->
@@ -330,19 +330,19 @@ primType PUnit = (VUnitType, VFinLevel mempty)
 primType PBool = (VType vFLZ, VFinLevel (vFLS mempty))
 primType PTrue = (VBool, VFinLevel mempty)
 primType PFalse = (VBool, VFinLevel mempty)
--- <l k> -> Type l -> Type (max l k)
+-- <k l> -> Type l -> Type (max l k)
 primType PLift =
-  (vpilvl "l" (const VOmega) $ \l ->
-  vpilvl "k" (\k -> VFinLevel (vFLS (l <> k))) $ \k ->
+  (vpilvl "k" (const VOmega) $ \k ->
+  vpilvl "l" (\l -> VFinLevel (vFLS (l <> k))) $ \l ->
   vfun (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS (l <> k))) $
   VTypeFin $ l <> k, VOmega)
--- <l k> {A : Type l} -> A -> Lift <l> <k> A
+-- <k l> {A : Type l} -> A -> Lift <k> <l> A
 primType PLiftTerm =
-  (vpilvl "l" (const VOmega) $ \l ->
-  vpilvl "k" (\k -> VFinLevel (vFLS l <> k)) $ \k ->
+  (vpilvl "k" (const VOmega) $ \k ->
+  vpilvl "l" (\l -> VFinLevel (vFLS l <> k)) $ \l ->
   vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (l <> k)) $ \a ->
   vfun a (VFinLevel l) (VFinLevel (l <> k)) $
-  VLift l k a, VOmega)
+  VLift k l a, VOmega)
 -- <l> {A : Type l} {B : Type l} -> A -> B -> Type l
 primType PHEq =
   (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
@@ -365,12 +365,12 @@ primElimType PEAbsurd =
   vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel l) $ \a ->
   vfun VVoid vFLZ (VFinLevel l) $
   a, VOmega)
--- <l> <k> {A : Type l} -> Lift <l> <k> A -> A
+-- <k> <l> {A : Type l} -> Lift <k> <l> A -> A
 primElimType PELower =
-  (vpilvl "l" (const VOmega) $ \l ->
-  vpilvl "k" (\k -> VFinLevel (vFLS l <> k)) $ \k ->
+  (vpilvl "k" (const VOmega) $ \k ->
+  vpilvl "l" (\l -> VFinLevel (vFLS l <> k)) $ \l ->
   vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (l <> k)) $ \a ->
-  vfun (VLift l k a) (VFinLevel (l <> k)) (VFinLevel l) $
+  vfun (VLift k l a) (VFinLevel (l <> k)) (VFinLevel l) $
   a, VOmega)
 {-
 <l>
