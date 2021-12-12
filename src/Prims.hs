@@ -18,7 +18,7 @@ data PrimName
 data PrimElimName
   = PEAbsurd
   | PELower
-  | PEIndBool
+  | PEIndBool | PEIfDesc
   | PEElimHEq
   | PEEx | PEEl
   deriving (Eq)
@@ -44,6 +44,7 @@ instance Show PrimElimName where
   show PEAbsurd = "absurd"
   show PELower = "lower"
   show PEIndBool = "indBool"
+  show PEIfDesc = "ifDesc"
   show PEElimHEq = "elimHEq"
   show PEEx = "Ex"
   show PEEl = "El"
@@ -70,6 +71,7 @@ toPrimElimName :: String -> Maybe PrimElimName
 toPrimElimName "absurd" = Just PEAbsurd
 toPrimElimName "lower" = Just PELower
 toPrimElimName "indBool" = Just PEIndBool
+toPrimElimName "ifDesc" = Just PEIfDesc
 toPrimElimName "elimHEq" = Just PEElimHEq
 toPrimElimName "Ex" = Just PEEx
 toPrimElimName "El" = Just PEEl

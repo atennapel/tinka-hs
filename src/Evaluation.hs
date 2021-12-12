@@ -102,6 +102,9 @@ vprimelim PELower _ (VLiftTerm _ _ _ v) = v
 vprimelim PEIndBool [_, _, Right (t, _), _] VTrue = t
 vprimelim PEIndBool [_, _, _, Right (f, _)] VFalse = f
 
+vprimelim PEIfDesc [_, _, Right (x, _), Right (y, _)] VTrue = x
+vprimelim PEIfDesc [_, _, Right (x, _), Right (y, _)] VFalse = y
+
 vprimelim PEElimHEq [_, _, _, _, _, Right (refl, _), _] (VHRefl _ _ _) = refl
 
 -- Ex (Var i) X = X i
@@ -135,6 +138,9 @@ vex l i x = vprimelim PEEx [Left l, Right (i, Impl), Right (x, Expl)]
 
 vel :: VFinLevel -> Val -> Val -> Val -> Val -> Val
 vel l i x ii = vprimelim PEEl [Left l, Right (i, Impl), Right (x, Expl), Right (ii, Expl)]
+
+vifdesc :: VFinLevel -> Val -> Val -> Val -> Val -> Val
+vifdesc l i x y = vprimelim PEIfDesc [Left l, Right (i, Impl), Right (x, Expl), Right (y, Expl)]
 
 vprim :: PrimName -> Val
 vprim PLiftTerm =
@@ -199,6 +205,13 @@ evalprimelim PEIndBool =
   vlam "f" $ \f ->
   vlam "b" $ \b ->
   vprimelim PEIndBool [Left l, Right (p, Expl), Right (t, Expl), Right (f, Expl)] b
+evalprimelim PEIfDesc =
+  vlamlvl "l" $ \l ->
+  vlamimpl "I" $ \i ->
+  vlam "x" $ \x ->
+  vlam "y" $ \y ->
+  vlam "b" $ \b ->
+  vifdesc l i x y b
 evalprimelim PEElimHEq =
   vlamlvl "l" $ \l ->
   vlamlvl "k" $ \k ->
@@ -455,6 +468,14 @@ primElimType PEIndBool =
   vfun (vapp p VFalse Expl) (VFinLevel l) (VFinLevel l) $
   vpi "b" VBool vFLZ (VFinLevel l) $ \b ->
   vapp p b Expl, VOmega)
+{- ifDesc : <l> {I : Type l} -> Desc <l> I -> Desc <l> I -> Bool -> Desc <l> I -}
+primElimType PEIfDesc =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vfun (VDesc l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
+  vfun (VDesc l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
+  vfun VBool (VFinLevel mempty) (VFinLevel (vFLS l)) $
+  VDesc l i, VOmega)
 {-
 <l k>
 {A : Type l}
@@ -490,3 +511,45 @@ primElimType PEEl =
   vfun i (VFinLevel l) (VFinLevel (vFLS l)) $
   vfun (VDesc l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
   VTypeFin l, VOmega)
+
+-- levitation
+vEnd :: VFinLevel -> Val
+vEnd l = let k = vFLS l in VHRefl k (VLift k mempty VUnitType) (VLiftTerm k mempty VUnitType VUnit)
+
+vVar :: VFinLevel -> Val -> Val -> Val
+vVar l i j = let k = vFLS l in VCon $ vpairs [VLiftTerm k mempty VBool VTrue, VLiftTerm k l i j, vEnd l]
+
+-- \<l> {I} A K. Con (lift <S l> <0> {Bool} False, lift <S l> <0> {Bool} True, A, \x. K (lower <S l> <l> {A} x), HRefl <S l> {Lift <S l> <0> ()} {lift <S l> <0> {()} []})
+vArg :: VFinLevel -> Val -> Val -> Val -> Val
+vArg l i a kk = let k = vFLS l in VCon $ vpairs [VLiftTerm k mempty VBool VFalse, VLiftTerm k mempty VBool VTrue, a, vlam "x" (\x -> vapp kk (vlower k l a x) Expl), vEnd l]
+
+-- \<l> {I} A B. Con (lift <S l> <0> {Bool} False, lift <S l> <0> {Bool} False, A, B, HRefl <S l> {Lift <S l> <0> ()} {lift <S l> <0> {()} []})
+vInd :: VFinLevel -> Val -> Val -> Val -> Val
+vInd l i a b = let k = vFLS l in VCon $ vpairs [VLiftTerm k mempty VBool VFalse, VLiftTerm k mempty VBool VFalse, a, b, vEnd l]
+
+-- \<l> {I} A B. Arg <l> {I} (Lift <l> <0> Bool) (\b. indBool <S l> (\_. Desc <l> I) A B (lower <l> <0> {Bool} b))
+vSumD :: VFinLevel -> Val -> Val -> Val -> Val
+vSumD l i a b = vArg l i (VLift l mempty VBool) (vlam "b" $ \b -> vifdesc l i a b (vlower l mempty VBool b))
+
+{-
+DescD : <l> -> Type l -> Desc (Lift <S l> ())
+  = \<l> I. 
+    let var = Var (lift []);
+    SumD (Arg (Lift <S l> I) \_. var)
+    (SumD
+      (Arg (Type l) (\A. Ind (Arg (Lift <S l> A) \_. var) var))
+      (Ind var (Ind var var)));
+-}
+vDescD :: VFinLevel -> Val -> Val
+vDescD l i =
+  let k = vFLS l in
+  let tu = VLift k mempty VUnitType in
+  let u = VLiftTerm k mempty VUnitType VUnit in
+  let var = vVar k tu u in
+  {- Var -} vSumD k tu (vArg k tu (VLift k l i) (vlam "_" $ \_ -> var)) $
+  {- Arg -} vSumD k tu (vArg k tu (VTypeFin l) (vlam "A" $ \a -> vInd k tu (vArg k tu (VLift k l a) (vlam "_" $ \_ -> var)) var)) $
+  {- Ind -} (vInd k tu var (vInd k tu var var))
+
+-- <l> -> Type l -> Type (S l) = \I. Data (DescD I) [];
+vDesc :: VFinLevel -> Val -> Val
+vDesc l i = let k = vFLS l in VData k (VLift k mempty VUnitType) (vDescD l i) (VLiftTerm k mempty VUnitType VUnit)

@@ -87,3 +87,6 @@ vlamimpl x b = VLam x Impl (Fun b)
 
 vlamlvl :: Name -> (VFinLevel -> Val) -> Val
 vlamlvl x b = VLamLvl x (Fun b)
+
+vpairs :: [Val] -> Val
+vpairs = foldr1 VPair
