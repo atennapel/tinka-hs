@@ -3,5 +3,5 @@ import lib/desc;
 ListD : Type -> Desc () = \A. SumD (Var []) (Arg A \_. Ind (Var []) (Var []));
 List : Type -> Type = \A. Data (ListD A) [];
 
-Nil : {A : Type} -> List A = Con (True, End);
-Cons : {A : Type} -> A -> List A -> List A = \hd tl. Con (False, hd, tl, End);
+Nil : {A : Type} -> List A = (True, End);
+Cons : {A : Type} -> A -> List A -> List A = \hd tl. (False, hd, tl, End);

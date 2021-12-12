@@ -5,3 +5,8 @@ import lib/bool.proofs;
 
 import lib/sum;
 import lib/maybe;
+
+import lib/desc;
+import lib/nat;
+import lib/list;
+import lib/vec;
