@@ -26,6 +26,8 @@ check ctx tm ty = do
       let vt = evalCtx ctx t
       check ctx v vt
       check (define x vt l (evalCtx ctx v) ctx) b ty
+    (Con t, VData l i d j) ->
+      check ctx t (vel l i (vlam "i" $ VData l i d) j d)
     (tm, ty) -> do
       ty' <- infer ctx tm
       throwUnless (conv (lvl ctx) ty' ty) $ VerifyError $ "check failed " ++ show tm ++ " : " ++ showV ctx ty ++ " got " ++ showV ctx ty'

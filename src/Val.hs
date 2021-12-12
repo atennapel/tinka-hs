@@ -36,6 +36,7 @@ data Val
   | VPiLvl Name (Clos VFinLevel) ClosLvl
   | VPair Val Val
   | VSigma Name Val VLevel (Clos Val) VLevel
+  | VCon Val
   | VType VLevel
 
 pattern VTypeFin l = VType (VFinLevel l)
@@ -59,7 +60,6 @@ pattern VArg l i a k = VNe (HPrim PArg) [EApp k Expl, EApp a Expl, EApp i Impl, 
 pattern VPar l i a b = VNe (HPrim PPar) [EApp b Expl, EApp a Expl, EApp i Impl, EAppLvl l]
 
 pattern VData l i d j = VNe (HPrim PData) [EApp j Expl, EApp d Expl, EApp i Impl, EAppLvl l]
-pattern VCon l i d j x = VNe (HPrim PCon) [EApp x Expl, EApp j Impl, EApp d Impl, EApp i Impl, EAppLvl l]
 
 vpi :: Name -> Val -> VLevel -> VLevel -> (Val -> Val) -> Val
 vpi x a u1 u2 b = VPi x Expl a u1 (Fun b) u2

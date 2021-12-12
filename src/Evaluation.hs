@@ -174,6 +174,7 @@ eval e = \case
   Proj t p -> vproj (eval e t) p
   Pair a b -> VPair (eval e a) (eval e b)
   Sigma x t u1 b u2 -> VSigma x (eval e t) (level e u1) (Clos e b) (level e u2)
+  Con t -> VCon (eval e t)
   Let x _ v b -> eval (Right (eval e v) : e) b
   Type l -> VType (level e l)
   Meta m -> vmeta m
@@ -274,6 +275,7 @@ quoteWith ql l = go l
       VPiLvl x b u -> let v = vFinLevelVar l in PiLvl x (go (l + 1) (vinstLevel b v)) (quoteLevel (l + 1) (vinstCL u v))
       VPair a b -> Pair (go l a) (go l b)
       VSigma x t u1 b u2 -> Sigma x (go l t) (quoteLevel l u1) (go (l + 1) (vinst b (VVar l))) (quoteLevel l u2)
+      VCon t -> Con (go l t)
       VType i -> Type (quoteLevel l i)
 
 quote :: Lvl -> Val -> Tm
@@ -322,6 +324,7 @@ convClosLevel l b b' = let v = vFinLevelVar l in conv (l + 1) (vinstLevel b v) (
 conv :: Lvl -> Val -> Val -> Bool
 conv l a b = case (a, b) of
   (VType i, VType i') -> i == i'
+  (VCon t, VCon t') -> conv l t t'
 
   (VPi _ i t u1 b u2, VPi _ i' t' u1' b' u2') | i == i' && u1 == u1' && u2 == u2' ->
     conv l t t' && convClos l b b'
@@ -422,14 +425,6 @@ primType PData =
   vfun (VDesc l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
   vfun i (VFinLevel l) (VFinLevel (vFLS l)) $
   VTypeFin l, VOmega)
--- Con : <l> {I : Type l} {D : Desc <l> I} {i : I} -> El <l> {I} D (Data <l> {I} D) i -> Data <l> {I} D i
-primType PCon =
-  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
-  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
-  vpimpl "D" (VDesc l i) (VFinLevel (vFLS l)) (VFinLevel l) $ \d ->
-  vpimpl "i" i (VFinLevel l) (VFinLevel l) $ \ii ->
-  vfun (vel l i (vlam "i" $ VData l i d) ii d) (VFinLevel l) (VFinLevel l) $
-  VData l i d ii, VOmega)
 
 primElimType :: PrimElimName -> (Val, VLevel)
 -- <l> {A : Type l} -> Void -> A

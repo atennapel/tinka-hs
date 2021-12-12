@@ -12,7 +12,7 @@ data PrimName
   | PLiftTerm
 
   | PDesc | PVar | PArg | PPar
-  | PData | PCon
+  | PData
   deriving (Eq)
 
 data PrimElimName
@@ -39,7 +39,6 @@ instance Show PrimName where
   show PArg = "Arg"
   show PPar = "Par"
   show PData = "Data"
-  show PCon = "Con"
 
 instance Show PrimElimName where
   show PEAbsurd = "absurd"
@@ -65,7 +64,6 @@ toPrimName "Var" = Just PVar
 toPrimName "Arg" = Just PArg
 toPrimName "Par" = Just PPar
 toPrimName "Data" = Just PData
-toPrimName "Con" = Just PCon
 toPrimName _ = Nothing
 
 toPrimElimName :: String -> Maybe PrimElimName

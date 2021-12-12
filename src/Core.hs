@@ -30,6 +30,7 @@ data Tm
   | Proj Tm ProjType
   | Pair Tm Tm
   | Sigma Name Tm Level Tm Level
+  | Con Tm
   | Let Name Ty Tm Tm
   | Type Level
   | Meta MetaVar
@@ -161,6 +162,7 @@ instance Show Tm where
   show t@(Proj _ _) = showTmProj t
   show t@(Pair _ _) = showTmPair t
   show t@Sigma {} = showTmSigma t
+  show (Con t) = "Con " ++ showTmS t
   show (Let x t v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (Type (FinLevel FLZ)) = "Type"
   show (Type l) = "Type " ++ showLevelS l

@@ -45,6 +45,7 @@ data STm
   | SProj STm SProjType
   | SPair STm STm
   | SSigma Name STm STm
+  | SCon STm
   | SLet Name (Maybe STy) STm STm
   | SType SLevel
   | SHole (Maybe Name)
@@ -177,6 +178,7 @@ instance Show STm where
   show t@(SProj _ _) = showSTmProj t
   show t@(SPair _ _) = showSTmPair t
   show t@(SSigma _ _ _) = showSTmSigma t
+  show (SCon t) = "Con " ++ showSTmS t
   show (SLet x (Just t) v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (SLet x Nothing v b) = "let " ++ x ++ " = " ++ show v ++ "; " ++ show b
   show (SType (SLNat 0)) = "Type"

@@ -154,7 +154,12 @@ check ctx tm ty lv = do
       (cv, ct, vt, u) <- checkOrInfer ctx v mt
       cb <- check (define x vt u (evalCtx ctx cv) ctx) b ty lv
       return $ Let x ct cv cb
-    
+
+    (SCon t, VData l i d j) -> do
+      ct <- check ctx t (vel l i (vlam "i" $ VData l i d) j d) lv
+      return $ Con ct
+    (SPair _ _, VData l i d j) -> check ctx (SCon tm) ty lv 
+
     (SVar "[]", VLift k l VUnitType) -> do
       unifyFinLevel (lvl ctx) l mempty
       return $ cLiftTerm (quoteFinLevelCtx ctx k) (quoteFinLevelCtx ctx l) (Prim (Left PUnitType)) (Prim (Left PUnit))

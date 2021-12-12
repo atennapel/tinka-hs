@@ -120,6 +120,7 @@ rename m pren v = go pren v
       VPiLvl x b u -> PiLvl x <$> goLiftLevel pren b <*> goLevel (lift pren) (vinstCL u (vFinLevelVar (cod pren)))
       VPair a b -> Pair <$> go pren a <*> go pren b
       VSigma x t u1 b u2 -> Sigma x <$> go pren t <*> goLevel pren u1 <*> goLift pren b <*> goLevel pren u2
+      VCon t -> Con <$> go pren t
       VType i -> Type <$> goLevel pren i
 
 lams :: Sp -> Tm -> Tm
@@ -175,6 +176,8 @@ unify l a b = do
   debug $ "unify " ++ show (quote l a) ++ " ~ " ++ show (quote l b)
   case (forceMetas a, forceMetas b) of
     (VType i, VType i') -> unifyLevel l i i'
+
+    (VCon t, VCon t') -> unify l t t'
 
     (VPi _ i t u1 b u2, VPi _ i' t' u1' b' u2') | i == i' ->
       unifyLevel l u1 u1' >> unify l t t' >> unifyLevel l u2 u2' >> unifyClos l b b'

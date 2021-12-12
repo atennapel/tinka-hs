@@ -56,7 +56,7 @@ TODO:
 - [ ] descriptions
   - [x] Desc and Data constructors
   - [x] Ex and El
-  - [ ] bidirectional Con
+  - [x] bidirectional Con
   - [ ] Data elimination
   - [ ] levitation
 - [ ] update unification

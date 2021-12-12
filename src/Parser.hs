@@ -53,7 +53,7 @@ pLambda :: Parser Char
 pLambda = char 'λ' <|> char '\\'
 
 keywords :: [String]
-keywords = ["let", "λ", "Type"]
+keywords = ["let", "λ", "Type", "Con"]
 
 keyword :: String -> Bool
 keyword x = x `elem` keywords
@@ -98,6 +98,11 @@ pType = do
   ws
   return $ maybe (SType (SLNat 0)) SType l
 
+pCon :: Parser STm
+pCon = do
+  symbol "Con"
+  SCon <$> pAtom
+
 pCommaSeparated :: Parser [STm]
 pCommaSeparated = do
   first <- pSurface
@@ -126,8 +131,7 @@ pAtom =
     try pType <|>
     (SType (SLNat 0) <$ symbol "Type") <|>
     (SVar <$> pIdent))
-  -- <|> try pType
-  -- <|> (SType (SLNat 0) <$ symbol "Type")
+  <|> pCon
   <|> try (SVar "()" <$ parens ws)
   <|> try (SVar "[]" <$ brackets ws)
   <|> try pPair
