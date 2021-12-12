@@ -10,6 +10,9 @@ data PrimName
 
   | PLift
   | PLiftTerm
+
+  | PDesc | PVar | PArg | PPar
+  | PData | PCon
   deriving (Eq)
 
 data PrimElimName
@@ -17,6 +20,7 @@ data PrimElimName
   | PELower
   | PEIndBool
   | PEElimHEq
+  | PEEx | PEEl
   deriving (Eq)
 
 instance Show PrimName where
@@ -30,12 +34,20 @@ instance Show PrimName where
   show PHRefl = "HRefl"
   show PLift = "Lift"
   show PLiftTerm = "lift"
+  show PDesc = "Desc"
+  show PVar = "Var"
+  show PArg = "Arg"
+  show PPar = "Par"
+  show PData = "Data"
+  show PCon = "Con"
 
 instance Show PrimElimName where
   show PEAbsurd = "absurd"
   show PELower = "lower"
   show PEIndBool = "indBool"
   show PEElimHEq = "elimHEq"
+  show PEEx = "Ex"
+  show PEEl = "El"
 
 toPrimName :: String -> Maybe PrimName
 toPrimName "Void" = Just PVoid
@@ -48,6 +60,12 @@ toPrimName "HEq" = Just PHEq
 toPrimName "HRefl" = Just PHRefl
 toPrimName "Lift" = Just PLift
 toPrimName "lift" = Just PLiftTerm
+toPrimName "Desc" = Just PDesc
+toPrimName "Var" = Just PVar
+toPrimName "Arg" = Just PArg
+toPrimName "Par" = Just PPar
+toPrimName "Data" = Just PData
+toPrimName "Con" = Just PCon
 toPrimName _ = Nothing
 
 toPrimElimName :: String -> Maybe PrimElimName
@@ -55,6 +73,8 @@ toPrimElimName "absurd" = Just PEAbsurd
 toPrimElimName "lower" = Just PELower
 toPrimElimName "indBool" = Just PEIndBool
 toPrimElimName "elimHEq" = Just PEElimHEq
+toPrimElimName "Ex" = Just PEEx
+toPrimElimName "El" = Just PEEl
 toPrimElimName _ = Nothing
 
 data PrimElimPosition = PEPFirst | PEPLast

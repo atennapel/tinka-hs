@@ -86,7 +86,7 @@ pLevel = suc <|> max <|> pLevelAtom
       SLMax <$> pLevelAtom <*> pLevelAtom
 
 pLevelAtom :: Parser SLevel
-pLevelAtom = nat <|> var <|> parens pLevel
+pLevelAtom = try nat <|> var <|> parens pLevel
   where
     var = SLVar <$> pIdent
     nat = SLNat <$> L.decimal
@@ -94,7 +94,9 @@ pLevelAtom = nat <|> var <|> parens pLevel
 pType :: Parser STm
 pType = do
   symbol "Type"
-  SType <$> pLevelAtom
+  l <- optional pLevelAtom
+  ws
+  return $ maybe (SType (SLNat 0)) SType l
 
 pCommaSeparated :: Parser [STm]
 pCommaSeparated = do
@@ -121,9 +123,11 @@ pAtom :: Parser STm
 pAtom =
   withPos (
     pHole <|>
+    try pType <|>
+    (SType (SLNat 0) <$ symbol "Type") <|>
     (SVar <$> pIdent))
-  <|> try pType
-  <|> (SType (SLNat 0) <$ symbol "Type")
+  -- <|> try pType
+  -- <|> (SType (SLNat 0) <$ symbol "Type")
   <|> try (SVar "()" <$ parens ws)
   <|> try (SVar "[]" <$ brackets ws)
   <|> try pPair

@@ -110,6 +110,9 @@ quoteCtx ctx v = quote (lvl ctx) v
 quoteLevelCtx :: Ctx -> VLevel -> Level
 quoteLevelCtx ctx l = quoteLevel (lvl ctx) l
 
+quoteFinLevelCtx :: Ctx -> VFinLevel -> FinLevel
+quoteFinLevelCtx ctx l = quoteFinLevel (lvl ctx) l
+
 zonkCtx :: Ctx -> Tm -> Tm
 zonkCtx ctx = zonk (lvl ctx) (env ctx)
 

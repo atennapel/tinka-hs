@@ -36,6 +36,14 @@ data Tm
   | InsertedMeta MetaVar [Maybe Icit]
   deriving (Eq)
 
+capps :: Tm -> [Either FinLevel (Tm, Icit)] -> Tm
+capps t [] = t
+capps t (Left l : r) = capps (AppLvl t l) r
+capps t (Right (a, i) : r) = capps (App t a i) r
+
+cLiftTerm :: FinLevel -> FinLevel -> Ty -> Tm -> Tm
+cLiftTerm k l a x = capps (Prim (Left PLiftTerm)) [Left k, Left l, Right (a, Impl), Right (x, Expl)]
+
 showTmS :: Tm -> String
 showTmS t@(Var _) = show t
 showTmS t@(Pair _ _) = show t

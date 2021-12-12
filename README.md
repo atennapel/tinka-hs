@@ -54,7 +54,13 @@ TODO:
   - [ ] lam and app with level renaming
   - [ ] improve level unification
 - [ ] descriptions
+  - [x] Desc and Data constructors
+  - [x] Ex and El
+  - [ ] bidirectional Con
+  - [ ] Data elimination
+  - [ ] levitation
 - [ ] update unification
+  - [ ] eta rule for Bool
   - [ ] pruning
   - [ ] postponing
 - [ ] add more syntax
@@ -62,3 +68,16 @@ TODO:
   - [ ] equality syntax
 - [ ] improve error message
   - [ ] use source position
+- [ ] more types
+  - [ ] nested fixpoints
+  - [ ] coinductive types
+  - [ ] mixed fixpoints
+  - [ ] nested types
+  - [ ] inductive-recursive types
+  - [ ] inductive-inductive types
+  - [ ] curried indexes and parameters
+- [ ] Prop universe
+- [ ] Setoid type theory/observational type theory
+
+Level solver issues:
+- max '4 ?l7 ~ S '4

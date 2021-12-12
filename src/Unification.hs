@@ -1,4 +1,4 @@
-module Unification (unify, unifyLevel) where
+module Unification (unify, unifyLevel, unifyFinLevel) where
 
 import qualified Data.IntMap as IM
 import qualified Data.Set as S
@@ -195,14 +195,14 @@ unify l a b = do
     (VPair a b, x) -> unify l a (vfst x) >> unify l b (vsnd x)
     (x, VPair a b) -> unify l (vfst x) a >> unify l (vsnd x) b
 
-    (VUnit, v) -> return ()
-    (v, VUnit) -> return ()
-
     (VLiftTerm lv k a x, y) -> unify l x (vlower lv k a y)
     (y, VLiftTerm lv k a x) -> unify l (vlower lv k a y) x
 
     (VNe (HMeta m) sp, t) -> solve l m sp t
     (t, VNe (HMeta m) sp) -> solve l m sp t
+
+    (VUnit, v) -> return ()
+    (v, VUnit) -> return ()
 
     (VNe h sp, VNe h' sp') | h == h' -> unifySp l sp sp'
 
@@ -239,23 +239,23 @@ unifyFinLevel l a b = do
         (Just (m, n), Just (m', n'), _, _) | n' >= n ->
           solveFinLevel l m (VFL 0 mempty (IM.singleton (coerce m') (n' - n)))
         (Just (m, n), Nothing, _, VFL 0 xs ys) | all (>= n) (IM.elems xs) && all (>= n) (IM.elems ys) ->
-          solveFinLevel l m (VFL 0 (IM.map (\x -> x - n) xs) (IM.map (\x -> x - n) ys))
+          solveFinLevel l m (subVFinLevel n b)
         (Just (m, n), Nothing, _, VFL n' xs ys) | n' >= n && all (>= n) (IM.elems xs) && all (>= n) (IM.elems ys) ->
-          solveFinLevel l m (VFL (n' - n) (IM.map (\x -> x - n) xs) (IM.map (\x -> x - n) ys))
+          solveFinLevel l m (subVFinLevel n b)
         (Nothing, Just (m, n), VFL 0 xs ys, _) | all (>= n) (IM.elems xs) && all (>= n) (IM.elems ys) ->
-          solveFinLevel l m (VFL 0 (IM.map (\x -> x - n) xs) (IM.map (\x -> x - n) ys))
+          solveFinLevel l m (subVFinLevel n a)
         (Nothing, Just (m, n), VFL n' xs ys, _) | n' >= n && all (>= n) (IM.elems xs) && all (>= n) (IM.elems ys) ->
-          solveFinLevel l m (VFL (n' - n) (IM.map (\x -> x - n) xs) (IM.map (\x -> x - n) ys))
+          solveFinLevel l m (subVFinLevel n a)
         (_, _, VFL 0 xs ys, VFL 0 xs' ys') -> do
           let m = minimum (IM.elems xs ++ IM.elems ys ++ IM.elems xs' ++ IM.elems ys')
           if m > 0 then
-            unifyFinLevel l (VFL 0 (IM.map (\x -> x - m) xs) (IM.map (\x -> x - m) ys)) (VFL 0 (IM.map (\x -> x - m) xs') (IM.map (\x -> x - m) ys'))
+            unifyFinLevel l (subVFinLevel m a) (subVFinLevel m b)
           else
             throwIO $ UnifyError $ "failed to unify " ++ show (quoteFinLevel l a) ++ " ~ " ++ show (quoteFinLevel l b)
         (_, _, VFL n xs ys, VFL n' xs' ys') -> do
           let m = minimum ([n] ++ IM.elems xs ++ IM.elems ys ++ [n'] ++ IM.elems xs' ++ IM.elems ys')
           if m > 0 then
-            unifyFinLevel l (VFL (n - m) (IM.map (\x -> x - m) xs) (IM.map (\x -> x - m) ys)) (VFL (n' - m) (IM.map (\x -> x - m) xs') (IM.map (\x -> x - m) ys'))
+            unifyFinLevel l (subVFinLevel m a) (subVFinLevel m b)
           else
             throwIO $ UnifyError $ "failed to unify " ++ show (quoteFinLevel l a) ++ " ~ " ++ show (quoteFinLevel l b)
       where

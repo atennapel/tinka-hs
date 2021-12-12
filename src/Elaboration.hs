@@ -154,6 +154,17 @@ check ctx tm ty lv = do
       (cv, ct, vt, u) <- checkOrInfer ctx v mt
       cb <- check (define x vt u (evalCtx ctx cv) ctx) b ty lv
       return $ Let x ct cv cb
+    
+    (SVar "[]", VLift k l VUnitType) -> do
+      unifyFinLevel (lvl ctx) l mempty
+      return $ cLiftTerm (quoteFinLevelCtx ctx k) (quoteFinLevelCtx ctx l) (Prim (Left PUnitType)) (Prim (Left PUnit))
+    (SVar "True", VLift k l VBool) -> do
+      unifyFinLevel (lvl ctx) l mempty
+      return $ cLiftTerm (quoteFinLevelCtx ctx k) (quoteFinLevelCtx ctx l) (Prim (Left PBool)) (Prim (Left PTrue))
+    (SVar "False", VLift k l VBool) -> do
+      unifyFinLevel (lvl ctx) l mempty
+      return $ cLiftTerm (quoteFinLevelCtx ctx k) (quoteFinLevelCtx ctx l) (Prim (Left PBool)) (Prim (Left PFalse))
+    
     (tm, ty) -> do
       (ctm, ty', lv') <- insert ctx $ infer ctx tm      
       unifyCtx ctx lv' lv ty' ty

@@ -53,6 +53,14 @@ pattern VLiftTerm k l a x = VNe (HPrim PLiftTerm) [EApp x Expl, EApp a Impl, EAp
 pattern VHEq l a b x y = VNe (HPrim PHEq) [EApp y Expl, EApp x Expl, EApp b Impl, EApp a Impl, EAppLvl l]
 pattern VHRefl l a x = VNe (HPrim PHRefl) [EApp x Impl, EApp a Impl, EAppLvl l]
 
+pattern VDesc l i = VNe (HPrim PDesc) [EApp i Expl, EAppLvl l]
+pattern VDVar l i j = VNe (HPrim PVar) [EApp j Expl, EApp i Impl, EAppLvl l]
+pattern VArg l i a k = VNe (HPrim PArg) [EApp k Expl, EApp a Expl, EApp i Impl, EAppLvl l]
+pattern VPar l i a b = VNe (HPrim PPar) [EApp b Expl, EApp a Expl, EApp i Impl, EAppLvl l]
+
+pattern VData l i d j = VNe (HPrim PData) [EApp j Expl, EApp d Expl, EApp i Impl, EAppLvl l]
+pattern VCon l i d j x = VNe (HPrim PCon) [EApp x Expl, EApp j Impl, EApp d Impl, EApp i Impl, EAppLvl l]
+
 vpi :: Name -> Val -> VLevel -> VLevel -> (Val -> Val) -> Val
 vpi x a u1 u2 b = VPi x Expl a u1 (Fun b) u2
 

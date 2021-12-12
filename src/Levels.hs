@@ -66,6 +66,9 @@ instance Semigroup VLevel where
 instance Monoid VLevel where
   mempty = VFinLevel mempty
 
+isVFinLevelZero :: VFinLevel -> Bool
+isVFinLevelZero l = l == mempty
+
 vFinLevelVar :: Lvl -> VFinLevel
 vFinLevelVar x = VFL 0 (M.singleton (coerce x) 0) mempty
 
@@ -74,6 +77,19 @@ vFinMeta m = VFL 0 mempty (M.singleton (coerce m) 0)
 
 addToVFinLevel :: Int -> VFinLevel -> VFinLevel
 addToVFinLevel n (VFL m xs ms) = VFL (n + m) ((+ n) <$> xs) ((+ n) <$> ms)
+
+-- partial
+subVFinLevel :: Int -> VFinLevel -> VFinLevel
+subVFinLevel n (VFL m xs ys) = VFL (goN n m) (subMap n xs) (subMap n ys)
+  where
+    goN n m | m == 0 = 0
+    goN n m | m >= n = m - n
+    goN _ _ = error "subVFinLevel subtracted too much!"
+
+    subMap n xs = M.map (goMap n) xs
+
+    goMap n x | x >= n = x - n
+    goMap n x = error "subVFinLevel subtracted too much!"
 
 addToFinLevel :: Int -> FinLevel -> FinLevel
 addToFinLevel n i = go n i
