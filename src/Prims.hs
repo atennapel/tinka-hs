@@ -11,7 +11,6 @@ data PrimName
   | PLift
   | PLiftTerm
 
-  | PDesc | PVar | PArg | PPar
   | PData
   deriving (Eq)
 
@@ -34,10 +33,6 @@ instance Show PrimName where
   show PHRefl = "HRefl"
   show PLift = "Lift"
   show PLiftTerm = "lift"
-  show PDesc = "Desc"
-  show PVar = "Var"
-  show PArg = "Arg"
-  show PPar = "Par"
   show PData = "Data"
 
 instance Show PrimElimName where
@@ -60,10 +55,6 @@ toPrimName "HEq" = Just PHEq
 toPrimName "HRefl" = Just PHRefl
 toPrimName "Lift" = Just PLift
 toPrimName "lift" = Just PLiftTerm
-toPrimName "Desc" = Just PDesc
-toPrimName "Var" = Just PVar
-toPrimName "Arg" = Just PArg
-toPrimName "Par" = Just PPar
 toPrimName "Data" = Just PData
 toPrimName _ = Nothing
 

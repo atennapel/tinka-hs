@@ -160,15 +160,9 @@ check ctx tm ty lv = do
       return $ Con ct
     (SPair _ _, VData l i d j) -> check ctx (SCon tm) ty lv 
 
-    (SVar "[]", VLift k l VUnitType) -> do
-      unifyFinLevel (lvl ctx) l mempty
-      return $ cLiftTerm (quoteFinLevelCtx ctx k) (quoteFinLevelCtx ctx l) (Prim (Left PUnitType)) (Prim (Left PUnit))
-    (SVar "True", VLift k l VBool) -> do
-      unifyFinLevel (lvl ctx) l mempty
-      return $ cLiftTerm (quoteFinLevelCtx ctx k) (quoteFinLevelCtx ctx l) (Prim (Left PBool)) (Prim (Left PTrue))
-    (SVar "False", VLift k l VBool) -> do
-      unifyFinLevel (lvl ctx) l mempty
-      return $ cLiftTerm (quoteFinLevelCtx ctx k) (quoteFinLevelCtx ctx l) (Prim (Left PBool)) (Prim (Left PFalse))
+    (SVar x, VLift k l t) | x == "[]" || x == "True" || x == "False" -> do
+      ct <- check ctx tm t (VFinLevel l)
+      return $ cLiftTerm (quoteFinLevelCtx ctx k) (quoteFinLevelCtx ctx l) (quoteCtx ctx t) ct
     
     (tm, ty) -> do
       (ctm, ty', lv') <- insert ctx $ infer ctx tm      

@@ -1,0 +1,7 @@
+import lib/desc;
+
+NatD : Desc () = SumD (Var []) (Ind (Var []) (Var []));
+Nat = Data NatD [];
+
+Z : Nat = Con (True, End);
+S : Nat -> Nat = \n. Con (False, n, End);

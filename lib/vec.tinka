@@ -1,0 +1,9 @@
+import lib/desc;
+import lib/nat;
+
+VecD : Type -> Desc Nat = \A. SumD (Var Z) (Arg Nat \n. Arg A \_. Ind (Var n) (Var (S n)));
+Vec : Nat -> Type -> Type = \n A. Data (VecD A) n;
+
+VNil : {A : Type} -> Vec Z A = Con (True, HRefl);
+VCons : {A : Type} {n : Nat} -> A -> Vec n A -> Vec (S n) A
+  = \{n = n} hd tl. Con (False, n, hd, tl, HRefl);

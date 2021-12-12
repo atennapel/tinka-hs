@@ -57,13 +57,18 @@ TODO:
   - [x] Desc and Data constructors
   - [x] Ex and El
   - [x] bidirectional Con
+  - [x] levitation
   - [ ] Data elimination
-  - [ ] levitation
+  - [ ] conversion of indBool and ifDesc
+  - [ ] more cumulativity in elaboration
+- [ ] simplify equality type
 - [ ] update unification
   - [ ] eta rule for Bool
   - [ ] pruning
   - [ ] postponing
 - [ ] add more syntax
+  - [ ] nat literals
+  - [ ] list and vector literals
   - [ ] if syntax
   - [ ] equality syntax
 - [ ] improve error message

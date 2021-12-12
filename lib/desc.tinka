@@ -1,0 +1,27 @@
+EndL : <l> -> HEq <l> {Lift <l> ()} {Lift <l> ()} [] [] = \<l>. HRefl <l> {Lift <l> ()} {[]};
+End : HEq [] [] = HRefl;
+
+Desc : <l> -> Type l -> Type (S l)
+  = \<l> I. Data (
+    Con (False, True, Lift <S l> Bool, \x. ifDesc (
+    Con (False, True, Lift <S l> I, \x. Con (True, lift {Lift <S l> ()} [], EndL), EndL)) (Con (False, True, Lift <S l> Bool, \x. ifDesc (
+    Con (False, True, Type l, \x. Con (False, False, Con (False, True, Lift <S l> (lower x), \x. Con (True, lift {Lift <S l> ()} [], EndL), EndL),
+      Con (True, [], EndL), EndL), EndL)) (Con (False, False, Con (True, [], EndL), Con (False, False, Con (True, lift {Lift <S l> ()} [], EndL),
+      Con (True, lift {Lift <S l> ()} [], EndL), EndL), EndL)) (lower (lower x)), EndL)) (lower (lower x)), EndL)) [];
+
+Var : <l> {I : Type l} -> I -> Desc <l> I
+  = \<l> {I} i. Con (True, lift i, EndL);
+Arg : <l> {I : Type l} (A : Type l) -> (A -> Desc <l> I) -> Desc <l> I
+  = \<l> {I} A K. Con (False, True, A, \x. K (lower x), EndL);
+Ind : <l> {I : Type l} -> Desc <l> I -> Desc <l> I -> Desc <l> I
+  = \<l> {I} A B. Con (False, False, A, B, EndL);
+
+SumD : <l> {I : Type l} -> Desc I -> Desc I -> Desc I
+  = \<l> A B. Arg (Lift <l> Bool) (\b. ifDesc A B (lower b));
+
+DescD : <l> -> Type l -> Desc (Lift <S l> ())
+  = \<l> I. let var = Var (lift []);
+    SumD <S l> (Arg (Lift <S l> I) \_. var)
+    (SumD
+      (Arg (Type l) (\A. Ind (Arg (Lift <S l> A) \_. var) var))
+      (Ind var (Ind var var)));
