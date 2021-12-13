@@ -105,7 +105,7 @@ vprimelim PEIndBool [_, _, _, Right (f, _)] VFalse = f
 vprimelim PEIfDesc [_, _, Right (x, _), Right (y, _)] VTrue = x
 vprimelim PEIfDesc [_, _, Right (x, _), Right (y, _)] VFalse = y
 
-vprimelim PEElimHEq [_, _, _, _, _, Right (refl, _), _] VRefl = refl
+vprimelim PEElimId [_, _, _, _, _, Right (refl, _), _] VRefl = refl
 
 -- Ex (Var i) X = X i
 vprimelim PEEx [_, _, Right (x, _)] (VDVar j) = vapp x j Expl
@@ -116,8 +116,8 @@ vprimelim PEEx [Left l, Right (i, _), Right (x, _)] (VArg a k) =
 vprimelim PEEx [Left l, Right (i, _), Right (x, _)] (VInd a b) =
   vpairty (vex l i x a) (VFinLevel l) (VFinLevel l) (vex l i x b)
 
--- El (Var j) X i = HEq j i
-vprimelim PEEl [Left l, Right (i, _), Right (x, _), Right (ii, _)] (VDVar j) = VHEq l i i j ii
+-- El (Var j) X i = Id j i
+vprimelim PEEl [Left l, Right (i, _), Right (x, _), Right (ii, _)] (VDVar j) = VId l i i j ii
 -- El (Arg A K) X i = (x : A) ** El (K x) X i
 vprimelim PEEl [Left l, Right (i, _), Right (x, _), Right (ii, _)] (VArg a k) =
   vsigma "x" a (VFinLevel l) (VFinLevel l) $ \xx -> vel l i x ii (vapp k (VLiftTerm (vFLS l) l a xx) Expl)
@@ -217,7 +217,7 @@ evalprimelim PEIfDesc =
   vlam "y" $ \y ->
   vlam "b" $ \b ->
   vifdesc l i x y b
-evalprimelim PEElimHEq =
+evalprimelim PEElimId =
   vlamlvl "l" $ \l ->
   vlamlvl "k" $ \k ->
   vlamimpl "A" $ \a ->
@@ -226,7 +226,7 @@ evalprimelim PEElimHEq =
   vlam "refl" $ \refl ->
   vlamimpl "y" $ \y ->
   vlam "p" $ \pp ->
-  vprimelim PEElimHEq [Left l, Left k, Right (a, Impl), Right (x, Impl), Right (p, Expl), Right (refl, Expl), Right (y, Impl)] p
+  vprimelim PEElimId [Left l, Left k, Right (a, Impl), Right (x, Impl), Right (p, Expl), Right (refl, Expl), Right (y, Impl)] p
 evalprimelim PEEx =
   vlamlvl "l" $ \l ->
   vlamimpl "I" $ \i ->
@@ -402,7 +402,7 @@ primType PLiftTerm =
   vfun a (VFinLevel l) (VFinLevel (l <> k)) $
   VLift k l a, VOmega)
 -- <l> {A : Type l} {B : Type l} -> A -> B -> Type l
-primType PHEq =
+primType PId =
   (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
   vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \a ->
   vpimpl "B" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \b ->
@@ -458,21 +458,21 @@ primElimType PEIfDesc =
 <l k>
 {A : Type l}
 {x : A}
-(P : {y : A} -> HEq <l> {A} {A} x y -> Type k)
+(P : {y : A} -> Id <l> {A} {A} x y -> Type k)
 (refl : P {x} Refl)
 {y : A}
-(p : HEq <l> {A} {A} x y)
+(p : Id <l> {A} {A} x y)
 P {y} p
 -}
-primElimType PEElimHEq =
+primElimType PEElimId =
   (vpilvl "l" (const VOmega) $ \l ->
   vpilvl "k" (\k -> VFinLevel (vFLS (l <> k))) $ \k ->
   vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (l <> vFLS k)) $ \a ->
   vpimpl "x" a (VFinLevel l) (VFinLevel (l <> vFLS k)) $ \x ->
-  vpi "P" (vpimpl "y" a (VFinLevel l) (VFinLevel (l <> vFLS k)) $ \y -> vfun (VHEq l a a x y) (VFinLevel l) (VFinLevel (vFLS k)) $ VTypeFin k) (VFinLevel (vFLS k)) (VFinLevel (l <> k)) $ \p ->
+  vpi "P" (vpimpl "y" a (VFinLevel l) (VFinLevel (l <> vFLS k)) $ \y -> vfun (VId l a a x y) (VFinLevel l) (VFinLevel (vFLS k)) $ VTypeFin k) (VFinLevel (vFLS k)) (VFinLevel (l <> k)) $ \p ->
   vfun (vapp (vapp p x Impl) VRefl Expl) (VFinLevel k) (VFinLevel (l <> k)) $
   vpimpl "y" a (VFinLevel l) (VFinLevel (l <> k)) $ \y ->
-  vpi "p" (VHEq l a a x y) (VFinLevel l) (VFinLevel k) $ \pp ->
+  vpi "p" (VId l a a x y) (VFinLevel l) (VFinLevel k) $ \pp ->
   vapp (vapp p y Impl) pp Expl, VOmega)
 -- Ex : <l> {I : Type l} -> (I -> Type l) -> Desc <l> I -> Type l
 primElimType PEEx =

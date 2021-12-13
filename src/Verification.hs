@@ -28,7 +28,7 @@ check ctx tm ty = do
       check (define x vt l (evalCtx ctx v) ctx) b ty
     (Con t, VData l i d j) ->
       check ctx t (vel l i (vlam "i" $ VData l i d) j d)
-    (Refl, VHEq l a b x y) -> do
+    (Refl, VId l a b x y) -> do
       throwUnless (conv (lvl ctx) a b) $ VerifyError $ "type equality failed " ++ show tm ++ " : " ++ showV ctx ty
       throwUnless (conv (lvl ctx) x y) $ VerifyError $ "value equality failed " ++ show tm ++ " : " ++ showV ctx ty
     (tm, ty) -> do

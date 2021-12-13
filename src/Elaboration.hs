@@ -160,12 +160,12 @@ check ctx tm ty lv = do
       return $ Con ct
     (SPair _ _, VData l i d j) -> check ctx (SCon tm) ty lv
 
-    (SRefl, VHEq l a b x y) -> do
+    (SRefl, VId l a b x y) -> do
       catch (unify (lvl ctx) a b >> unify (lvl ctx) x y) $ \(err :: Error) -> 
         catch (unify (lvl ctx) x y >> unify (lvl ctx) a b) $ \(err :: Error) ->
           throwIO $ ElaborateError $ "check failed " ++ show tm ++ " : " ++ showVZ ctx ty ++ ": " ++ show err
       return Refl
-    (SVar "[]", VHEq {}) -> check ctx SRefl ty lv
+    (SVar "[]", VId {}) -> check ctx SRefl ty lv
 
     (SVar x, VLift k l t) | x == "[]" || x == "True" || x == "False" -> do
       ct <- check ctx tm t (VFinLevel l)

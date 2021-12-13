@@ -61,9 +61,9 @@ TODO:
   - [ ] Data elimination
   - [ ] conversion of indBool and ifDesc
   - [ ] more cumulativity in elaboration
-- [ ] simplify equality type
+- [x] simplify equality type
   - [x] Refl as a core term
-  - [ ] rename HEq to Id
+  - [x] rename HEq to Id
 - [ ] update unification
   - [ ] eta rule for Bool
   - [ ] pruning

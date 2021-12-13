@@ -6,7 +6,7 @@ data PrimName
   = PVoid
   | PUnitType | PUnit
   | PBool | PTrue | PFalse
-  | PHEq
+  | PId
 
   | PLift
   | PLiftTerm
@@ -18,7 +18,7 @@ data PrimElimName
   = PEAbsurd
   | PELower
   | PEIndBool | PEIfDesc
-  | PEElimHEq
+  | PEElimId
   | PEEx | PEEl
   deriving (Eq)
 
@@ -29,7 +29,7 @@ instance Show PrimName where
   show PBool = "Bool"
   show PTrue = "True"
   show PFalse = "False"
-  show PHEq = "HEq"
+  show PId = "Id"
   show PLift = "Lift"
   show PLiftTerm = "lift"
   show PData = "Data"
@@ -39,7 +39,7 @@ instance Show PrimElimName where
   show PELower = "lower"
   show PEIndBool = "indBool"
   show PEIfDesc = "ifDesc"
-  show PEElimHEq = "elimHEq"
+  show PEElimId = "elimId"
   show PEEx = "Ex"
   show PEEl = "El"
 
@@ -50,7 +50,7 @@ toPrimName "[]" = Just PUnit
 toPrimName "Bool" = Just PBool
 toPrimName "True" = Just PTrue
 toPrimName "False" = Just PFalse
-toPrimName "HEq" = Just PHEq
+toPrimName "Id" = Just PId
 toPrimName "Lift" = Just PLift
 toPrimName "lift" = Just PLiftTerm
 toPrimName "Data" = Just PData
@@ -61,7 +61,7 @@ toPrimElimName "absurd" = Just PEAbsurd
 toPrimElimName "lower" = Just PELower
 toPrimElimName "indBool" = Just PEIndBool
 toPrimElimName "ifDesc" = Just PEIfDesc
-toPrimElimName "elimHEq" = Just PEElimHEq
+toPrimElimName "elimId" = Just PEElimId
 toPrimElimName "Ex" = Just PEEx
 toPrimElimName "El" = Just PEEl
 toPrimElimName _ = Nothing

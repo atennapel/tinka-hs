@@ -52,7 +52,7 @@ pattern VTrue = VNe (HPrim PTrue) []
 pattern VFalse = VNe (HPrim PFalse) []
 pattern VLift k l x = VNe (HPrim PLift) [EApp x Expl, EAppLvl l, EAppLvl k]
 pattern VLiftTerm k l a x = VNe (HPrim PLiftTerm) [EApp x Expl, EApp a Impl, EAppLvl l, EAppLvl k]
-pattern VHEq l a b x y = VNe (HPrim PHEq) [EApp y Expl, EApp x Expl, EApp b Impl, EApp a Impl, EAppLvl l]
+pattern VId l a b x y = VNe (HPrim PId) [EApp y Expl, EApp x Expl, EApp b Impl, EApp a Impl, EAppLvl l]
 
 pattern VData l i d j = VNe (HPrim PData) [EApp j Expl, EApp d Expl, EApp i Impl, EAppLvl l]
 
