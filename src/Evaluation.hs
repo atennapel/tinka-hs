@@ -105,7 +105,7 @@ vprimelim PEIndBool [_, _, _, Right (f, _)] VFalse = f
 vprimelim PEIfDesc [_, _, Right (x, _), Right (y, _)] VTrue = x
 vprimelim PEIfDesc [_, _, Right (x, _), Right (y, _)] VFalse = y
 
-vprimelim PEElimHEq [_, _, _, _, _, Right (refl, _), _] (VHRefl _ _ _) = refl
+vprimelim PEElimHEq [_, _, _, _, _, Right (refl, _), _] VRefl = refl
 
 -- Ex (Var i) X = X i
 vprimelim PEEx [_, _, Right (x, _)] (VDVar j) = vapp x j Expl
@@ -185,6 +185,7 @@ eval e = \case
   Pair a b -> VPair (eval e a) (eval e b)
   Sigma x t u1 b u2 -> VSigma x (eval e t) (level e u1) (Clos e b) (level e u2)
   Con t -> VCon (eval e t)
+  Refl -> VRefl
   Let x _ v b -> eval (Right (eval e v) : e) b
   Type l -> VType (level e l)
   Meta m -> vmeta m
@@ -293,6 +294,7 @@ quoteWith ql l = go l
       VPair a b -> Pair (go l a) (go l b)
       VSigma x t u1 b u2 -> Sigma x (go l t) (quoteLevel l u1) (go (l + 1) (vinst b (VVar l))) (quoteLevel l u2)
       VCon t -> Con (go l t)
+      VRefl -> Refl
       VType i -> Type (quoteLevel l i)
 
 quote :: Lvl -> Val -> Tm
@@ -365,6 +367,9 @@ conv l a b = case (a, b) of
   (VUnit, v) -> True
   (v, VUnit) -> True
 
+  (VRefl, v) -> True
+  (v, VRefl) -> True
+
   (VLiftTerm lv k a x, y) -> conv l x (vlower lv k a y)
   (y, VLiftTerm lv k a x) -> conv l (vlower lv k a y) x
 
@@ -404,12 +409,6 @@ primType PHEq =
   vfun a (VFinLevel l) (VFinLevel (vFLS l)) $
   vfun b (VFinLevel l) (VFinLevel (vFLS l)) $
   VTypeFin l, VOmega)
--- <l> {A : Type l} {x : A} -> HEq {l} {A} {A} x x
-primType PHRefl =
-  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
-  vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel l) $ \a ->
-  vpimpl "x" a (VFinLevel l) (VFinLevel l) $ \x ->
-  VHEq l a a x x, VOmega)
 -- Data : <l> {I : Type l} -> Desc <l> I -> I -> Type l
 primType PData =
   (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
@@ -460,7 +459,7 @@ primElimType PEIfDesc =
 {A : Type l}
 {x : A}
 (P : {y : A} -> HEq <l> {A} {A} x y -> Type k)
-(refl : P {x} (HRefl <l> {A} {x}))
+(refl : P {x} Refl)
 {y : A}
 (p : HEq <l> {A} {A} x y)
 P {y} p
@@ -471,7 +470,7 @@ primElimType PEElimHEq =
   vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (l <> vFLS k)) $ \a ->
   vpimpl "x" a (VFinLevel l) (VFinLevel (l <> vFLS k)) $ \x ->
   vpi "P" (vpimpl "y" a (VFinLevel l) (VFinLevel (l <> vFLS k)) $ \y -> vfun (VHEq l a a x y) (VFinLevel l) (VFinLevel (vFLS k)) $ VTypeFin k) (VFinLevel (vFLS k)) (VFinLevel (l <> k)) $ \p ->
-  vfun (vapp (vapp p x Impl) (VHRefl l a x) Expl) (VFinLevel k) (VFinLevel (l <> k)) $
+  vfun (vapp (vapp p x Impl) VRefl Expl) (VFinLevel k) (VFinLevel (l <> k)) $
   vpimpl "y" a (VFinLevel l) (VFinLevel (l <> k)) $ \y ->
   vpi "p" (VHEq l a a x y) (VFinLevel l) (VFinLevel k) $ \pp ->
   vapp (vapp p y Impl) pp Expl, VOmega)
@@ -492,23 +491,20 @@ primElimType PEEl =
   VTypeFin l, VOmega)
 
 -- levitation
-vEnd :: VFinLevel -> Val
-vEnd l = let k = vFLS l in VHRefl k (VLift k mempty VUnitType) (VLiftTerm k mempty VUnitType VUnit)
-
 vVar :: VFinLevel -> Val -> Val -> Val
-vVar l i j = let k = vFLS l in VCon $ vpairs [VLiftTerm k mempty VBool VTrue, VLiftTerm k l i j, vEnd l]
+vVar l i j = let k = vFLS l in VCon $ vpairs [VLiftTerm k mempty VBool VTrue, VLiftTerm k l i j, VRefl]
 
 pattern VDVar j <- VCon (VPair (VLiftTerm _ _ _ VTrue) (VPair (VLiftTerm _ _ _ j) _))
 
--- \<l> {I} A K. Con (lift <S l> <0> {Bool} False, lift <S l> <0> {Bool} True, A, \x. K (lower <S l> <l> {A} x), HRefl <S l> {Lift <S l> <0> ()} {lift <S l> <0> {()} []})
+-- \<l> {I} A K. Con (lift <S l> <0> {Bool} False, lift <S l> <0> {Bool} True, A, \x. K (lower <S l> <l> {A} x), Refl)
 vArg :: VFinLevel -> Val -> Val -> Val -> Val
-vArg l i a kk = let k = vFLS l in VCon $ vpairs [VLiftTerm k mempty VBool VFalse, VLiftTerm k mempty VBool VTrue, a, vlam "x" (\x -> vapp kk (vlower k l a x) Expl), vEnd l]
+vArg l i a kk = let k = vFLS l in VCon $ vpairs [VLiftTerm k mempty VBool VFalse, VLiftTerm k mempty VBool VTrue, a, vlam "x" (\x -> vapp kk (vlower k l a x) Expl), VRefl]
 
 pattern VArg a k <- VCon (VPair (VLiftTerm _ _ _ VFalse) (VPair (VLiftTerm _ _ _ VTrue) (VPair a (VPair k _))))
 
--- \<l> {I} A B. Con (lift <S l> <0> {Bool} False, lift <S l> <0> {Bool} False, A, B, HRefl <S l> {Lift <S l> <0> ()} {lift <S l> <0> {()} []})
+-- \<l> {I} A B. Con (lift <S l> <0> {Bool} False, lift <S l> <0> {Bool} False, A, B, Refl)
 vInd :: VFinLevel -> Val -> Val -> Val -> Val
-vInd l i a b = let k = vFLS l in VCon $ vpairs [VLiftTerm k mempty VBool VFalse, VLiftTerm k mempty VBool VFalse, a, b, vEnd l]
+vInd l i a b = let k = vFLS l in VCon $ vpairs [VLiftTerm k mempty VBool VFalse, VLiftTerm k mempty VBool VFalse, a, b, VRefl]
 
 pattern VInd a b <- VCon (VPair (VLiftTerm _ _ _ VFalse) (VPair (VLiftTerm _ _ _ VFalse) (VPair a (VPair b _))))
 

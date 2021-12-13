@@ -3,5 +3,5 @@ import lib/desc;
 NatD : Desc () = SumD (Var []) (Ind (Var []) (Var []));
 Nat = Data NatD [];
 
-Z : Nat = (True, End);
-S : Nat -> Nat = \n. (False, n, End);
+Z : Nat = [True];
+S : Nat -> Nat = \n. [False, n];

@@ -53,7 +53,7 @@ pLambda :: Parser Char
 pLambda = char 'λ' <|> char '\\'
 
 keywords :: [String]
-keywords = ["let", "λ", "Type", "Con"]
+keywords = ["let", "λ", "Type", "Con", "Refl"]
 
 keyword :: String -> Bool
 keyword x = x `elem` keywords
@@ -130,6 +130,7 @@ pAtom =
     pHole <|>
     try pType <|>
     (SType (SLNat 0) <$ symbol "Type") <|>
+    (SRefl <$ symbol "Refl") <|>
     (SVar <$> pIdent))
   <|> pCon
   <|> try (SVar "()" <$ parens ws)

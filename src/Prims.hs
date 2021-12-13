@@ -6,7 +6,7 @@ data PrimName
   = PVoid
   | PUnitType | PUnit
   | PBool | PTrue | PFalse
-  | PHEq | PHRefl
+  | PHEq
 
   | PLift
   | PLiftTerm
@@ -30,7 +30,6 @@ instance Show PrimName where
   show PTrue = "True"
   show PFalse = "False"
   show PHEq = "HEq"
-  show PHRefl = "HRefl"
   show PLift = "Lift"
   show PLiftTerm = "lift"
   show PData = "Data"
@@ -52,7 +51,6 @@ toPrimName "Bool" = Just PBool
 toPrimName "True" = Just PTrue
 toPrimName "False" = Just PFalse
 toPrimName "HEq" = Just PHEq
-toPrimName "HRefl" = Just PHRefl
 toPrimName "Lift" = Just PLift
 toPrimName "lift" = Just PLiftTerm
 toPrimName "Data" = Just PData

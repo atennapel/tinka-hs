@@ -1,20 +1,14 @@
-EndL : <l> -> HEq {Lift <l> ()} {Lift <l> ()} [] [] = \<l>. HRefl {Lift <l> ()} {[]};
-End : HEq [] [] = HRefl;
-
 Desc : <l> -> Type l -> Type (S l)
   = \<l> I. Data (
-      (False, True, Lift <S l> Bool, \x. ifDesc
-      (False, True, Lift <S l> I, \x. (True, lift {Lift <S l> ()} [], EndL), EndL) (False, True, Lift <S l> Bool, \x. ifDesc (
-      (False, True, Type l, \x. (False, False, (False, True, Lift <S l> (lower x), \x. (True, lift {Lift <S l> ()} [], EndL), EndL),
-        (True, [], EndL), EndL), EndL)) (False, False, (True, [], EndL), (False, False, (True, lift {Lift <S l> ()} [], EndL),
-        (True, lift {Lift <S l> ()} [], EndL), EndL), EndL) (lower (lower x)), EndL) (lower (lower x)), EndL)) [];
+      [False, True, Lift <S l> Bool, \x. ifDesc
+      [False, True, Lift <S l> I, \x. [True, lift {Lift <S l> ()} []]] [False, True, Lift <S l> Bool, \x. ifDesc (
+      [False, True, Type l, \x. [False, False, [False, True, Lift <S l> (lower x), \x. [True, lift {Lift <S l> ()} []]],
+        [True, []]]]) [False, False, [True, []], [False, False, [True, lift {Lift <S l> ()} []],
+        [True, lift {Lift <S l> ()} []]]] (lower (lower x))] (lower (lower x))]) [];
 
-Var : <l> {I : Type l} -> I -> Desc I
-  = \i. (True, lift i, EndL);
-Arg : <l> {I : Type l} (A : Type l) -> (A -> Desc I) -> Desc I
-  = \A K. (False, True, A, \x. K (lower x), EndL);
-Ind : <l> {I : Type l} -> Desc I -> Desc I -> Desc I
-  = \A B. (False, False, A, B, EndL);
+Var : <l> {I : Type l} -> I -> Desc I = \i. [True, lift i];
+Arg : <l> {I : Type l} (A : Type l) -> (A -> Desc I) -> Desc I = \A K. [False, True, A, \x. K (lower x)];
+Ind : <l> {I : Type l} -> Desc I -> Desc I -> Desc I = \A B. [False, False, A, B];
 
 SumD : <l> {I : Type l} -> Desc I -> Desc I -> Desc I
   = \<l> A B. Arg (Lift <l> Bool) (\b. ifDesc A B (lower b));

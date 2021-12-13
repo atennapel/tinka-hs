@@ -37,6 +37,7 @@ data Val
   | VPair Val Val
   | VSigma Name Val VLevel (Clos Val) VLevel
   | VCon Val
+  | VRefl
   | VType VLevel
 
 pattern VTypeFin l = VType (VFinLevel l)
@@ -52,7 +53,6 @@ pattern VFalse = VNe (HPrim PFalse) []
 pattern VLift k l x = VNe (HPrim PLift) [EApp x Expl, EAppLvl l, EAppLvl k]
 pattern VLiftTerm k l a x = VNe (HPrim PLiftTerm) [EApp x Expl, EApp a Impl, EAppLvl l, EAppLvl k]
 pattern VHEq l a b x y = VNe (HPrim PHEq) [EApp y Expl, EApp x Expl, EApp b Impl, EApp a Impl, EAppLvl l]
-pattern VHRefl l a x = VNe (HPrim PHRefl) [EApp x Impl, EApp a Impl, EAppLvl l]
 
 pattern VData l i d j = VNe (HPrim PData) [EApp j Expl, EApp d Expl, EApp i Impl, EAppLvl l]
 

@@ -1,4 +1,4 @@
 import lib/bool;
 
 notnot : (b : Bool) -> HEq b (not (not b))
-  = \b. indBool (\b. HEq b (not (not b))) HRefl HRefl b;
+  = \b. indBool (\b. HEq b (not (not b))) Refl Refl b;

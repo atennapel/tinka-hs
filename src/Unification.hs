@@ -121,6 +121,7 @@ rename m pren v = go pren v
       VPair a b -> Pair <$> go pren a <*> go pren b
       VSigma x t u1 b u2 -> Sigma x <$> go pren t <*> goLevel pren u1 <*> goLift pren b <*> goLevel pren u2
       VCon t -> Con <$> go pren t
+      VRefl -> return Refl
       VType i -> Type <$> goLevel pren i
 
 lams :: Sp -> Tm -> Tm
@@ -206,6 +207,9 @@ unify l a b = do
 
     (VUnit, v) -> return ()
     (v, VUnit) -> return ()
+
+    (VRefl, v) -> return ()
+    (v, VRefl) -> return ()
 
     (VNe h sp, VNe h' sp') | h == h' -> unifySp l sp sp'
 

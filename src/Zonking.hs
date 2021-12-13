@@ -74,6 +74,7 @@ zonk = go
       Pi x i t u1 b u2 -> Pi x i (go k vs t) (zonkLevel k vs u1) (goUnder k vs b) (zonkLevel k vs u2)
       Sigma x t u1 b u2 -> Sigma x (go k vs t) (zonkLevel k vs u1) (goUnder k vs b) (zonkLevel k vs u2)
       Con t -> Con (go k vs t)
+      Refl -> Refl
       Let x t v b -> Let x (go k vs t) (go k vs v) (goUnder k vs b)
       LamLvl x b -> LamLvl x (goUnderLevel k vs b)
       PiLvl x b u -> PiLvl x (goUnderLevel k vs b) (zonkLevel (k + 1) (Left (vFinLevelVar k) : vs) u)
