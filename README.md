@@ -47,32 +47,32 @@ TODO:
   - [x] update elaboration
   - [x] named holes
   - [x] implicit functions
-- [ ] level metas
+- [x] level metas
   - [x] basic level metas
   - [x] levels in pi/sigma
   - [x] update elaboration
-  - [ ] lam and app with level renaming
+  - [x] lam and app with level renaming
 - [ ] descriptions
   - [x] Desc and Data constructors
   - [x] Ex and El
   - [x] bidirectional Con
   - [x] levitation
   - [x] conversion of indBool and ifDesc
-  - [ ] eta rule for Bool
   - [ ] Data elimination
 - [x] simplify equality type
   - [x] Refl as a core term
   - [x] rename HEq to Id
 - [ ] update unification
+  - [ ] eta rule for Bool
   - [ ] more cumulativity in elaboration
   - [ ] improve level unification
   - [ ] pruning
   - [ ] postponing
 - [ ] add more syntax
   - [ ] nat literals
-  - [ ] list and vector literals
   - [ ] if syntax
   - [ ] equality syntax
+  - [ ] list and vector literals
 - [ ] improve error message
   - [ ] use source position
 - [ ] more types
@@ -88,3 +88,15 @@ TODO:
 
 Level solver issues:
 - max '4 ?l7 ~ S '4
+
+```
+mapDEx : <l> {I : Type l} -> (D : Desc <l> I) -> {A B : I -> Type l} ({i : I} -> A i -> B i) -> Ex <l> {I} D A -> Ex <l> {I} D B
+mapDEx (Var j) f x = f {j} x
+mapDEx (Arg A K) f g = \x. mapDEx (K x) f (g x)
+mapDEx (Par A B) f (x, y) = (mapDEx A f x, mapDEx B f y)
+
+mapD : <l> {I : Type l} -> (D : Desc <l> I) -> {A B : I -> Type l} ({i : I} -> A i -> B i) {i : I} -> El <l> {I} D A i -> El <l> {I} D B i
+mapD (Var j) f Refl = Refl
+mapD (Arg A K) f (x, y) = (x, mapD (K x) f y)
+mapD (Par A B) f (x, y) = (mapDEx A f x, mapD B y)
+```

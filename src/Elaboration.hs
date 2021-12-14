@@ -63,6 +63,15 @@ insert' ctx act = go =<< act where
       go (AppLvl t m, vinstLevel b mv, vinstCL u mv)
     va -> pure (t, va, lv)
 
+insertNoLevel' :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
+insertNoLevel' ctx act = go =<< act where
+  go (t, va, lv) = case force va of
+    VPi x Impl a _ b u2 -> do
+      m <- freshMeta ctx
+      let mv = eval (env ctx) m
+      go (App t m Impl, vinst b mv, u2)
+    va -> pure (t, va, lv)
+
 insertLvl :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insertLvl ctx act = go =<< act where
   go (t, va, lv) = case force va of
@@ -75,6 +84,7 @@ insertLvl ctx act = go =<< act where
 insert :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insert ctx act = act >>= \case
   (t@(Lam _ Impl _), va, lv) -> return (t, va, lv)
+  (t@(LamLvl _ _), va, lv) -> return (t, va, lv)
   (t, va, lv) -> insert' ctx (return (t, va, lv))
 
 insertUntilName :: Ctx -> Name -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
@@ -91,6 +101,22 @@ insertUntilName ctx name act = go =<< act where
       m <- freshLMeta ctx
       let mv = finLevel (env ctx) m
       go (AppLvl t m, vinstLevel b mv, vinstCL u mv)
+    _ -> error $ "name " ++ name ++ " not found in pi"
+
+insertUntilLevelName :: Ctx -> Name -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
+insertUntilLevelName ctx name act = go =<< act where
+  go (t, va, lv) = case force va of
+    va@(VPi x Impl a _ b u2) -> do
+      m <- freshMeta ctx
+      let mv = eval (env ctx) m
+      go (App t m Impl, vinst b mv, u2)
+    VPiLvl x b u -> do
+      if x == name then
+        return (t, va, lv)
+      else do
+        m <- freshLMeta ctx
+        let mv = finLevel (env ctx) m
+        go (AppLvl t m, vinstLevel b mv, vinstCL u mv)
     _ -> error $ "name " ++ name ++ " not found in pi"
 
 checkOrInfer :: Ctx -> STm -> Maybe STm -> IO (Tm, Tm, Val, VLevel)
@@ -140,7 +166,7 @@ check ctx tm ty lv = do
       return $ Lam x i' cb
     (t, VPi x Impl a u1 b u2) -> do
       Lam x Impl <$> check (bindInsert x Impl a u1 ctx) t (vinst b (VVar (lvl ctx))) u2
-    (SLamLvl x b, VPiLvl _ c u) -> do
+    (SLamLvl x i b, VPiLvl y c u) | maybe True (== y) i -> do
       let v = vFinLevelVar (lvl ctx)
       LamLvl x <$> check (bindLevel x ctx) b (vinstLevel c v) (vinstCL u v)
     (t, VPiLvl x c u) -> do
@@ -273,8 +299,10 @@ infer ctx tm = do
           return (a, u1, b, u2)
       ca <- check ctx a pt u1
       return (App cf ca i, vinst rt (evalCtx ctx ca), u2)
-    c@(SAppLvl f l) -> do
-      (cf, fty, lf) <- infer ctx f
+    c@(SAppLvl f l i) -> do
+      (cf, fty, lf) <- case i of
+        Nothing -> insertNoLevel' ctx $ infer ctx f
+        Just name -> insertUntilLevelName ctx name $ infer ctx f
       l' <- checkFinLevel ctx l
       let ffty = force fty
       case ffty of
@@ -299,7 +327,7 @@ infer ctx tm = do
       (cb, rty, u2) <- insert ctx $ infer (bind x i a u1 ctx) b
       let vt = VPi x i a u1 (closeVal ctx rty) u2
       return (Let "f" (quoteCtx ctx vt) (Lam x i cb) (Var 0), vt, u1 <> u2)
-    SLamLvl x b -> do
+    SLamLvl x Nothing b -> do
       (cb, rty, u) <- infer (bindLevel x ctx) b
       let vt = VPiLvl x (closeLevel ctx rty) (closeCL ctx u)
       return (Let "f" (quoteCtx ctx vt) (LamLvl x cb) (Var 0), vt, VOmega)

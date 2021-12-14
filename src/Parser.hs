@@ -153,12 +153,12 @@ pProj = do
     index = SIndex <$> L.decimal
     named = SNamed <$> pIdent
 
-pArg :: Parser (Either SProjType (Either SLevel (Either Name Icit, STm)))
-pArg = proj <|> abs <|> level <|> try implByName <|> impl <|> arg
+pArg :: Parser (Either SProjType (Either (SLevel, Maybe Name) (Either Name Icit, STm)))
+pArg = proj <|> abs <|> try levelByName <|> level <|> try implByName <|> impl <|> arg
   where
     impl = Right . Right . (Right Impl,) <$> braces pSurface
 
-    level = Right . Left <$> angled pLevel
+    level = Right . Left . (, Nothing) <$> angled pLevel
 
     arg = Right . Right . (Right Expl,) <$> pAtom
 
@@ -171,6 +171,12 @@ pArg = proj <|> abs <|> level <|> try implByName <|> impl <|> arg
       char '='
       t <- pSurface
       return $ Right $ Right (Left x, t)
+    
+    levelByName = angled $ do
+      x <- pIdent
+      char '='
+      t <- pLevel
+      return $ Right $ Left (t, Just x) 
 
 pSpine :: Parser STm
 pSpine = do
@@ -178,23 +184,24 @@ pSpine = do
   args <- many pArg
   pure $ apps h args
   where
-    apps :: STm -> [Either SProjType (Either SLevel (Either Name Icit, STm))] -> STm
+    apps :: STm -> [Either SProjType (Either (SLevel, Maybe Name) (Either Name Icit, STm))] -> STm
     apps t [] = t
     apps t (Left p : as) = apps (SProj t p) as
     apps t (Right (Right (Right Expl, u)) : Left p : as) = apps t (Right (Right (Right Expl, SProj u p)) : as)
     apps t (Right (Right (i, u)) : as) = apps (SApp t u i) as
-    apps t (Right (Left l) : as) = apps (SAppLvl t l) as
+    apps t (Right (Left (l, x)) : as) = apps (SAppLvl t l x) as
 
-pLamBinder :: Parser ([Name], Either () (Either Name Icit, Maybe STm))
+pLamBinder :: Parser ([Name], Either (Maybe Name) (Either Name Icit, Maybe STm))
 pLamBinder = levels <|> implBinder <|> binderWithType <|> justBinder
   where
     -- \x
     justBinder = (\x -> ([x], Right (Right Expl, Nothing))) <$> pBinder
 
-    -- \<x y z>
+    -- \<x y z> | \<x y z = b>
     levels = angled $ do
       xs <- some pIdent
-      return (xs, Left ())
+      b <- optional (symbol "=" >> pBinder)
+      return (xs, Left b)
 
     -- \(x y z : A)
     binderWithType = parens $ do
@@ -218,8 +225,8 @@ pLam = do
   t <- pSurface
   pure (foldr go t xs)
   where
-    go :: ([Name], Either () (Either Name Icit, Maybe STm)) -> STm -> STm
-    go (xs, Left ()) t = foldr SLamLvl t xs
+    go :: ([Name], Either (Maybe Name) (Either Name Icit, Maybe STm)) -> STm -> STm
+    go (xs, Left i) t = foldr (\x -> SLamLvl x i) t xs
     go (xs, Right (i, a)) t = foldr (\x t -> SLam x i a t) t xs
 
 pArrowOrCross :: Parser Bool

@@ -146,12 +146,6 @@ unifyElim :: Lvl -> Elim -> Elim -> IO ()
 unifyElim k (EApp v _) (EApp v' _) = unify k v v'
 unifyElim k (EAppLvl l) (EAppLvl l') = unifyFinLevel k l l'
 unifyElim k (EProj p) (EProj p') | eqvProj p p' = return ()
-unifyElim k (EPrimElim x1 as1) (EPrimElim x2 as2) | x1 == x2 =
-  zipWithM_ (go k) as1 as2
-  where
-    go _ (Left l) (Left l') = unifyFinLevel k l l'
-    go k (Right (v, _)) (Right (v', _)) = unify k v v'
-    go _ _ _ = throwIO $ UnifyError $ "prim elim spine mismatch: " ++ show x1
 -- indBool <S l> (\_. Desc <l> I) t f ~ ifDesc <l> {I} t f
 unifyElim k (EPrimElim PEIndBool [Left l, Right (p, _), Right (t, _), Right (f, _)]) (EPrimElim PEIfDesc [Left l', Right (i, _), Right (t', _), Right (f', _)]) = do
   unifyFinLevel k l (vFLS l')
@@ -163,6 +157,12 @@ unifyElim k (EPrimElim PEIfDesc [Left l', Right (i, _), Right (t', _), Right (f'
   unify k (vlam "_" $ \_ -> vDesc l i) p
   unify k t' t
   unify k f' f
+unifyElim k (EPrimElim x1 as1) (EPrimElim x2 as2) | x1 == x2 =
+  zipWithM_ (go k) as1 as2
+  where
+    go _ (Left l) (Left l') = unifyFinLevel k l l'
+    go k (Right (v, _)) (Right (v', _)) = unify k v v'
+    go _ _ _ = throwIO $ UnifyError $ "prim elim spine mismatch: " ++ show x1
 unifyElim k _ _ = throwIO $ UnifyError $ "elim mismatch"
 
 unifySpProj :: Lvl -> Sp -> Sp -> Ix -> IO ()
