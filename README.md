@@ -52,20 +52,20 @@ TODO:
   - [x] levels in pi/sigma
   - [x] update elaboration
   - [ ] lam and app with level renaming
-  - [ ] improve level unification
 - [ ] descriptions
   - [x] Desc and Data constructors
   - [x] Ex and El
   - [x] bidirectional Con
   - [x] levitation
+  - [x] conversion of indBool and ifDesc
+  - [ ] eta rule for Bool
   - [ ] Data elimination
-  - [ ] conversion of indBool and ifDesc
-  - [ ] more cumulativity in elaboration
 - [x] simplify equality type
   - [x] Refl as a core term
   - [x] rename HEq to Id
 - [ ] update unification
-  - [ ] eta rule for Bool
+  - [ ] more cumulativity in elaboration
+  - [ ] improve level unification
   - [ ] pruning
   - [ ] postponing
 - [ ] add more syntax

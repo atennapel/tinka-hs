@@ -320,6 +320,10 @@ convElim k (EPrimElim x1 as1) (EPrimElim x2 as2) =
     go _ (Left l) (Left l') = l == l'
     go k (Right (v, _)) (Right (v', _)) = conv k v v'
     go _ _ _ = False
+convElim k (EPrimElim PEIndBool [Left l, Right (p, _), Right (t, _), Right (f, _)]) (EPrimElim PEIfDesc [Left l', Right (i, _), Right (t', _), Right (f', _)]) =
+  l == vFLS l' && conv k p (vlam "_" $ \_ -> vDesc l i) && conv k t t' && conv k f f'
+convElim k (EPrimElim PEIfDesc [Left l', Right (i, _), Right (t', _), Right (f', _)]) (EPrimElim PEIndBool [Left l, Right (p, _), Right (t, _), Right (f, _)]) =
+  vFLS l' == l && conv k (vlam "_" $ \_ -> vDesc l i) p && conv k t' t && conv k f' f
 convElim k _ _ = False
 
 convSpProj :: Lvl -> Sp -> Sp -> Ix -> Bool
