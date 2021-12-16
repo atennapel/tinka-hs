@@ -90,6 +90,9 @@ rename m pren v = go pren v
       return $ case primElimPosition x of
         PEPLast -> App (foldl app h qas) t' (primElimIcit x)
         PEPFirst -> foldl app (App h t' (primElimIcit x)) qas
+        PEPThird -> case qas of
+          (a : b : rest) -> foldl app (App (app (app (Prim (Right x)) a) b) t (primElimIcit x)) rest
+          _ -> undefined
       where
         renameArg :: Either VFinLevel (Val, Icit) -> IO (Either FinLevel (Tm, Icit))
         renameArg (Left l) = Left <$> goFinLevel pren l

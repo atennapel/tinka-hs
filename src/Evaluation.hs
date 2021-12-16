@@ -107,6 +107,10 @@ vprimelim PEIfDesc [_, _, Right (x, _), Right (y, _)] VFalse = y
 
 vprimelim PEElimId [_, _, _, _, _, Right (refl, _), _] VRefl = refl
 
+-- elimData <k> <l> {I} {D} P alg {i} (Con x) = alg {Data <l> {I} D} (\{i} x. x) (\{i} x. elimData <k> <l> {I} {D} P alg {i} x) {i} x
+vprimelim PEElimData as@[_, Left l, Right (i, _), Right (d, _), _, Right (alg, _), Right (ii, _)] (VCon x) =
+  vapp (vapp (vapp (vapp (vapp alg (vlam "i" $ \ii -> VData l i d ii) Impl) (vlamimpl "i" $ \ii -> vlam "x" $ \x -> x) Expl) (vlamimpl "i" $ \ii -> vlam "x" $ \x -> vprimelim PEElimData (init as ++ [Right (ii, Impl)]) x) Expl) ii Impl) x Expl
+
 -- Ex (Var i) X = X i
 vprimelim PEEx [_, _, Right (x, _)] (VDVar j) = vapp x j Expl
 -- Ex (Arg A K) X = (x : A) -> Ex (K x) X
@@ -125,6 +129,24 @@ vprimelim PEEl [Left l, Right (i, _), Right (x, _), Right (ii, _)] (VArg a k) =
 vprimelim PEEl [Left l, Right (i, _), Right (x, _), Right (ii, _)] (VInd a b) =
   vpairty (vex l i x a) (VFinLevel l) (VFinLevel l) (vel l i x ii b)
 
+-- mapDEx (Var j) f x = f {j} x
+vprimelim PEMapDEx [Left l, Right (i, _), Right (a, _), Right (b, _), Right (fn, _), Right (x, _)] (VDVar j) = vapp (vapp fn j Impl) x Expl
+-- mapDEx (Arg A K) f g = \x. mapDEx (K x) f (g x)
+vprimelim PEMapDEx [Left l, Right (i, _), Right (a, _), Right (b, _), Right (fn, _), Right (g, _)] (VArg ta k) =
+  vlam "x" $ \x -> vmapdex l i (vapp k (VLiftTerm (vFLS l) l a x) Expl) a b fn (vapp g x Expl)
+-- mapDEx (Par A B) f (x, y) = (mapDEx A f x, mapDEx B f y)
+vprimelim PEMapDEx [Left l, Right (i, _), Right (a, _), Right (b, _), Right (fn, _), Right (x, _)] (VInd ta tb) =
+  VPair (vmapdex l i ta a b fn (vfst x)) (vmapdex l i tb a b fn (vsnd x))
+
+-- mapD (Var j) f Refl = Refl
+vprimelim PEMapD [Left l, Right (i, _), Right (a, _), Right (b, _), Right (fn, _), Right (ii, _), Right (x, _)] (VDVar j) = VRefl
+-- mapD (Arg A K) f (x, y) = (x, mapD (K x) f y)
+vprimelim PEMapD [Left l, Right (i, _), Right (a, _), Right (b, _), Right (fn, _), Right (ii, _), Right (x, _)] (VArg ta k) =
+  VPair (vfst x) (vmapd l i (vapp k (VLiftTerm (vFLS l) l a (vfst x)) Expl) a b fn ii (vsnd x))
+-- mapD (Par A B) f (x, y) = (mapDEx A f x, mapD B y)
+vprimelim PEMapD [Left l, Right (i, _), Right (a, _), Right (b, _), Right (fn, _), Right (ii, _), Right (x, _)] (VInd ta tb) =
+  VPair (vmapd l i ta a b fn ii (vfst x)) (vmapd l i tb a b fn ii (vsnd x))
+
 vprimelim x as (VNe h sp) = VNe h (EPrimElim x as : sp)
 vprimelim p as (VGlobal x sp v) = VGlobal x (EPrimElim p as : sp) (vprimelim p as v)
 vprimelim x as _ = undefined
@@ -142,6 +164,12 @@ vex l i x = vprimelim PEEx [Left l, Right (i, Impl), Right (x, Expl)]
 
 vel :: VFinLevel -> Val -> Val -> Val -> Val -> Val
 vel l i x ii = vprimelim PEEl [Left l, Right (i, Impl), Right (x, Expl), Right (ii, Expl)]
+
+vmapd :: VFinLevel -> Val -> Val -> Val -> Val -> Val -> Val -> Val -> Val
+vmapd l i d a b fn ii x = vprimelim PEMapD [Left l, Right (i, Impl), Right (a, Impl), Right (b, Impl), Right (fn, Expl), Right (ii, Impl), Right (x, Expl)] d
+
+vmapdex :: VFinLevel -> Val -> Val -> Val -> Val -> Val -> Val -> Val
+vmapdex l i d a b fn x = vprimelim PEMapDEx [Left l, Right (i, Impl), Right (a, Impl), Right (b, Impl), Right (fn, Expl), Right (x, Expl)] d
 
 vifdesc :: VFinLevel -> Val -> Val -> Val -> Val -> Val
 vifdesc l i x y = vprimelim PEIfDesc [Left l, Right (i, Impl), Right (x, Expl), Right (y, Expl)]
@@ -218,15 +246,15 @@ evalprimelim PEIfDesc =
   vlam "b" $ \b ->
   vifdesc l i x y b
 evalprimelim PEElimId =
-  vlamlvl "l" $ \l ->
   vlamlvl "k" $ \k ->
+  vlamlvl "l" $ \l ->
   vlamimpl "A" $ \a ->
   vlamimpl "x" $ \x ->
   vlam "P" $ \p ->
   vlam "refl" $ \refl ->
   vlamimpl "y" $ \y ->
   vlam "p" $ \pp ->
-  vprimelim PEElimId [Left l, Left k, Right (a, Impl), Right (x, Impl), Right (p, Expl), Right (refl, Expl), Right (y, Impl)] p
+  vprimelim PEElimId [Left k, Left l, Right (a, Impl), Right (x, Impl), Right (p, Expl), Right (refl, Expl), Right (y, Impl)] p
 evalprimelim PEEx =
   vlamlvl "l" $ \l ->
   vlamimpl "I" $ \i ->
@@ -240,6 +268,35 @@ evalprimelim PEEl =
   vlam "i" $ \ii ->
   vlam "D" $ \d ->
   vel l i x ii d
+evalprimelim PEMapD =
+  vlamlvl "l" $ \l ->
+  vlamimpl "I" $ \i ->
+  vlam "D" $ \d ->
+  vlamimpl "A" $ \a ->
+  vlamimpl "B" $ \b ->
+  vlam "fn" $ \fn ->
+  vlamimpl "i" $ \ii ->
+  vlam "x" $ \x ->
+  vmapd l i d a b fn ii x
+evalprimelim PEMapDEx =
+  vlamlvl "l" $ \l ->
+  vlamimpl "I" $ \i ->
+  vlam "D" $ \d ->
+  vlamimpl "A" $ \a ->
+  vlamimpl "B" $ \b ->
+  vlam "fn" $ \fn ->
+  vlam "x" $ \x ->
+  vmapdex l i d a b fn x
+evalprimelim PEElimData =
+  vlamlvl "k" $ \k ->
+  vlamlvl "l" $ \l ->
+  vlamimpl "I" $ \i ->
+  vlamimpl "D" $ \d ->
+  vlam "P" $ \p ->
+  vlam "alg" $ \alg ->
+  vlamimpl "i" $ \ii ->
+  vlam "x" $ \x ->
+  vprimelim PEElimData [Left k, Left l, Right (i, Impl), Right (d, Impl), Right (p, Expl), Right (alg, Expl), Right (ii, Impl)] x
 
 -- quote
 data QuoteLevel = Full | KeepGlobals
@@ -273,6 +330,9 @@ quoteElim ql l (EPrimElim x as) t =
   case primElimPosition x of
     PEPLast -> App (foldl app (Prim (Right x)) as) t (primElimIcit x)
     PEPFirst -> foldl app (App (Prim (Right x)) t (primElimIcit x)) as
+    PEPThird -> case as of
+      (a : b : rest) -> foldl app (App (app (app (Prim (Right x)) a) b) t (primElimIcit x)) rest
+      _ -> undefined
   where
     app :: Tm -> Either VFinLevel (Val, Icit) -> Tm
     app a (Left lv) = AppLvl a (quoteFinLevel l lv)
@@ -459,7 +519,7 @@ primElimType PEIfDesc =
   vfun VBool (VFinLevel mempty) (VFinLevel (vFLS l)) $
   vDesc l i, VOmega)
 {-
-<l k>
+<k l>
 {A : Type l}
 {x : A}
 (P : {y : A} -> Id <l> {A} {A} x y -> Type k)
@@ -469,8 +529,8 @@ primElimType PEIfDesc =
 P {y} p
 -}
 primElimType PEElimId =
-  (vpilvl "l" (const VOmega) $ \l ->
-  vpilvl "k" (\k -> VFinLevel (vFLS (l <> k))) $ \k ->
+  (vpilvl "k" (const VOmega) $ \k ->
+  vpilvl "l" (\l -> VFinLevel (vFLS (l <> k))) $ \l ->
   vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (l <> vFLS k)) $ \a ->
   vpimpl "x" a (VFinLevel l) (VFinLevel (l <> vFLS k)) $ \x ->
   vpi "P" (vpimpl "y" a (VFinLevel l) (VFinLevel (l <> vFLS k)) $ \y -> vfun (VId l a a x y) (VFinLevel l) (VFinLevel (vFLS k)) $ VTypeFin k) (VFinLevel (vFLS k)) (VFinLevel (l <> k)) $ \p ->
@@ -493,6 +553,61 @@ primElimType PEEl =
   vfun i (VFinLevel l) (VFinLevel (vFLS l)) $
   vfun (vDesc l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
   VTypeFin l, VOmega)
+-- mapD : <l> {I : Type l} -> (D : Desc <l> I) -> {A B : I -> Type l} ({i : I} -> A i -> B i) {i : I} -> El <l> {I} D A i -> El <l> {I} D B i
+primElimType PEMapD =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vpi "D" (vDesc l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \d ->
+  vpimpl "A" (vfun i (VFinLevel l) (VFinLevel (vFLS l)) (VTypeFin l)) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \a ->
+  vpimpl "B" (vfun i (VFinLevel l) (VFinLevel (vFLS l)) (VTypeFin l)) (VFinLevel (vFLS l)) (VFinLevel l) $ \b ->
+  vfun (vpimpl "i" i (VFinLevel l) (VFinLevel l) $ \ii -> vfun (vapp a ii Expl) (VFinLevel l) (VFinLevel l) (vapp b ii Expl)) (VFinLevel l) (VFinLevel l) $
+  vpimpl "i" i (VFinLevel l) (VFinLevel l) $ \ii ->
+  vfun (vel l i a ii d) (VFinLevel l) (VFinLevel l) $
+  vel l i b ii d, VOmega)
+-- mapDEx : <l> {I : Type l} -> (D : Desc <l> I) -> {A B : I -> Type l} ({i : I} -> A i -> B i) -> Ex <l> {I} D A -> Ex <l> {I} D B
+primElimType PEMapDEx =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vpi "D" (vDesc l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \d ->
+  vpimpl "A" (vfun i (VFinLevel l) (VFinLevel (vFLS l)) (VTypeFin l)) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \a ->
+  vpimpl "B" (vfun i (VFinLevel l) (VFinLevel (vFLS l)) (VTypeFin l)) (VFinLevel (vFLS l)) (VFinLevel l) $ \b ->
+  vfun (vpimpl "i" i (VFinLevel l) (VFinLevel l) $ \ii -> vfun (vapp a ii Expl) (VFinLevel l) (VFinLevel l) (vapp b ii Expl)) (VFinLevel l) (VFinLevel l) $
+  vfun (vex l i a d) (VFinLevel l) (VFinLevel l) $
+  vex l i b d, VOmega)
+{- elimData :
+<k l>
+{I : Type l}
+{D : Desc <l> I}
+(P : {i : I} -> Data <l> {I} D i -> Type k)
+(
+  {R : I -> Type l}
+  (case : {i : I} -> R i -> Data <l> {I} D i)
+  -> ({i : I} -> (x : R i) -> P {i} (case {i} x))
+  -> {i : I} (x : El <l> {I} D R i)
+  -> P {i} (Con (mapD <l> {I} D {R} {Data <l> {I} D} case {i} x))
+)
+{i : I}
+(x : Data <l> {I} D i)
+P {i} x
+-}
+primElimType PEElimData =
+  (vpilvl "k" (\_ -> VOmega) $ \k ->
+  vpilvl "l" (\l -> VFinLevel (vFLS l <> vFLS k)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l <> vFLS k)) $ \i ->
+  vpimpl "D" (vDesc l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l <> vFLS k)) $ \d ->
+  vpi "P" (vpimpl "i" i (VFinLevel l) (VFinLevel (l <> vFLS k)) $ \ii -> vfun (VData l i d ii) (VFinLevel l) (VFinLevel (vFLS k)) (VTypeFin k)) (VFinLevel (l <> vFLS k)) (VFinLevel (vFLS l <> k)) $ \p ->
+  vfun (alg k l i d p) (VFinLevel (vFLS l <> k)) (VFinLevel (l <> k)) $
+  vpimpl "i" i (VFinLevel l) (VFinLevel (l <> k)) $ \ii ->
+  vpi "x" (VData l i d ii) (VFinLevel l) (VFinLevel k) $ \x ->
+  vapp (vapp p ii Impl) x Expl, VOmega)
+  where
+    alg k l i d p =
+      (vpimpl "R" (vfun i (VFinLevel l) (VFinLevel (vFLS l)) (VTypeFin l)) (VFinLevel (vFLS l)) (VFinLevel (l <> k)) $ \r ->
+      vpi "case" (vpimpl "i" i (VFinLevel l) (VFinLevel l) $ \ii -> vfun (vapp r ii Expl) (VFinLevel l) (VFinLevel l) $ VData l i d ii) (VFinLevel l) (VFinLevel (l <> k)) $ \cs ->
+      vfun (vpimpl "i" i (VFinLevel l) (VFinLevel (l <> k)) $ \ii -> vpi "x" (vapp r ii Expl) (VFinLevel l) (VFinLevel k) $ \x -> vapp (vapp p ii Impl) (vapp (vapp cs ii Impl) x Expl) Expl) (VFinLevel (l <> k)) (VFinLevel (l <> k)) $
+      vpimpl "i" i (VFinLevel l) (VFinLevel (l <> k)) $ \ii ->
+      vpi "x" (vel l i r ii d) (VFinLevel l) (VFinLevel k) $ \x ->
+      vapp (vapp p ii Impl) (VCon (vmapd l i d r (vlam "ii" $ \ii -> VData l i d ii) cs ii x)) Expl)
 
 -- levitation
 vVar :: VFinLevel -> Val -> Val -> Val

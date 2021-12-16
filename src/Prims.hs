@@ -19,7 +19,8 @@ data PrimElimName
   | PELower
   | PEIndBool | PEIfDesc
   | PEElimId
-  | PEEx | PEEl
+  | PEEx | PEEl | PEMapD | PEMapDEx
+  | PEElimData
   deriving (Eq)
 
 instance Show PrimName where
@@ -42,6 +43,9 @@ instance Show PrimElimName where
   show PEElimId = "elimId"
   show PEEx = "Ex"
   show PEEl = "El"
+  show PEMapD = "mapD"
+  show PEMapDEx = "mapDEx"
+  show PEElimData = "elimData"
 
 toPrimName :: String -> Maybe PrimName
 toPrimName "Void" = Just PVoid
@@ -64,11 +68,16 @@ toPrimElimName "ifDesc" = Just PEIfDesc
 toPrimElimName "elimId" = Just PEElimId
 toPrimElimName "Ex" = Just PEEx
 toPrimElimName "El" = Just PEEl
+toPrimElimName "mapD" = Just PEMapD
+toPrimElimName "mapDEx" = Just PEMapDEx
+toPrimElimName "elimData" = Just PEElimData
 toPrimElimName _ = Nothing
 
-data PrimElimPosition = PEPFirst | PEPLast
+data PrimElimPosition = PEPFirst | PEPLast | PEPThird
 
 primElimPosition :: PrimElimName -> PrimElimPosition
+primElimPosition PEMapD = PEPThird
+primElimPosition PEMapDEx = PEPThird
 primElimPosition _ = PEPLast
 
 primElimIcit :: PrimElimName -> Icit

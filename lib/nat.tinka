@@ -1,7 +1,37 @@
 import lib/desc;
+import lib/bool;
 
 NatD : Desc () = SumD (Var []) (Ind (Var []) (Var []));
 Nat = Data NatD [];
 
 Z : Nat = [True];
 S : Nat -> Nat = \n. [False, n];
+
+indNat :
+  <k> (P : Nat -> Type k)
+  (z : P Z)
+  (s : (m : Nat) -> P m -> P (S m))
+  (x : Nat)
+  -> P x
+  = \<l> P z s x. elimData P (\{R} case ind y.
+      indBool (\tag. (xs : El R [] (if tag (Var []) (Ind (Var []) (Var [])))) -> P (tag, mapD (if tag (Var []) (Ind (Var []) (Var []))) case xs))
+        (\_. z)
+        (\xs. s (case xs._1) (ind xs._1))
+        y._1 y._2) x;
+
+paraNat : <k> {R : Type k} -> Nat -> R -> (Nat -> R -> R) -> R
+  = \{R} n z s. indNat (\_. R) z s n;
+
+caseNat : <k> {R : Type k} -> Nat -> R -> (Nat -> R) -> R
+  = \n z s. paraNat n z (\m _. s m);
+
+cataNat : <k> {R : Type k} -> Nat -> R -> (R -> R) -> R
+  = \n z s. paraNat n z (\_. s);
+
+pred : Nat -> Nat = \n. caseNat n Z (\m. m);
+add : Nat -> Nat -> Nat = \a b. cataNat a b S;
+
+n0 = Z;
+n1 = S n0;
+n2 = S n1;
+n3 = S n2;
