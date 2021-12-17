@@ -62,13 +62,21 @@ TODO:
 - [x] simplify equality type
   - [x] Refl as a core term
   - [x] rename HEq to Id
+- [ ] lib updates
+  - [ ] induction for SumD and SumDL
+  - [ ] induction deriviation
 - [ ] update unification
   - [ ] eta rule for Bool
   - [ ] more cumulativity in elaboration
   - [ ] improve level unification
   - [ ] pruning
   - [ ] postponing
+- [ ] improved unfolding
+  - [ ] selective unfolding in holes
+  - [ ] unfolding annotations on definitions
+  - [ ] unfold if progress is made
 - [ ] add more syntax
+  - [ ] infix operators
   - [ ] nat literals
   - [ ] if syntax
   - [ ] equality syntax
@@ -88,3 +96,4 @@ TODO:
 
 Level solver issues:
 - max '4 ?l7 ~ S '4
+- max (S ?l0) ?l1 ~ max (S '3) '2
