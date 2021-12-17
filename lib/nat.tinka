@@ -1,13 +1,13 @@
 import lib/desc;
 import lib/bool;
 
-NatD : Desc () = SumD (Var []) (Ind (Var []) (Var []));
+NatD : Desc () = Var [] |: Ind (Var []) (Var []);
 Nat = Data NatD [];
 
 Z : Nat = [True];
 S : Nat -> Nat = \n. [False, n];
 
-NatDBody : Bool -> Desc () = \tag. if tag (Var []) (Ind (Var []) (Var []));
+NatDBody : Bool -> Desc () = Var [] <?> Ind (Var []) (Var []);
 
 indNat :
   <k> (P : Nat -> Type k)
@@ -32,6 +32,8 @@ cataNat : <k> {R : Type k} -> Nat -> R -> (R -> R) -> R
 
 pred : Nat -> Nat = \n. caseNat n Z (\m. m);
 add : Nat -> Nat -> Nat = \a b. cataNat a b S;
+
+(+) = add;
 
 n0 = Z;
 n1 = S n0;

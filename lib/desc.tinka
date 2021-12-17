@@ -10,10 +10,10 @@ Desc : <l> -> Type l -> Type (S l)
 
 Var : <l> {I : Type l} -> I -> Desc I = \i. [True, lift i];
 Arg : <l> {I : Type l} (A : Type l) -> (A -> Desc I) -> Desc I = \A K. [False, True, A, \x. K (lower x)];
+Arg' : <l> {I : Type l} {A : Type l} -> (A -> Desc I) -> Desc I = \{I} {A} K. Arg {I} A K;
 Ind : <l> {I : Type l} -> Desc I -> Desc I -> Desc I = \A B. [False, False, A, B];
 
-SumD : {I : Type} -> Desc I -> Desc I -> Desc I
-  = \A B. Arg Bool (\b. if b A B);
+(|:) : {I : Type} -> Desc I -> Desc I -> Desc I = \A B. Arg' (A <?> B);
 
 SumDL : <l> {I : Type l} -> Desc I -> Desc I -> Desc I
   = \<l> A B. Arg (Lift <l> Bool) (\b. if (lower b) A B);

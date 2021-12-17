@@ -1,6 +1,8 @@
 if : <l> {A : Type l} -> Bool -> A -> A -> A
   = \{A} b t f. indBool (\_. A) t f b;
 
+(<?>) : <l> {A : Type l} -> A -> A -> Bool -> A = \t f b. if b t f;
+
 not : Bool -> Bool = \b. if b False True;
 
 and : Bool -> Bool -> Bool

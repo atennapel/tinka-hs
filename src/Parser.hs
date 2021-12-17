@@ -190,7 +190,7 @@ data Sp
   | SpOp Name
 
 pSp :: Parser Sp
-pSp = proj <|> abs <|> try levelByName <|> level <|> try implByName <|> impl <|> try parensOp <|> try op <|> arg
+pSp = proj <|> abs <|> try levelByName <|> try level <|> try implByName <|> impl <|> try parensOp <|> try op <|> arg
   where
     -- {t}
     impl = flip SpArg (Right Impl) <$> braces pSurface
