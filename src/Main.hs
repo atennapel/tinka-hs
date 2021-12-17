@@ -123,7 +123,7 @@ reduceGlobalLet _ t = t
 
 showElabDef :: GlobalEntry -> String
 showElabDef (GlobalEntry x _ _ _ ety _ etm file) =
-  maybe "" (++ ".") file ++ x ++ " : " ++ showC empty ety ++ " = " ++ showC empty (reduceGlobalLet x etm)
+  maybe "" (++ ".") file ++ showName x ++ " : " ++ showC empty ety ++ " = " ++ showC empty (reduceGlobalLet x etm)
 
 showElabDecls :: GlobalCtx -> String
 showElabDecls [] = ""

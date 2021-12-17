@@ -75,7 +75,7 @@ showSTmApp t =
     showAppArgument :: Either (SLevel, Maybe Name) (STm, Either Name Icit) -> String
     showAppArgument (Right (a, Right Expl)) = showSTmS a
     showAppArgument (Right (a, Right Impl)) = "{" ++ show a ++ "}"
-    showAppArgument (Right (a, Left x)) = "{" ++ x ++ " = " ++ show a ++ "}"
+    showAppArgument (Right (a, Left x)) = "{" ++ showName x ++ " = " ++ show a ++ "}"
     showAppArgument (Left (a, Just x)) = "<" ++ x ++ " = " ++ show a ++ ">"
     showAppArgument (Left (a, Nothing)) = "<" ++ show a ++ ">"
 
@@ -91,12 +91,12 @@ showSTmLam t =
     go t = ([], t)
 
     showAbsParameter :: (Name, Either (Maybe Name) (Either Name Icit, Maybe STy)) -> String
-    showAbsParameter (x, Right (Right Expl, Nothing)) = x
-    showAbsParameter (x, Right (Right Expl, Just t)) = "(" ++ x ++ " : " ++ show t ++ ")"
-    showAbsParameter (x, Right (Right Impl, Nothing)) = "{" ++ x ++ "}"
-    showAbsParameter (x, Right (Right Impl, Just t)) = "{" ++ x ++ " : " ++ show t ++ "}"
-    showAbsParameter (x, Right (Left y, Nothing)) = "{" ++ x ++ " = " ++ y ++ "}"
-    showAbsParameter (x, Right (Left y, Just t)) = "{" ++ x ++ " : " ++ show t ++ " = " ++ y ++ "}"
+    showAbsParameter (x, Right (Right Expl, Nothing)) = showName x
+    showAbsParameter (x, Right (Right Expl, Just t)) = "(" ++ showName x ++ " : " ++ show t ++ ")"
+    showAbsParameter (x, Right (Right Impl, Nothing)) = "{" ++ showName x ++ "}"
+    showAbsParameter (x, Right (Right Impl, Just t)) = "{" ++ showName x ++ " : " ++ show t ++ "}"
+    showAbsParameter (x, Right (Left y, Nothing)) = "{" ++ showName x ++ " = " ++ y ++ "}"
+    showAbsParameter (x, Right (Left y, Just t)) = "{" ++ showName x ++ " : " ++ show t ++ " = " ++ y ++ "}"
     showAbsParameter (x, Left (Just y)) = "<" ++ x ++ " = " ++ y ++ ">"
     showAbsParameter (x, Left Nothing) = "<" ++ x ++ ">"
 
@@ -120,8 +120,8 @@ showSTmPi t =
 
     showParam :: (Name, Maybe (STm, Icit)) -> String
     showParam ("_", Just (t, Expl)) = showApp t
-    showParam (x, Just (t, Expl)) = "(" ++ x ++ " : " ++ show t ++ ")"
-    showParam (x, Just (t, Impl)) = "{" ++ x ++ " : " ++ show t ++ "}"
+    showParam (x, Just (t, Expl)) = "(" ++ showName x ++ " : " ++ show t ++ ")"
+    showParam (x, Just (t, Impl)) = "{" ++ showName x ++ " : " ++ show t ++ "}"
     showParam (x, Nothing) = "<" ++ x ++ ">"
 
 showSTmPair :: STm -> String
@@ -168,11 +168,11 @@ showSTmSigma t =
 
     showParam :: (Name, STm) -> String
     showParam ("_", t) = showApp t
-    showParam (x, t) = "(" ++ x ++ " : " ++ show t ++ ")"
+    showParam (x, t) = "(" ++ showName x ++ " : " ++ show t ++ ")"
 
 instance Show STm where
   show (SPos _ t) = show t
-  show (SVar x) = x
+  show (SVar x) = showName x
   show (SHole x) = "_" ++ fromMaybe "" x
   show t@SApp {} = showSTmApp t
   show t@SLam {} = showSTmLam t
@@ -185,8 +185,8 @@ instance Show STm where
   show t@(SSigma _ _ _) = showSTmSigma t
   show (SCon t) = "Con " ++ showSTmS t
   show SRefl = "Refl"
-  show (SLet x (Just t) v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
-  show (SLet x Nothing v b) = "let " ++ x ++ " = " ++ show v ++ "; " ++ show b
+  show (SLet x (Just t) v b) = "let " ++ showName x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
+  show (SLet x Nothing v b) = "let " ++ showName x ++ " = " ++ show v ++ "; " ++ show b
   show (SType (SLNat 0)) = "Type"
   show (SType l) = "Type " ++ showSLevelS l
 
@@ -195,8 +195,8 @@ data Decl
   | Import String
 
 instance Show Decl where
-  show (Def x (Just ty) tm) = x ++ " : " ++ show ty ++ " = " ++ show tm
-  show (Def x Nothing tm) = x ++ " = " ++ show tm
+  show (Def x (Just ty) tm) = showName x ++ " : " ++ show ty ++ " = " ++ show tm
+  show (Def x Nothing tm) = showName x ++ " = " ++ show tm
   show (Import x) = "import " ++ x
 
 type Decls = [Decl]

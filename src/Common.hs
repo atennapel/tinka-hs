@@ -1,6 +1,7 @@
 module Common where
 
 import Data.Coerce (coerce)
+import Data.Char (isAlpha, isDigit)
 
 newtype MetaVar = MetaVar { unMetaVar :: Int } deriving (Eq, Show, Num, Ord) via Int
 newtype LMetaVar = LMetaVar { unLMetaVar :: Int } deriving (Eq, Show, Num, Ord) via Int
@@ -27,3 +28,12 @@ doDebug = False
 
 debug :: String -> IO ()
 debug = if doDebug then putStrLn else (\_ -> return ())
+
+showName :: Name -> String
+showName x@"()" = x
+showName x@"[]" = x
+showName x | length x > 0 && head x == '_' = x
+showName x | length x > 1 && head x == '?' && all isDigit (tail x) = x
+showName x | length x > 2 && head x == '?' && head (tail x) == '*' && all isDigit (tail (tail x)) = x
+showName x | length x > 0 && not (isAlpha (head x)) = "(" ++ x ++ ")"
+showName x = x

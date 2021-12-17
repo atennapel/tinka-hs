@@ -55,18 +55,45 @@ pLambda = char 'λ' <|> char '\\'
 keywords :: [String]
 keywords = ["let", "λ", "Type", "Con", "Refl"]
 
+invalidOperators :: [String]
+invalidOperators = ["->", "**", "\\", ":", "<", ">", "→", "⨯", ".", ",", ";", "=", "_"]
+
+validOperatorSymbols :: String
+validOperatorSymbols = "?:<>-*&^%$#@!~'`+|/,._=;"
+
+validIdentSymbols :: String
+validIdentSymbols = "?:-*&^%$#@!~'`+|/_"
+
+isValidOperator :: Char -> Bool
+isValidOperator c = c `elem` validOperatorSymbols
+
 keyword :: String -> Bool
 keyword x = x `elem` keywords
 
+invalidOperator :: String -> Bool
+invalidOperator x = x `elem` invalidOperators
+
 pName :: Parser Name
 pName = try $ do
-  x <- takeWhile1P Nothing (\c -> isAlphaNum c || c == '-' || c == '\'')
-  guard (not (keyword x) && x /= "-" && x /= "'")
+  x <- takeWhile1P Nothing (\c -> isAlphaNum c || c `elem` validIdentSymbols)
+  guard (not (keyword x) && not (isValidOperator (head x)) && not (isDigit (head x)))
+  return x
+
+pOperator' :: Parser Name
+pOperator' = try $ do
+  x <- takeWhile1P Nothing (\c -> isValidOperator c || isAlphaNum c)
+  guard (not (invalidOperator x) && not (isAlphaNum (head x)))
   return x
 
 pIdent :: Parser Name
 pIdent = try $ do
   x <- pName
+  ws
+  return x
+
+pOperator :: Parser Name
+pOperator = try $ do
+  x <- pOperator'
   ws
   return x
 
@@ -142,6 +169,9 @@ pAtom =
 pBinder :: Parser Name
 pBinder = pIdent <|> symbol "_"
 
+pOpBinder :: Parser Name
+pOpBinder = parens pOperator <|> pBinder
+
 pProj :: Parser SProjType
 pProj = do
   char '.'
@@ -153,49 +183,66 @@ pProj = do
     index = SIndex <$> L.decimal
     named = SNamed <$> pIdent
 
-pArg :: Parser (Either SProjType (Either (SLevel, Maybe Name) (Either Name Icit, STm)))
-pArg = proj <|> abs <|> try levelByName <|> level <|> try implByName <|> impl <|> arg
+data Sp
+  = SpProj SProjType
+  | SpLevel SLevel (Maybe Name)
+  | SpArg STm (Either Name Icit)
+  | SpOp Name
+
+pSp :: Parser Sp
+pSp = proj <|> abs <|> try levelByName <|> level <|> try implByName <|> impl <|> try op <|> arg
   where
-    impl = Right . Right . (Right Impl,) <$> braces pSurface
+    -- {t}
+    impl = flip SpArg (Right Impl) <$> braces pSurface
 
-    level = Right . Left . (, Nothing) <$> angled pLevel
+    -- <t>
+    level = flip SpLevel Nothing <$> angled pLevel
 
-    arg = Right . Right . (Right Expl,) <$> pAtom
+    -- t
+    arg = flip SpArg (Right Expl) <$> pAtom
 
-    abs = Right . Right . (Right Expl,) <$> pLam
+    -- \x y z. ...
+    abs = flip SpArg (Right Expl) <$> pLam
 
-    proj = Left <$> pProj
+    -- ._1 ._2 .xx .3
+    proj = SpProj <$> pProj
 
+    -- {x = t}
     implByName = braces $ do
-      x <- pIdent
+      x <- parens pOperator <|> pIdent
       char '='
       t <- pSurface
-      return $ Right $ Right (Left x, t)
+      return $ SpArg t (Left x)
     
+    -- <x = l>
     levelByName = angled $ do
       x <- pIdent
       char '='
       t <- pLevel
-      return $ Right $ Left (t, Just x) 
+      return $ SpLevel t (Just x)
+    
+    -- operator
+    op = SpOp <$> pOperator
 
 pSpine :: Parser STm
 pSpine = do
   h <- pAtom
-  args <- many pArg
-  pure $ apps h args
+  sp <- many pSp
+  pure $ apps h sp
   where
-    apps :: STm -> [Either SProjType (Either (SLevel, Maybe Name) (Either Name Icit, STm))] -> STm
+    apps :: STm -> [Sp] -> STm
     apps t [] = t
-    apps t (Left p : as) = apps (SProj t p) as
-    apps t (Right (Right (Right Expl, u)) : Left p : as) = apps t (Right (Right (Right Expl, SProj u p)) : as)
-    apps t (Right (Right (i, u)) : as) = apps (SApp t u i) as
-    apps t (Right (Left (l, x)) : as) = apps (SAppLvl t l x) as
+    apps t (SpProj p : as) = apps (SProj t p) as
+    apps t (SpLevel l x : as) = apps (SAppLvl t l x) as
+    apps t (SpArg u (Right Expl) : SpProj p : as) = apps t (SpArg (SProj u p) (Right Expl) : as)
+    apps t (SpArg u i : as) = apps (SApp t u i) as
+    apps t (SpOp x : as) = apps (SApp (SVar x) t (Right Expl)) as
 
 pLamBinder :: Parser ([Name], Either (Maybe Name) (Either Name Icit, Maybe STm))
-pLamBinder = levels <|> implBinder <|> binderWithType <|> justBinder
+pLamBinder = levels <|> implBinder <|> try binderWithType <|> justBinder
   where
     -- \x
-    justBinder = (\x -> ([x], Right (Right Expl, Nothing))) <$> pBinder
+    justBinder = (\x -> ([x], Right (Right Expl, Nothing))) <$> pOpBinder
 
     -- \<x y z> | \<x y z = b>
     levels = angled $ do
@@ -205,14 +252,14 @@ pLamBinder = levels <|> implBinder <|> binderWithType <|> justBinder
 
     -- \(x y z : A)
     binderWithType = parens $ do
-      xs <- some pBinder
+      xs <- some pOpBinder
       symbol ":"
       ty <- pSurface
       return (xs, Right (Right Expl, Just ty))
     
     -- \{x y z} | \{x y z : A} | \{x y z = b} | \{x y z : A = b}
     implBinder = braces $ do
-      xs <- some pBinder
+      xs <- some pOpBinder
       ty <- optional (symbol ":" >> pSurface)
       b <- optional (symbol "=" >> pBinder)
       return $ maybe (xs, Right (Right Impl, ty)) (\b -> (xs, Right (Left b, ty))) b
@@ -220,7 +267,7 @@ pLamBinder = levels <|> implBinder <|> binderWithType <|> justBinder
 pLam :: Parser STm
 pLam = do
   pLambda
-  xs <- some pLamBinder
+  xs <- many pLamBinder
   char '.'
   t <- pSurface
   pure (foldr go t xs)
@@ -237,7 +284,7 @@ pPiSigmaBinder = levels <|> implBinder <|> binderWithType
   where
     -- (x y z : A)
     binderWithType = parens $ do
-      xs <- some pBinder
+      xs <- some pOpBinder
       symbol ":"
       ty <- pSurface
       return (xs, Right (Expl, ty))
@@ -249,7 +296,7 @@ pPiSigmaBinder = levels <|> implBinder <|> binderWithType
     
     -- {x y z} | {x y z : A}
     implBinder = braces $ do
-      xs <- some pBinder
+      xs <- some pOpBinder
       ty <- optional (symbol ":" >> pSurface)
       return (xs, Right (Impl, fromMaybe (SHole Nothing) ty))
 
@@ -276,7 +323,7 @@ funOrSpine = do
 pLet :: Parser STm
 pLet = do
   pKeyword "let"
-  x <- pBinder
+  x <- pOpBinder
   a <- optional (do
     symbol ":"
     pSurface)
@@ -318,7 +365,7 @@ parseStdin = do
 
 pDef :: Parser [Decl]
 pDef = do
-  x <- pBinder
+  x <- pOpBinder
   a <- optional (do
     symbol ":"
     pSurface)

@@ -83,8 +83,8 @@ showTmLam t =
     go t = ([], t)
 
     showAbsParameter :: (Name, Maybe Icit) -> String
-    showAbsParameter (x, Just Expl) = x
-    showAbsParameter (x, Just Impl) = "{" ++ x ++ "}"
+    showAbsParameter (x, Just Expl) = showName x
+    showAbsParameter (x, Just Impl) = "{" ++ showName x ++ "}"
     showAbsParameter (x, Nothing) = "<" ++ x ++ ">"
 
 showTmPi :: Tm -> String
@@ -105,8 +105,8 @@ showTmPi t =
 
     showParam :: (Name, Maybe (Icit, Tm)) -> String
     showParam ("_", Just (Expl, t)) = showApp t
-    showParam (x, Just (Expl, t)) = "(" ++ x ++ " : " ++ show t ++ ")"
-    showParam (x, Just (Impl, t)) = "{" ++ x ++ " : " ++ show t ++ "}"
+    showParam (x, Just (Expl, t)) = "(" ++ showName x ++ " : " ++ show t ++ ")"
+    showParam (x, Just (Impl, t)) = "{" ++ showName x ++ " : " ++ show t ++ "}"
     showParam (x, Nothing) = "<" ++ x ++ ">"
 
 showTmPair :: Tm -> String
@@ -149,11 +149,11 @@ showTmSigma t =
 
     showParam :: (Name, Tm) -> String
     showParam ("_", t) = showApp t
-    showParam (x, t) = "(" ++ x ++ " : " ++ show t ++ ")"
+    showParam (x, t) = "(" ++ showName x ++ " : " ++ show t ++ ")"
 
 instance Show Tm where
   show (Var i) = "'" ++ show i
-  show (Global x) = x
+  show (Global x) = showName x
   show (Prim (Left x)) = show x
   show (Prim (Right x)) = show x
   show t@(App _ _ _) = showTmApp t
@@ -167,7 +167,7 @@ instance Show Tm where
   show t@Sigma {} = showTmSigma t
   show (Con t) = "Con " ++ showTmS t
   show Refl = "Refl"
-  show (Let x t v b) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
+  show (Let x t v b) = "let " ++ showName x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (Type (FinLevel FLZ)) = "Type"
   show (Type l) = "Type " ++ showLevelS l
   show (Meta m) = "?" ++ show m

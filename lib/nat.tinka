@@ -18,7 +18,7 @@ indNat :
   = \<l> P z s x. elimData P (\{R} case ind y.
       indBool (\tag. (xs : El R [] (NatDBody tag)) -> P (tag, mapD (NatDBody tag) case xs))
         (\_. z)
-        (\xs. _s)--s (case xs._1) (ind xs._1))
+        (\xs. s (case xs._1) (ind xs._1))
         y._1 y._2) x;
 
 paraNat : <k> {R : Type k} -> Nat -> R -> (Nat -> R -> R) -> R

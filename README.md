@@ -76,6 +76,7 @@ TODO:
   - [ ] unfolding annotations on definitions
   - [ ] unfold if progress is made
 - [ ] add more syntax
+  - [x] `\.` for lambdas with no parameters (like Haskell's `$`)
   - [ ] infix operators
   - [ ] nat literals
   - [ ] if syntax
