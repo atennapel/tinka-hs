@@ -6,7 +6,7 @@ import Data.Char
 import Data.Void
 import System.Exit
 import Text.Megaparsec
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust, fromJust)
 
 import qualified Text.Megaparsec.Char       as C
 import qualified Text.Megaparsec.Char.Lexer as L
@@ -190,7 +190,7 @@ data Sp
   | SpOp Name
 
 pSp :: Parser Sp
-pSp = proj <|> abs <|> try levelByName <|> level <|> try implByName <|> impl <|> try op <|> arg
+pSp = proj <|> abs <|> try levelByName <|> level <|> try implByName <|> impl <|> try parensOp <|> try op <|> arg
   where
     -- {t}
     impl = flip SpArg (Right Impl) <$> braces pSurface
@@ -224,19 +224,92 @@ pSp = proj <|> abs <|> try levelByName <|> level <|> try implByName <|> impl <|>
     -- operator
     op = SpOp <$> pOperator
 
+    -- operator in parens
+    parensOp = flip SpArg (Right Expl) . SVar <$> parens pOperator
+
+prec :: Name -> Int
+prec x = go (head x)
+  where    
+    go '*' = 99
+    go '/' = 99
+    go '%' = 99
+
+    go '+' = 98
+    go '-' = 98
+
+    go ':' = 97
+
+    go '=' = 96
+    go '!' = 96
+    
+    go '<' = 95
+    go '>' = 95
+    
+    go '&' = 94
+
+    go '^' = 93
+  
+    go '|' = 92
+    
+    go '$' = 91
+    go '_' = 91
+
+    go _ = 999
+
+rightAssoc :: Name -> Bool
+rightAssoc x = last x == ':'
+
 pSpine :: Parser STm
 pSpine = do
   h <- pAtom
   sp <- many pSp
-  pure $ apps h sp
+  let os = ops h sp
+  guard (isJust os)
+  pure $ shunting (fromJust os)
   where
-    apps :: STm -> [Sp] -> STm
-    apps t [] = t
-    apps t (SpProj p : as) = apps (SProj t p) as
-    apps t (SpLevel l x : as) = apps (SAppLvl t l x) as
-    apps t (SpArg u (Right Expl) : SpProj p : as) = apps t (SpArg (SProj u p) (Right Expl) : as)
-    apps t (SpArg u i : as) = apps (SApp t u i) as
-    apps t (SpOp x : as) = apps (SApp (SVar x) t (Right Expl)) as
+    shunting :: [Either Name STm] -> STm
+    shunting st = stack [] (reverse $ go st [] [])
+      where
+        go :: [Either Name STm] -> [Either Name STm] -> [Name] -> [Either Name STm]
+        go [] out [] = out
+        go [] out (op : ops) = go [] (Left op : out) ops
+        go (Right t : st) out ops = go st (Right t : out) ops
+        go (Left o1 : st) out (o2 : ops) | prec o2 > prec o1 || prec o1 == prec o2 && not (rightAssoc o1) = go (Left o1 : st) (Left o2 : out) ops
+        go (Left o1 : st) out ops = go st out (o1 : ops)
+
+        stack :: [STm] -> [Either Name STm] -> STm
+        stack (t : _) [] = t
+        stack st (Right t : ops) = stack (t : st) ops
+        stack (a : b : st) (Left x : ops) = stack (SApp (SApp (SVar x) b (Right Expl)) a (Right Expl) : st) ops
+        stack _ _ = undefined
+
+    ops :: STm -> [Sp] -> Maybe [Either Name STm]
+    ops t sp =
+      let splitted = split (SpArg t (Right Expl) : sp) [] in
+      traverse (traverse appsSp) splitted
+      where
+        split :: [Sp] -> [Sp] -> [Either Name [Sp]]
+        split (SpOp x : as) acc = Right (reverse acc) : Left x : split as []
+        split (s : as) acc = split as (s : acc)
+        split [] acc = [Right (reverse acc)]
+
+        appHead :: Sp -> Maybe STm
+        appHead (SpArg t (Right Expl)) = Just t
+        appHead _ = Nothing
+
+        apps :: STm -> [Sp] -> STm
+        apps t [] = t
+        apps t (SpProj p : as) = apps (SProj t p) as
+        apps t (SpLevel l x : as) = apps (SAppLvl t l x) as
+        apps t (SpArg u (Right Expl) : SpProj p : as) = apps t (SpArg (SProj u p) (Right Expl) : as)
+        apps t (SpArg u i : as) = apps (SApp t u i) as
+        apps t (SpOp x : as) = apps (SApp (SVar x) t (Right Expl)) as
+
+        appsSp :: [Sp] -> Maybe STm
+        appsSp [] = Nothing
+        appsSp (hd : tl) = do
+          hd' <- appHead hd
+          return $ apps hd' tl
 
 pLamBinder :: Parser ([Name], Either (Maybe Name) (Either Name Icit, Maybe STm))
 pLamBinder = levels <|> implBinder <|> try binderWithType <|> justBinder

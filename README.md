@@ -77,7 +77,7 @@ TODO:
   - [ ] unfold if progress is made
 - [ ] add more syntax
   - [x] `\.` for lambdas with no parameters (like Haskell's `$`)
-  - [ ] infix operators
+  - [x] infix operators
   - [ ] nat literals
   - [ ] if syntax
   - [ ] equality syntax
