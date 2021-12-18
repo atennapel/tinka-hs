@@ -78,9 +78,7 @@ TODO:
 - [ ] add more syntax
   - [x] `\.` for lambdas with no parameters (like Haskell's `$`)
   - [x] infix operators
-  - [ ] nat literals
-  - [ ] if syntax
-  - [ ] equality syntax
+  - [x] nat literals
   - [ ] list and vector literals
 - [ ] improve error message
   - [ ] use source position

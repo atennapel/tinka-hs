@@ -34,8 +34,3 @@ pred : Nat -> Nat = \n. caseNat n Z (\m. m);
 add : Nat -> Nat -> Nat = \a b. cataNat a b S;
 
 (+) = add;
-
-n0 = Z;
-n1 = S n0;
-n2 = S n1;
-n3 = S n2;

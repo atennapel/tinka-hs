@@ -156,6 +156,7 @@ pAtom =
   withPos (
     pHole <|>
     try pType <|>
+    (SNatLit <$> (L.decimal <* ws)) <|>
     (SType (SLNat 0) <$ symbol "Type") <|>
     (SRefl <$ symbol "Refl") <|>
     (SVar <$> pIdent))

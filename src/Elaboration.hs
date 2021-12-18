@@ -376,6 +376,10 @@ infer ctx tm = do
       t <- freshMeta ctx
       maybe (return ()) (\x -> addHole x ctx t a) x
       return (t, a, u)
+    SNatLit n | n >= 0 -> infer ctx (go n)
+      where
+        go 0 = SVar "Z"
+        go n = SApp (SVar "S") (go (n - 1)) (Right Expl)
     tm -> throwIO $ ElaborateError $ "cannot infer: " ++ show tm
 
 showHoles :: HoleMap -> IO ()
