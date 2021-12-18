@@ -15,11 +15,7 @@ indNat :
   (s : (m : Nat) -> P m -> P (S m))
   (x : Nat)
   -> P x
-  = \<l> P z s x. elimData P (\{R} case ind y.
-      indBool (\tag. (xs : El R [] (NatDBody tag)) -> P (tag, mapD (NatDBody tag) case xs))
-        (\_. z)
-        (\xs. s (case xs._1) (ind xs._1))
-        y._1 y._2) x;
+  = \P z s x. elimSumD P (\_ _ _. z) (\case ind d. s (case d.0) (ind d.0)) x;
 
 paraNat : <k> {R : Type k} -> Nat -> R -> (Nat -> R -> R) -> R
   = \{R} n z s. indNat (\_. R) z s n;
@@ -30,7 +26,21 @@ caseNat : <k> {R : Type k} -> Nat -> R -> (Nat -> R) -> R
 cataNat : <k> {R : Type k} -> Nat -> R -> (R -> R) -> R
   = \n z s. paraNat n z (\_. s);
 
-pred : Nat -> Nat = \n. caseNat n Z (\m. m);
-add : Nat -> Nat -> Nat = \a b. cataNat a b S;
+predN : Nat -> Nat = \n. caseNat n 0 (\m. m);
+addN : Nat -> Nat -> Nat = \a b. cataNat a b S;
+subN : Nat -> Nat -> Nat = \a b. cataNat b a predN;
+mulN : Nat -> Nat -> Nat = \a b. cataNat a 0 (addN b);
+powN : Nat -> Nat -> Nat = \a b. cataNat b 1 (mulN a);
 
-(+) = add;
+(+N) = addN;
+(-N) = subN;
+(*N) = mulN;
+(^N:) = powN;
+
+Z? : Nat -> Bool = \n. caseNat n True (\_. False);
+S? : Nat -> Bool = \n. not (Z? n);
+
+eqN : Nat -> Nat -> Bool = \a. cataNat a Z? (\rec b. caseNat b False rec);
+neqN : Nat -> Nat -> Bool = \a b. not (eqN a b);
+(==N) = eqN;
+(!=N) = neqN;

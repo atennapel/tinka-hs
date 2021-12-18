@@ -1,9 +1,11 @@
 the : <l> (A : Type l) -> A -> A = \A x. x;
+(~:) = the;
 
 id = \<l> {A}. the <l> A;
 
-const : <l> {A B : Type l} -> A -> B -> A
-  = \x y. x;
+const : <l> {A B : Type l} -> A -> B -> A = \x y. x;
 
-compose : <l> {A B C : Type l} -> (B -> C) -> (A -> B) -> A -> C
-  = \f g x. f (g x);
+compose : <l> {A B C : Type l} -> (B -> C) -> (A -> B) -> A -> C = \f g x. f (g x);
+rcompose : <l> {A B C : Type l} -> (A -> B) -> (B -> C) -> A -> C = \f g x. g (f x);
+(<<) = compose;
+(>>) = rcompose;

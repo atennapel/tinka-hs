@@ -6,6 +6,7 @@ import System.IO
 import GHC.IO.Encoding
 import Control.Exception (catch, SomeException)
 import Data.List (isPrefixOf)
+import System.Exit (exitSuccess)
 
 import Common
 import Surface
@@ -77,12 +78,18 @@ repl = do
     ":resetglobals" -> do
       resetGlobals
       putStrLn "done"
+    ":exit" -> stop
+    ":quit" -> stop
+    ":q" -> stop
     inp -> try $ do
       (c, ty) <- parseAndElabSurface "(repl)" inp
       putStrLn $ showC empty ty
       putStrLn $ showC empty c
       putStrLn $ showC empty $ nf c
   repl
+
+stop :: IO ()
+stop = putStrLn "bye" >> exitSuccess
 
 tryIO :: IO t -> (t -> IO ()) -> IO ()
 tryIO a k = do

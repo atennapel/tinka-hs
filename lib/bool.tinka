@@ -7,12 +7,18 @@ not : Bool -> Bool = \b. if b False True;
 
 and : Bool -> Bool -> Bool
   = \a b. if a b False;
+(&&) = and;
 
 or : Bool -> Bool -> Bool
   = \a b. if a True b;
+(||) = or;
 
 xor : Bool -> Bool -> Bool
   = \a b. if a (not b) b;
+(^^) = xor;
 
 neqBool = xor;
 eqBool : Bool -> Bool -> Bool = \a b. not (neqBool a b);
+
+(!=B) = neqBool;
+(==B) = eqBool;

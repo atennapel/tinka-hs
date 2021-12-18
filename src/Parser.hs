@@ -73,16 +73,19 @@ keyword x = x `elem` keywords
 invalidOperator :: String -> Bool
 invalidOperator x = x `elem` invalidOperators
 
+isHole :: Name -> Bool
+isHole x = head x == '_' && all isAlphaNum (tail x)
+
 pName :: Parser Name
 pName = try $ do
   x <- takeWhile1P Nothing (\c -> isAlphaNum c || c `elem` validIdentSymbols)
-  guard (not (keyword x) && not (isValidOperator (head x)) && not (isDigit (head x)))
+  guard (not (keyword x) && not (isValidOperator (head x)) && not (isDigit (head x)) && not (isHole x))
   return x
 
 pOperator' :: Parser Name
 pOperator' = try $ do
   x <- takeWhile1P Nothing (\c -> isValidOperator c || isAlphaNum c)
-  guard (not (invalidOperator x) && not (isAlphaNum (head x)))
+  guard (not (invalidOperator x) && not (isAlphaNum (head x)) && not (isHole x))
   return x
 
 pIdent :: Parser Name

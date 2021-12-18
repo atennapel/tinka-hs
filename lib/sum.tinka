@@ -3,6 +3,8 @@ import lib/bool;
 Sum : <l> (A B : Type l) -> Type l
   = \A B. (b : Bool) ** if b A B;
 
+(+:) = Sum;
+
 Left : <l> {A B : Type l} -> A -> Sum A B = \x. (True, x);
 Right : <l> {A B : Type l} -> B -> Sum A B = \x. (False, x);
 
