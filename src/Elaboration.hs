@@ -61,7 +61,7 @@ insert' ctx act = go =<< act where
       m <- freshLMeta ctx
       let mv = finLevel (env ctx) m
       go (AppLvl t m, vinstLevel b mv, vinstCL u mv)
-    va -> pure (t, va, lv)
+    _ -> pure (t, va, lv)
 
 insertNoLevel' :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insertNoLevel' ctx act = go =<< act where
@@ -70,7 +70,7 @@ insertNoLevel' ctx act = go =<< act where
       m <- freshMeta ctx
       let mv = eval (env ctx) m
       go (App t m Impl, vinst b mv, u2)
-    va -> pure (t, va, lv)
+    _ -> pure (t, va, lv)
 
 insertLvl :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insertLvl ctx act = go =<< act where
@@ -79,7 +79,7 @@ insertLvl ctx act = go =<< act where
       m <- freshLMeta ctx
       let mv = finLevel (env ctx) m
       go (AppLvl t m, vinstLevel b mv, vinstCL u mv)
-    va -> pure (t, va, lv)
+    _ -> pure (t, va, lv)
 
 insert :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insert ctx act = act >>= \case
@@ -90,7 +90,7 @@ insert ctx act = act >>= \case
 insertUntilName :: Ctx -> Name -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insertUntilName ctx name act = go =<< act where
   go (t, va, lv) = case force va of
-    va@(VPi x Impl a _ b u2) -> do
+    VPi x Impl a _ b u2 -> do
       if x == name then
         return (t, va, lv)
       else do
@@ -106,7 +106,7 @@ insertUntilName ctx name act = go =<< act where
 insertUntilLevelName :: Ctx -> Name -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insertUntilLevelName ctx name act = go =<< act where
   go (t, va, lv) = case force va of
-    va@(VPi x Impl a _ b u2) -> do
+    VPi x Impl a _ b u2 -> do
       m <- freshMeta ctx
       let mv = eval (env ctx) m
       go (App t m Impl, vinst b mv, u2)
@@ -197,8 +197,9 @@ check ctx tm ty lv = do
       ct <- check ctx tm t (VFinLevel l)
       return $ cLiftTerm (quoteFinLevelCtx ctx k) (quoteFinLevelCtx ctx l) (quoteCtx ctx t) ct
     
-    (tm, ty) -> do
-      (ctm, ty', lv') <- insert ctx $ infer ctx tm      
+    (tm, _) -> do
+      (ctm, ty', lv') <- insert ctx $ infer ctx tm
+      debug $ "check: try to unify " ++ showVZ ctx ty' ++ " ~ " ++ showVZ ctx ty
       unifyCtx ctx lv' lv ty' ty
         ("level check failed " ++ show tm ++ " : " ++ showVZ ctx ty ++ " : " ++ prettyVLevelCtx ctx lv ++ " got " ++ showVZ ctx ty' ++ " : " ++ prettyVLevelCtx ctx lv')
         ("check failed " ++ show tm ++ " : " ++ showVZ ctx ty ++ " got " ++ showVZ ctx ty')
@@ -247,7 +248,9 @@ infer ctx tm = do
                 Just (_, Nothing) -> throwIO $ ElaborateError $ "variable referes to universe level variable: " ++ show t
                 Nothing -> do
                   case getGlobal x of
-                    Just e -> return (Global x, gTy e, gUniv e)
+                    Just e -> do
+                      debug $ "global elaborated: " ++ show t ++ " : " ++ showVZ ctx (gTy e)
+                      return (Global x, gTy e, gUniv e)
                     Nothing -> throwIO $ ElaborateError $ "undefined var " ++ show t
     SType l -> do
       l' <- checkFinLevel ctx l
@@ -395,6 +398,8 @@ elaborate ctx tm = do
   resetMetas
   resetHoles
   (tm', vty, vlv) <- infer ctx tm
+  debug $ "elaborated tm: " ++ show tm'
+  debug $ "elaborated ty: " ++ showV ctx vty
   let tm = zonkCtx ctx tm'
   let ty = zonkCtx ctx $ quoteCtx ctx vty
   let lv = zonkLevelCtx ctx $ quoteLevelCtx ctx vlv
