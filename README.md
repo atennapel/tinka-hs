@@ -79,6 +79,7 @@ TODO:
   - [x] `\.` for lambdas with no parameters (like Haskell's `$`)
   - [x] infix operators
   - [x] nat literals
+  - [ ] defs and lets with parameters
   - [ ] list and vector literals
 - [ ] improve error message
   - [ ] use source position
