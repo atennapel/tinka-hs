@@ -37,3 +37,12 @@ showName x | length x > 1 && head x == '?' && all isDigit (tail x) = x
 showName x | length x > 2 && head x == '?' && head (tail x) == '*' && all isDigit (tail (tail x)) = x
 showName x | length x > 0 && not (isAlpha (head x)) = "(" ++ x ++ ")"
 showName x = x
+
+nextName :: Name -> Name
+nextName "_" = "_"
+nextName x = x ++ "'"
+
+chooseName :: Name -> [Name] -> Name
+chooseName "_" _ = "_"
+chooseName x ns | elem x ns = chooseName (nextName x) ns
+chooseName x _ = x

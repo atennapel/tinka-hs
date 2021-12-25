@@ -128,16 +128,16 @@ prettyCore ns tm = show (go ns tm)
       Prim (Left x) -> SVar (show x)
       Prim (Right x) -> SVar (show x)
       App f a i -> SApp (go ns f) (go ns a) (Right i)
-      Lam x i b -> SLam x (Right i) Nothing (go (x : ns) b)
-      Pi x i t _ b _ -> SPi x i (go ns t) (go (x : ns) b)
+      Lam x i b -> let x' = chooseName x ns in SLam x' (Right i) Nothing (go (x' : ns) b)
+      Pi x i t _ b _ ->let x' = chooseName x ns in SPi x' i (go ns t) (go (x' : ns) b)
       AppLvl f l -> SAppLvl (go ns f) (finLevelToSurface ns l) Nothing
       LamLvl x b -> SLamLvl x Nothing (go (x : ns) b)
-      PiLvl x b _ -> SPiLvl x (go (x : ns) b)
-      Sigma x t _ b _ -> SSigma x (go ns t) (go (x : ns) b)
+      PiLvl x b _ -> let x' = chooseName x ns in SPiLvl x' (go (x' : ns) b)
+      Sigma x t _ b _ -> let x' = chooseName x ns in SSigma x' (go ns t) (go (x' : ns) b)
       Con t -> SCon (go ns t)
       Refl -> SRefl
       Pair a b -> SPair (go ns a) (go ns b)
-      Let x t v b -> SLet x (Just $ go ns t) (go ns v) (go (x : ns) b)
+      Let x t v b -> let x' = chooseName x ns in SLet x' (Just $ go ns t) (go ns v) (go (x' : ns) b)
       Proj s p -> SProj (go ns s) (goProj p)
         where
           goProj Fst = SFst
