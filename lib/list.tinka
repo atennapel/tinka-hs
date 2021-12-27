@@ -1,6 +1,6 @@
 import lib/desc;
 
-ListD (A : Type) : Desc () = Var [] |: Arg A \_. Ind (Var []) (Var []);
+ListD (A : Type) = desc \ListA. ListA :|: A :->: ListA :=>: ListA;
 List (A : Type) : Type = Data (ListD A) [];
 
 Nil {A : Type} : List A = [True];

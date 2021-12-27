@@ -11,10 +11,13 @@ Desc <l> (I : Type l) : Type (S l)
 Var <l> {I : Type l} (i : I) : Desc I = [True, lift i];
 Arg <l> {I : Type l} (A : Type l) (K : A -> Desc I) : Desc I = [False, True, A, \x. K (lower x)];
 Arg' <l> {I : Type l} {A : Type l} (K : A -> Desc I) : Desc I = Arg {I} A K;
+Arg'' <l> {I : Type l} (A : Type l) (B : Desc I) : Desc I = Arg {I} A (\_. B);
+(:->:) = Arg'';
 Ind <l> {I : Type l} (A B : Desc I) : Desc I = [False, False, A, B];
+(:=>:) = Ind;
 
 SumD {I : Type} (A B : Desc I) : Desc I = Arg' (A <?> B);
-(|:) = SumD;
+(:|:) = SumD;
 
 SumDL <l> {I : Type l} (A B : Desc I) : Desc I
   = Arg (Lift <l> Bool) (\b. if (lower b) A B);
@@ -29,13 +32,16 @@ DescD <l> (I : Type l) : Desc (Lift <S l> ())
 elimSumD
   <k> {I : Type}
   {A B : Desc I}
-  (P : {i : I} -> Data (A |: B) i -> Type k)
-  (left : {R : I -> Type} -> (case : {i : I} -> R i -> Data (A |: B) i) -> ({i : I} -> (x : R i) -> P (case x)) -> {i : I} -> (x : El R i A) -> P (True, mapD A case x))
-  (right : {R : I -> Type} -> (case : {i : I} -> R i -> Data (A |: B) i) -> ({i : I} -> (x : R i) -> P (case x)) -> {i : I} -> (x : El R i B) -> P (False, mapD B case x))
+  (P : {i : I} -> Data (A :|: B) i -> Type k)
+  (left : {R : I -> Type} -> (case : {i : I} -> R i -> Data (A :|: B) i) -> ({i : I} -> (x : R i) -> P (case x)) -> {i : I} -> (x : El R i A) -> P (True, mapD A case x))
+  (right : {R : I -> Type} -> (case : {i : I} -> R i -> Data (A :|: B) i) -> ({i : I} -> (x : R i) -> P (case x)) -> {i : I} -> (x : El R i B) -> P (False, mapD B case x))
   {i : I}
-  (x : Data (A |: B) i) : P x
+  (x : Data (A :|: B) i) : P x
   = elimData P (\{R} case ind {j} y.
       indBool (\b. (xs : El R j (if b A B)) -> P (b, mapD (if b A B) case xs))
         (left {R} case ind)
         (right {R} case ind)
         y._1 y._2) x;
+
+desc (K : Desc () -> Desc ()) : Desc () = K (Var []);
+idesc <l> {I : Type l} (K : (I -> Desc I) -> Desc I) : Desc I = K Var;

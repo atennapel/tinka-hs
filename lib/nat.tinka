@@ -1,7 +1,7 @@
 import lib/desc;
 import lib/bool;
 
-NatD : Desc () = Var [] |: Ind (Var []) (Var []);
+NatD = desc \Nat. Nat :|: Nat :=>: Nat;
 Nat = Data NatD [];
 
 Z : Nat = [True];

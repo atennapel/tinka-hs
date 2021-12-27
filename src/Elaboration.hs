@@ -212,7 +212,11 @@ checkTy ctx tm = do
   debug $ "checkTy done: " ++ show ctm
   case force ty of
     VType l -> return (ctm, l)
-    _ -> throwIO $ ElaborateError $ "expected Type in " ++ show tm ++ " but got " ++ showV ctx ty
+    _ -> do
+      l <- VFinLevel . finLevel (env ctx) <$> freshLMeta ctx
+      catch (unify (lvl ctx) ty (VType l)) $ \(err :: Error) ->
+        throwIO $ ElaborateError $ "expected Type in " ++ show tm ++ " but got " ++ showV ctx ty ++ ": " ++ show err 
+      return (ctm, l)
 
 checkFinLevel :: Ctx -> SLevel -> IO FinLevel
 checkFinLevel ctx = \case
@@ -398,11 +402,16 @@ elaborate ctx tm = do
   resetMetas
   resetHoles
   (tm', vty, vlv) <- infer ctx tm
+  solveUnsolvedLMetas
   debug $ "elaborated tm: " ++ show tm'
   debug $ "elaborated ty: " ++ showV ctx vty
+  debug $ "elaborated lv: " ++ prettyVLevelCtx ctx vlv
   let tm = zonkCtx ctx tm'
   let ty = zonkCtx ctx $ quoteCtx ctx vty
   let lv = zonkLevelCtx ctx $ quoteLevelCtx ctx vlv
+  debug $ "zonked tm: " ++ show tm
+  debug $ "zonked ty: " ++ show ty
+  debug $ "zonked lv: " ++ show lv
   hs <- readIORef holes
   onlyIf (not $ null hs) $ showHoles hs
   throwUnless (null hs) $ ElaborateError $ "\nholes found:\n" ++ showCZ ctx tm ++ "\n" ++ showCZ ctx ty ++ "\nholes: " ++ show (map fst $ reverse hs)

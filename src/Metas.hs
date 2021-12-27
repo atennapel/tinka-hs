@@ -85,6 +85,12 @@ writeLMeta (LMetaVar m) e = modifyIORef lmctx $ IM.insert m e
 solveLMeta :: LMetaVar -> VFinLevel -> FinLevel -> IO ()
 solveLMeta m v c = writeLMeta m (LSolved v c)
 
+solveUnsolvedLMetas :: IO ()
+solveUnsolvedLMetas = modifyIORef lmctx (IM.map solve)
+  where
+    solve s@(LSolved {}) = s
+    solve (LUnsolved _ _) = LSolved mempty FLZ
+
 newLMeta :: Lvl -> S.Set Lvl -> IO LMetaVar
 newLMeta k scope = do
   m <- readIORef nextLMeta

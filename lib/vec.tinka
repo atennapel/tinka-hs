@@ -1,7 +1,7 @@
 import lib/desc;
 import lib/nat;
 
-VecD (A : Type) : Desc Nat = Var Z |: Arg Nat \n. Arg A \_. Ind (Var n) (Var (S n));
+VecD (A : Type) = idesc \Vec. Vec 0 :|: Arg Nat \n. A :->: Vec n :=>: Vec (1 +N n);
 Vec (n : Nat) (A : Type) : Type = Data (VecD A) n;
 
 VNil {A : Type} : Vec 0 A = [True];
