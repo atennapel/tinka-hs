@@ -192,6 +192,7 @@ data Sp
   | SpLevel SLevel (Maybe Name)
   | SpArg STm (Either Name Icit)
   | SpOp Name
+  deriving (Show)
 
 pSp :: Parser Sp
 pSp = proj <|> abs <|> try levelByName <|> try level <|> try implByName <|> impl <|> try parensOp <|> try op <|> arg
@@ -265,13 +266,16 @@ rightAssoc x = last x == ':'
 
 pSpine :: Parser STm
 pSpine = do
-  h <- pAtom
+  h <- Left <$> try pOperator <|> Right <$> pAtom
   sp <- many pSp
   let os = ops h sp
   guard (isJust os)
   pure $ shunting (fromJust os)
   where
     shunting :: [Either Name STm] -> STm
+    shunting [Left op] = SVar op
+    shunting [Left op, Right t] = SApp (SApp (SVar "flip") (SVar op) (Right Expl)) t (Right Expl)
+    shunting [Right t, Left op] = SApp (SVar op) t (Right Expl)
     shunting st = stack [] (reverse $ go st [] [])
       where
         go :: [Either Name STm] -> [Either Name STm] -> [Name] -> [Either Name STm]
@@ -287,11 +291,13 @@ pSpine = do
         stack (a : b : st) (Left x : ops) = stack (SApp (SApp (SVar x) b (Right Expl)) a (Right Expl) : st) ops
         stack _ _ = undefined
 
-    ops :: STm -> [Sp] -> Maybe [Either Name STm]
-    ops t sp =
-      let splitted = split (SpArg t (Right Expl) : sp) [] in
-      traverse (traverse appsSp) splitted
+    ops :: Either Name STm -> [Sp] -> Maybe [Either Name STm]
+    ops t sp = fmap (map (fmap fromJust) . filter nonEmpty) $ traverse (traverse appsSp) (split (either SpOp (flip SpArg (Right Expl)) t : sp) [])
       where
+        nonEmpty :: Either Name (Maybe STm) -> Bool
+        nonEmpty (Right Nothing) = False
+        nonEmpty _ = True
+
         split :: [Sp] -> [Sp] -> [Either Name [Sp]]
         split (SpOp x : as) acc = Right (reverse acc) : Left x : split as []
         split (s : as) acc = split as (s : acc)
@@ -309,11 +315,12 @@ pSpine = do
         apps t (SpArg u i : as) = apps (SApp t u i) as
         apps t (SpOp x : as) = apps (SApp (SVar x) t (Right Expl)) as
 
-        appsSp :: [Sp] -> Maybe STm
-        appsSp [] = Nothing
-        appsSp (hd : tl) = do
-          hd' <- appHead hd
-          return $ apps hd' tl
+        appsSp :: [Sp] -> Maybe (Maybe STm)
+        appsSp [] = Just Nothing
+        appsSp (hd : tl) =
+          case appHead hd of
+            Just hd' -> Just (Just $ apps hd' tl)
+            Nothing -> Nothing
 
 pLamBinder :: Parser ([Name], Either (Maybe Name) (Either Name Icit, Maybe STm))
 pLamBinder = levels <|> implBinder <|> try binderWithType <|> justBinder

@@ -267,6 +267,10 @@ unifyFinLevel l a b = do
           solveFinLevel l m (subVFinLevel n a)
         (Nothing, Just (m, n), VFL n' xs ys, _) | n' >= n && all (>= n) (IM.elems xs) && all (>= n) (IM.elems ys) ->
           solveFinLevel l m (subVFinLevel n a)
+        (_, _, VFL 0 xs ys, VFL 0 xs' ys') | IM.null xs && IM.null ys && IM.null xs' && all (== 0) (IM.elems ys') ->
+          mapM_ (\m -> solveFinLevel l (LMetaVar m) mempty) (IM.keys ys')
+        (_, _, VFL 0 xs' ys', VFL 0 xs ys) | IM.null xs && IM.null ys && IM.null xs' && all (== 0) (IM.elems ys') ->
+          mapM_ (\m -> solveFinLevel l (LMetaVar m) mempty) (IM.keys ys')
         (_, _, VFL 0 xs ys, VFL 0 xs' ys') -> do
           let m = minimum (IM.elems xs ++ IM.elems ys ++ IM.elems xs' ++ IM.elems ys')
           if m > 0 then

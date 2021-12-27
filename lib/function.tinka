@@ -9,3 +9,6 @@ compose <l> {A B C : Type l} (f : B -> C) (g : A -> B) (x : A) : C = f (g x);
 rcompose <l> {A B C : Type l} (f : A -> B) (g : B -> C) (x : A) : C = g (f x);
 (<<) = compose;
 (>>) = rcompose;
+
+flip <l k m> {A : Type l} {B : Type k} {C : A -> B -> Type m} (f : (x : A) -> (y : B) -> C x y) (x : B) (y : A) : C y x
+  = f y x;
