@@ -1,24 +1,22 @@
 import lib/desc;
 import lib/nat;
 
-VecD : Type -> Desc Nat = \A. Var Z |: Arg Nat \n. Arg A \_. Ind (Var n) (Var (S n));
-Vec : Nat -> Type -> Type = \n A. Data (VecD A) n;
+VecD (A : Type) : Desc Nat = Var Z |: Arg Nat \n. Arg A \_. Ind (Var n) (Var (S n));
+Vec (n : Nat) (A : Type) : Type = Data (VecD A) n;
 
-VNil : {A : Type} -> Vec Z A = [True];
-VCons : {A : Type} {n : Nat} -> A -> Vec n A -> Vec (S n) A
-  = \{n = n} hd tl. [False, n, hd, tl];
+VNil {A : Type} : Vec 0 A = [True];
+VCons {A : Type} {n : Nat} (hd : A) (tl : Vec n A) : Vec (1 +N n) A = [False, n, hd, tl];
 
 (:V:) = VCons;
 
-indVec :
+indVec
   <k> {A : Type}
   (P : {n : Nat} -> Vec n A -> Type k)
   (vnil : P VNil)
   (vcons : {m : Nat} (hd : A) (tl : Vec m A) -> P tl -> P (hd :V: tl))
   {n : Nat}
-  (x : Vec n A)
-  -> P x
-  = \P vnil vcons x. elimSumD P
+  (x : Vec n A) : P x
+  = elimSumD P
       (\_ _ p. elimId (\p. P (True, p)) vnil p)
       (\case ind d.
         let m = d.0;

@@ -1,32 +1,31 @@
 import lib/desc;
 
-ListD : Type -> Desc () = \A. Var [] |: Arg A \_. Ind (Var []) (Var []);
-List : Type -> Type = \A. Data (ListD A) [];
+ListD (A : Type) : Desc () = Var [] |: Arg A \_. Ind (Var []) (Var []);
+List (A : Type) : Type = Data (ListD A) [];
 
-Nil : {A : Type} -> List A = [True];
-Cons : {A : Type} -> A -> List A -> List A = \hd tl. [False, hd, tl];
+Nil {A : Type} : List A = [True];
+Cons {A : Type} (hd : A) (tl : List A) : List A = [False, hd, tl];
 
 (::) = Cons;
 
-indList :
+indList
   <k> {A : Type}
   (P : List A -> Type k)
   (nil : P Nil)
   (cons : (hd : A) (tl : List A) -> P tl -> P (hd :: tl))
-  (x : List A)
-  -> P x
-  = \P nil cons x. elimSumD P (\_ _ _. nil) (\case ind d. cons d.0 (case d.1) (ind d.1)) x;
+  (x : List A) : P x
+  = elimSumD P (\_ _ _. nil) (\case ind d. cons d.0 (case d.1) (ind d.1)) x;
 
-paraList : <k> {R : Type k} {A : Type} -> List A -> R -> (A -> List A -> R -> R) -> R
-  = \{R} x nil cons. indList (\_. R) nil cons x;
+paraList <k> {R : Type k} {A : Type} (x : List A) (nil : R) (cons : A -> List A -> R -> R) : R
+  = indList (\_. R) nil cons x;
 
-caseList : <k> {R : Type k} {A : Type} -> List A -> R -> (A -> List A -> R) -> R
-  = \x nil cons. paraList x nil (\hd tl _. cons hd tl);
+caseList <k> {R : Type k} {A : Type} (x : List A) (nil : R) (cons : A -> List A -> R) : R
+  = paraList x nil (\hd tl _. cons hd tl);
 
-cataList : <k> {R : Type k} {A : Type} -> List A -> R -> (A -> R -> R) -> R
-  = \x nil cons. paraList x nil (\hd _. cons hd);
+cataList <k> {R : Type k} {A : Type} (x : List A) (nil : R) (cons : A -> R -> R) : R
+  = paraList x nil (\hd _. cons hd);
 
-mapList : {A B : Type} -> (A -> B) -> List A -> List B
-  = \fn x. cataList x Nil (\hd tl. fn hd :: tl);
+mapList {A B : Type} (fn : A -> B) (x : List A) : List B
+  = cataList x Nil (\hd tl. fn hd :: tl);
 
 (<$L>) = mapList;

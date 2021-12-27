@@ -347,11 +347,22 @@ pLam = do
   xs <- many pLamBinder
   char '.'
   t <- pSurface
-  pure (foldr go t xs)
+  return $ foldLamBinders t xs
+  where
+
+foldLamBinders :: STm -> [([Name], Either (Maybe Name) (Either Name Icit, Maybe STm))] -> STm
+foldLamBinders t xs = foldr go t xs
   where
     go :: ([Name], Either (Maybe Name) (Either Name Icit, Maybe STm)) -> STm -> STm
     go (xs, Left i) t = foldr (\x -> SLamLvl x i) t xs
     go (xs, Right (i, a)) t = foldr (\x t -> SLam x i a t) t xs
+
+foldLamBindersUnannotated :: STm -> [([Name], Either (Maybe Name) (Either Name Icit, Maybe STm))] -> STm
+foldLamBindersUnannotated t xs = foldr go t xs
+  where
+    go :: ([Name], Either (Maybe Name) (Either Name Icit, Maybe STm)) -> STm -> STm
+    go (xs, Left i) t = foldr (\x -> SLamLvl x i) t xs
+    go (xs, Right (i, a)) t = foldr (\x t -> SLam x i Nothing t) t xs
 
 pArrowOrCross :: Parser Bool
 pArrowOrCross = (True <$ pArrow) <|> (False <$ pCross)
@@ -401,13 +412,25 @@ pLet :: Parser STm
 pLet = do
   pKeyword "let"
   x <- pOpBinder
+  ps <- many pLamBinder
   a <- optional (do
     symbol ":"
     pSurface)
   symbol "="
   t <- pSurface
   symbol ";"
-  SLet x a t <$> pSurface
+  SLet x (setupPiForDef ps a) (foldLamBindersUnannotated t ps) <$> pSurface
+
+setupPiForDef :: [([Name], Either (Maybe Name) (Either Name Icit, Maybe STm))] -> Maybe STm -> Maybe STm
+setupPiForDef [] Nothing = Nothing
+setupPiForDef xs a = Just $ createPiForDef xs (fromMaybe (SHole Nothing) a)
+
+createPiForDef :: [([Name], Either (Maybe Name) (Either Name Icit, Maybe STm))] -> STm -> STm
+createPiForDef xs t = foldr go t xs
+  where
+    go :: ([Name], Either (Maybe Name) (Either Name Icit, Maybe STm)) -> STm -> STm
+    go (xs, Left i) t = foldr SPiLvl t xs
+    go (xs, Right (i, a)) t = foldr (\x t -> SPi x (either (const Impl) id i) (fromMaybe (SHole Nothing) a) t) t xs
 
 pSurface :: Parser STm
 pSurface = withPos (pLam <|> pLet <|> try pPiOrSigma <|> funOrSpine)
@@ -443,12 +466,13 @@ parseStdin = do
 pDef :: Parser [Decl]
 pDef = do
   x <- pOpBinder
+  ps <- many pLamBinder
   a <- optional (do
     symbol ":"
     pSurface)
   symbol "="
-  body <- pSurface
-  return [Def x a body]
+  t <- pSurface
+  return [Def x (setupPiForDef ps a) (foldLamBindersUnannotated t ps)]
 
 pImport :: Parser [Decl]
 pImport = do

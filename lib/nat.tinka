@@ -5,42 +5,39 @@ NatD : Desc () = Var [] |: Ind (Var []) (Var []);
 Nat = Data NatD [];
 
 Z : Nat = [True];
-S : Nat -> Nat = \n. [False, n];
+S (n : Nat) : Nat = [False, n];
 
-NatDBody : Bool -> Desc () = Var [] <?> Ind (Var []) (Var []);
-
-indNat :
+indNat
   <k> (P : Nat -> Type k)
   (z : P Z)
   (s : (m : Nat) -> P m -> P (S m))
-  (x : Nat)
-  -> P x
-  = \P z s x. elimSumD P (\_ _ _. z) (\case ind d. s (case d.0) (ind d.0)) x;
+  (x : Nat) : P x
+  = elimSumD P (\_ _ _. z) (\case ind d. s (case d.0) (ind d.0)) x;
 
-paraNat : <k> {R : Type k} -> Nat -> R -> (Nat -> R -> R) -> R
-  = \{R} n z s. indNat (\_. R) z s n;
+paraNat <k> {R : Type k} (n : Nat) (z : R) (s : Nat -> R -> R) : R
+  = indNat (\_. R) z s n;
 
-caseNat : <k> {R : Type k} -> Nat -> R -> (Nat -> R) -> R
-  = \n z s. paraNat n z (\m _. s m);
+caseNat <k> {R : Type k} (n : Nat) (z : R) (s : Nat -> R) : R
+  = paraNat n z (\m _. s m);
 
-cataNat : <k> {R : Type k} -> Nat -> R -> (R -> R) -> R
-  = \n z s. paraNat n z (\_. s);
+cataNat <k> {R : Type k} (n : Nat) (z : R) (s : R -> R) : R
+  = paraNat n z (\_. s);
 
-predN : Nat -> Nat = \n. caseNat n 0 (\m. m);
-addN : Nat -> Nat -> Nat = \a b. cataNat a b S;
-subN : Nat -> Nat -> Nat = \a b. cataNat b a predN;
-mulN : Nat -> Nat -> Nat = \a b. cataNat a 0 (addN b);
-powN : Nat -> Nat -> Nat = \a b. cataNat b 1 (mulN a);
+predN (n : Nat) : Nat = caseNat n 0 (\m. m);
+addN (a b : Nat) : Nat = cataNat a b S;
+subN (a b : Nat) : Nat = cataNat b a predN;
+mulN (a b : Nat) : Nat = cataNat a 0 (addN b);
+powN (a b : Nat) : Nat = cataNat b 1 (mulN a);
 
 (+N) = addN;
 (-N) = subN;
 (*N) = mulN;
 (^N:) = powN;
 
-Z? : Nat -> Bool = \n. caseNat n True (\_. False);
-S? : Nat -> Bool = \n. not (Z? n);
+Z? (n : Nat) : Bool = caseNat n True (\_. False);
+S? (n : Nat) : Bool = not (Z? n);
 
-eqN : Nat -> Nat -> Bool = \a. cataNat a Z? (\rec b. caseNat b False rec);
-neqN : Nat -> Nat -> Bool = \a b. not (eqN a b);
+eqN (a : Nat) : Nat -> Bool = cataNat a Z? (\rec b. caseNat b False rec);
+neqN (a b : Nat) : Bool = not (eqN a b);
 (==N) = eqN;
 (!=N) = neqN;

@@ -1,5 +1,5 @@
 import lib/bool;
 import lib/id;
 
-notnot : (b : Bool) -> b ~ not (not b)
-  = \b. indBool (\b. b ~ not (not b)) Refl Refl b;
+notnot (b : Bool) : b ~ not (not b)
+  = indBool (\b. b ~ not (not b)) Refl Refl b;
