@@ -21,7 +21,7 @@ import Metas
 import Unification
 
 -- holes
-data HoleEntry = HoleEntry Ctx Tm Val
+data HoleEntry = HoleEntry Ctx Tm Val VLevel
 
 type HoleMap = [(Name, HoleEntry)]
 
@@ -32,12 +32,12 @@ holes = unsafeDupablePerformIO $ newIORef mempty
 resetHoles :: IO ()
 resetHoles = writeIORef holes mempty
 
-addHole :: Name -> Ctx -> Tm -> Val -> IO ()
-addHole x ctx tm ty = do
+addHole :: Name -> Ctx -> Tm -> Val -> VLevel -> IO ()
+addHole x ctx tm ty lv = do
   hs <- readIORef holes
-  case lookup x hs of
+  case (if x == "_" then Nothing else lookup x hs) of
     Just _ -> error $ "duplicate hole _" ++ x
-    Nothing -> writeIORef holes ((x, HoleEntry ctx tm ty) : hs)
+    Nothing -> writeIORef holes ((x, HoleEntry ctx tm ty lv) : hs)
 
 -- elaboration
 freshMeta :: Ctx -> IO Tm
@@ -151,7 +151,7 @@ check ctx tm ty lv = do
     (SPos p tm, _) -> check (enter p ctx) tm ty lv
     (SHole x, _) -> do
       tm <- freshMeta ctx
-      maybe (return ()) (\x -> addHole x ctx tm ty) x
+      maybe (return ()) (\x -> addHole x ctx tm ty lv) x
       return tm
     (SLam x i ma b, VPi x' i' ty u1 b' u2) | either (\x -> x == x' && i' == Impl) (== i') i -> do
       case ma of
@@ -381,7 +381,7 @@ infer ctx tm = do
       let u = VFinLevel $ finLevel (env ctx) l
       a <- eval (env ctx) <$> freshMeta ctx
       t <- freshMeta ctx
-      maybe (return ()) (\x -> addHole x ctx t a) x
+      maybe (return ()) (\x -> addHole x ctx t a u) x
       return (t, a, u)
     SNatLit n | n >= 0 -> infer ctx (go n)
       where
@@ -389,9 +389,81 @@ infer ctx tm = do
         go n = SApp (SVar "S") (go (n - 1)) (Right Expl)
     tm -> throwIO $ ElaborateError $ "cannot infer: " ++ show tm
 
+tryUnify :: Ctx -> VLevel -> VLevel -> VTy -> VTy -> IO Bool
+tryUnify ctx u1 u2 a b = do
+  ls <- readIORef lmctx
+  ms <- readIORef mctx
+  catch (True <$ unifyCtx ctx u1 u2 a b "" "") \(err :: Error) -> do
+    writeIORef lmctx ls
+    writeIORef mctx ms
+    return False
+
+tryUnifyCtx :: Ctx -> VTy -> VLevel -> IO (Maybe Tm)
+tryUnifyCtx ctx ty lv = do
+  debug $ "try to find instance in local for " ++ showVZ ctx ty
+  let bs = binders ctx
+  go 0 bs
+  where
+    go :: Ix -> [BinderEntry] -> IO (Maybe Tm)
+    go i [] = return Nothing
+    go i (BinderEntry _ _ _ (Just (ty', lv')) : rest) = do
+      (tm', ty', lv') <- insert ctx (return (Var i, ty', lv'))
+      succeeded <- tryUnify ctx lv lv' ty ty'
+      if succeeded then
+        return $ Just tm'
+      else
+        go (i + 1) rest
+    go i (_ : rest) = go (i + 1) rest
+
+tryUnifyGlobals :: Ctx -> VTy -> VLevel -> IO (Maybe Tm)
+tryUnifyGlobals ctx ty lv = do
+  debug $ "try to find instance in globals for " ++ showVZ ctx ty
+  gs <- readIORef globals
+  go gs
+  where
+    go :: [GlobalEntry] -> IO (Maybe Tm)
+    go [] = return Nothing
+    go (e : rest) = do
+      (tm', ty', lv') <- insert ctx (return (Global (gName e), gTy e, gUniv e))
+      succeeded <- tryUnify ctx lv lv' ty ty'
+      if succeeded then
+        return $ Just tm'
+      else
+        go rest
+
+trySolveInstances :: IO ()
+trySolveInstances = do
+  debug "try to solve instances"
+  hs <- readIORef holes
+  hs' <- go hs
+  writeIORef holes hs'
+  where
+    go :: HoleMap -> IO HoleMap
+    go [] = return []
+    go (hd@("_", HoleEntry ctx tm ty lv) : rest) = do
+      tl <- go rest
+      case force ty of
+        VNe (HMeta _) _ -> return (hd : tl) -- TODO: postpone
+        _ -> do
+          res <- tryUnifyCtx ctx ty lv
+          case res of
+            Nothing -> do
+              res <- tryUnifyGlobals ctx ty lv
+              case res of
+                Nothing -> return (hd : tl)
+                Just tm' -> do
+                  unify (lvl ctx) (eval (env ctx) tm) (eval (env ctx) tm')
+                  return tl
+            Just tm' -> do
+              unify (lvl ctx) (eval (env ctx) tm) (eval (env ctx) tm')
+              return tl
+    go (x : rest) = do
+      tl <- go rest
+      return (x : tl)
+
 showHoles :: HoleMap -> IO ()
 showHoles [] = return ()
-showHoles ((x, HoleEntry ctx tm ty) : t) = do
+showHoles ((x, HoleEntry ctx tm ty _) : t) = do
   showHoles t
   putStrLn ""
   putStrLn $ "hole\n_" ++ x ++ " : " ++ showVZ ctx ty ++ " = " ++ showCZ ctx tm
@@ -402,6 +474,7 @@ elaborate ctx tm = do
   resetMetas
   resetHoles
   (tm', vty, vlv) <- infer ctx tm
+  trySolveInstances
   solveUnsolvedLMetas
   debug $ "elaborated tm: " ++ show tm'
   debug $ "elaborated ty: " ++ showV ctx vty

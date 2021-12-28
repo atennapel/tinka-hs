@@ -85,7 +85,7 @@ pName = try $ do
 pOperator' :: Parser Name
 pOperator' = try $ do
   x <- takeWhile1P Nothing (\c -> isValidOperator c || isAlphaNum c)
-  guard (not (invalidOperator x) && not (isAlphaNum (head x)) && not (isHole x))
+  guard (not (invalidOperator x) && not (isAlphaNum (head x)) && not (isHole x) && head x /= '_')
   return x
 
 pIdent :: Parser Name
@@ -150,7 +150,7 @@ pUnitPair = brackets (foldr SPair (SVar "[]") <$> pCommaSeparated)
 pHole :: Parser STm
 pHole = do
   C.char '_'
-  x <- optional (takeWhile1P Nothing isAlphaNum)
+  x <- optional (C.string "_") <|> optional (takeWhile1P Nothing isAlphaNum)
   ws
   return $ SHole x
 
