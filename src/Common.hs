@@ -2,6 +2,8 @@ module Common where
 
 import Data.Coerce (coerce)
 import Data.Char (isAlpha, isDigit)
+import System.IO.Unsafe
+import Data.IORef
 
 newtype MetaVar = MetaVar { unMetaVar :: Int } deriving (Eq, Show, Num, Ord) via Int
 newtype LMetaVar = LMetaVar { unLMetaVar :: Int } deriving (Eq, Show, Num, Ord) via Int
@@ -23,11 +25,18 @@ onlyIf :: Bool -> IO () -> IO ()
 onlyIf True action = action
 onlyIf False _ = return ()
 
-doDebug :: Bool
-doDebug = False
+doDebug :: IORef Bool
+doDebug = unsafeDupablePerformIO $ newIORef False
+{-# noinline doDebug #-}
+
+getDebug :: IO Bool
+getDebug = readIORef doDebug
+
+setDebug :: Bool -> IO ()
+setDebug b = writeIORef doDebug b
 
 debug :: String -> IO ()
-debug = if doDebug then putStrLn else (\_ -> return ())
+debug x = if unsafeDupablePerformIO (readIORef doDebug) then putStrLn x else return ()
 
 showName :: Name -> String
 showName x@"()" = x

@@ -52,6 +52,15 @@ mainWith getOpt getSurface = do
         Just e ->
           putStrLn $ showC empty (nf (gCoreVal e))
         Nothing -> return ()
+    ["elab-decls-debug"] -> try $ do
+      setDebug True
+      elabDecls parseStdinDecls
+      gs <- getGlobals
+      putStrLn $ showElabDecls gs
+      case getGlobal "main" of
+        Just e ->
+          putStrLn $ showC empty (nf (gCoreVal e))
+        Nothing -> return ()
     _ -> do
       (c, ty) <- elab getSurface
       putStrLn $ showC empty ty
@@ -81,6 +90,10 @@ repl = do
     ":exit" -> stop
     ":quit" -> stop
     ":q" -> stop
+    s | s == ":debug" || s == ":d" -> do
+      b <- getDebug
+      setDebug (not b)
+      putStrLn $ "debug = " ++ show (not b)
     inp -> try $ do
       (c, ty) <- parseAndElabSurface "(repl)" inp
       putStrLn $ showC empty ty
