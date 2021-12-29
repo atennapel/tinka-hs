@@ -398,6 +398,16 @@ tryUnify ctx u1 u2 a b = do
     writeIORef mctx ms
     return False
 
+tryUnify' :: Ctx -> Tm -> Val -> VLevel -> Val -> VLevel -> IO (Maybe Tm)
+tryUnify' ctx tm ty' lv' ty lv = do
+  succeeded <- tryUnify ctx lv' lv ty' ty
+  if succeeded then
+    return $ Just tm
+  else do
+    (tm', ty', lv') <- insert ctx (return (tm, ty, lv))
+    succeeded <- tryUnify ctx lv' lv ty' ty
+    if succeeded then return $ Just tm' else return $ Nothing
+
 tryUnifyCtx :: Ctx -> VTy -> VLevel -> IO (Maybe Tm)
 tryUnifyCtx ctx ty lv = do
   debug $ "try to find instance in local for " ++ showVZ ctx ty
@@ -407,12 +417,10 @@ tryUnifyCtx ctx ty lv = do
     go :: Ix -> [BinderEntry] -> IO (Maybe Tm)
     go i [] = return Nothing
     go i (BinderEntry _ _ _ (Just (ty', lv')) : rest) = do
-      (tm', ty', lv') <- insert ctx (return (Var i, ty', lv'))
-      succeeded <- tryUnify ctx lv lv' ty ty'
-      if succeeded then
-        return $ Just tm'
-      else
-        go (i + 1) rest
+      res <- tryUnify' ctx (Var i) ty' lv' ty lv
+      case res of
+        Nothing -> go (i + 1) rest
+        _ -> return res
     go i (_ : rest) = go (i + 1) rest
 
 tryUnifyGlobals :: Ctx -> VTy -> VLevel -> IO (Maybe Tm)
@@ -424,12 +432,10 @@ tryUnifyGlobals ctx ty lv = do
     go :: [GlobalEntry] -> IO (Maybe Tm)
     go [] = return Nothing
     go (e : rest) = do
-      (tm', ty', lv') <- insert ctx (return (Global (gName e), gTy e, gUniv e))
-      succeeded <- tryUnify ctx lv lv' ty ty'
-      if succeeded then
-        return $ Just tm'
-      else
-        go rest
+      res <- tryUnify' ctx (Global (gName e)) (gTy e) (gUniv e) ty lv
+      case res of
+        Nothing -> go rest
+        _ -> return res
 
 trySolveInstances :: IO ()
 trySolveInstances = do

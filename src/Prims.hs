@@ -12,7 +12,7 @@ data PrimName
   | PLiftTerm
 
   | PData
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 data PrimElimName
   = PEAbsurd
