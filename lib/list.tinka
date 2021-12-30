@@ -1,4 +1,5 @@
 import lib/desc;
+import lib/functor;
 
 ListD (A : Type) = desc \ListA. ListA :|: A :->: ListA :=>: ListA;
 List (A : Type) : Type = Data (ListD A) [];
@@ -29,3 +30,5 @@ mapList {A B : Type} (fn : A -> B) (x : List A) : List B
   = cataList x Nil (\hd tl. fn hd :: tl);
 
 (<$L>) = mapList;
+
+functorList : Functor List = mapList;

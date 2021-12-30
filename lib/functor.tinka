@@ -1,0 +1,5 @@
+Functor (F : Type -> Type) = {A B : Type} -> (A -> B) -> F A -> F B;
+
+map {F : Type -> Type} {{fmap : Functor F}} : Functor F = fmap;
+
+(<$>) = map;

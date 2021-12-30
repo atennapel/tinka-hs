@@ -3,6 +3,8 @@ import lib/function;
 import lib/bool;
 import lib/bool.proofs;
 
+import lib/functor;
+
 import lib/sum;
 import lib/maybe;
 
