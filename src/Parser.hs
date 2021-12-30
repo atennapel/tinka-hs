@@ -53,7 +53,7 @@ pLambda :: Parser Char
 pLambda = char 'λ' <|> char '\\'
 
 keywords :: [String]
-keywords = ["let", "λ", "Type", "Con", "Refl"]
+keywords = ["let", "λ", "Type", "Con", "Refl", "instance"]
 
 invalidOperators :: [String]
 invalidOperators = ["->", "**", "\\", ":", "<", ">", "→", "⨯", ".", ",", ";", "=", "_"]
@@ -495,6 +495,7 @@ parseStdin = do
 
 pDef :: Parser [Decl]
 pDef = do
+  inst <- maybe False (const True) <$> optional (symbol "instance")
   x <- pOpBinder
   ps <- many pLamBinder
   a <- optional (do
@@ -502,7 +503,7 @@ pDef = do
     pSurface)
   symbol "="
   t <- pSurface
-  return [Def x (setupPiForDef ps a) (foldLamBindersUnannotated t ps)]
+  return [Def x inst (setupPiForDef ps a) (foldLamBindersUnannotated t ps)]
 
 pImport :: Parser [Decl]
 pImport = do

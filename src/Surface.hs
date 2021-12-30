@@ -201,12 +201,12 @@ instance Show STm where
   show (SNatLit i) = show i
 
 data Decl
-  = Def Name (Maybe STy) STm
+  = Def Name Bool (Maybe STy) STm
   | Import String
 
 instance Show Decl where
-  show (Def x (Just ty) tm) = showName x ++ " : " ++ show ty ++ " = " ++ show tm
-  show (Def x Nothing tm) = showName x ++ " = " ++ show tm
+  show (Def x inst (Just ty) tm) = (if inst then "instance " else "") ++ showName x ++ " : " ++ show ty ++ " = " ++ show tm
+  show (Def x inst Nothing tm) = (if inst then "instance " else "") ++ showName x ++ " = " ++ show tm
   show (Import x) = "import " ++ x
 
 type Decls = [Decl]
@@ -217,7 +217,7 @@ showDecls (hd : tl) = show hd ++ "\n" ++ showDecls tl
 
 declNames :: Decls -> [String]
 declNames [] = []
-declNames (Def x _ _ : t) = x : declNames t
+declNames (Def x _ _ _ : t) = x : declNames t
 declNames (_ : t) = declNames t
 
 countNames :: Decls -> Int

@@ -142,8 +142,8 @@ reduceGlobalLet x (Let y _ v (Var 0)) | x == y = v
 reduceGlobalLet _ t = t
 
 showElabDef :: GlobalEntry -> String
-showElabDef (GlobalEntry x _ _ _ ety _ etm file) =
-  maybe "" (++ ".") file ++ showName x ++ " : " ++ showC empty ety ++ " = " ++ showC empty (reduceGlobalLet x etm)
+showElabDef (GlobalEntry x _ _ _ ety _ etm inst file) =
+  (if inst then "instance " else "") ++ maybe "" (++ ".") file ++ showName x ++ " : " ++ showC empty ety ++ " = " ++ showC empty (reduceGlobalLet x etm)
 
 showElabDecls :: GlobalCtx -> String
 showElabDecls [] = ""

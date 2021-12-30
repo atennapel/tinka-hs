@@ -31,4 +31,4 @@ mapList {A B : Type} (fn : A -> B) (x : List A) : List B
 
 (<$L>) = mapList;
 
-functorList : Functor List = MkFunctor mapList;
+instance functorList : Functor List = MkFunctor mapList;

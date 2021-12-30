@@ -466,12 +466,13 @@ tryUnifyGlobals ctx ty lv = do
   where
     go :: [GlobalEntry] -> IO (Maybe Tm)
     go [] = return Nothing
-    go (e : rest) = do
+    go (e : rest) | gInstance e = do
       debug $ "try global " ++ gName e ++ " : " ++ showVZ ctx (gTy e)
       res <- tryUnify' ctx (Global (gName e)) (gTy e) (gUniv e) ty lv
       case res of
         Nothing -> go rest
         _ -> return res
+    go (_ : rest) = go rest
 
 trySolveInstance :: HoleEntry -> IO Bool
 trySolveInstance (HoleEntry ctx tm ty lv) = do
@@ -578,20 +579,20 @@ elaborate ctx tm = do
   -- throwUnless (ty == ty') $ ElaborateError $ "elaborated type did not match verified type: " ++ show ty ++ " ~ " ++ show ty'
   return (tm, ty, lv)
 
-elaborateDef :: Maybe String -> Name -> Maybe STy -> STm -> IO GlobalEntry
-elaborateDef mod x ty tm =
+elaborateDef :: Maybe String -> Name -> Bool -> Maybe STy -> STm -> IO GlobalEntry
+elaborateDef mod x inst ty tm =
   case getGlobal x of
     Just e | x /= "_" ->
       error $ "cannot redefine global " ++ maybe "" (++ ".") (gModule e) ++ x ++ " as " ++ maybe "" (++ ".") mod ++ x
     _ -> do
       (etm, ety, elv) <- elaborate empty (SLet x ty tm (SVar x))
       debug $ "finished elaboration of " ++ x
-      return $ GlobalEntry x (eval [] ety) (level [] elv) (eval [] etm) ety elv etm mod
+      return $ GlobalEntry x (eval [] ety) (level [] elv) (eval [] etm) ety elv etm inst mod
 
 elaborateDecl :: Maybe String -> Decl -> IO Decls
 elaborateDecl _ (Import x) = return []
-elaborateDecl mod d@(Def x ty tm) = do
-  entry <- elaborateDef mod x ty tm
+elaborateDecl mod d@(Def x inst ty tm) = do
+  entry <- elaborateDef mod x inst ty tm
   addGlobal entry
   return [d]
 

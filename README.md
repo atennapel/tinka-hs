@@ -71,7 +71,8 @@ TODO:
   - [x] instance parameters
   - [x] recursive instance search
   - [x] limit instance search
-  - [ ] instance definitions (limit search)
+  - [x] instance definitions
+  - [ ] instance lets
 - [ ] erased parameters
 - [ ] update unification
   - [ ] eta rule for Bool

@@ -16,6 +16,7 @@ data GlobalEntry = GlobalEntry {
   gCoreTy :: Ty,
   gCoreUniv :: Level,
   gCoreVal :: Tm,
+  gInstance :: Bool,
   gModule :: Maybe String
 }
 
