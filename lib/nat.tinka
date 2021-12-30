@@ -1,5 +1,6 @@
 import lib/desc;
 import lib/bool;
+import lib/eq;
 
 NatD = desc \Nat. Nat :|: Nat :=>: Nat;
 Nat = Data NatD [];
@@ -41,3 +42,5 @@ eqN (a : Nat) : Nat -> Bool = cataNat a Z? (\rec b. caseNat b False rec);
 neqN (a b : Nat) : Bool = not (eqN a b);
 (==N) = eqN;
 (!=N) = neqN;
+
+instance eqNat : Eq Nat = MkEq eqN;

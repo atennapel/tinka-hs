@@ -150,9 +150,14 @@ pUnitPair = brackets (foldr SPair (SVar "[]") <$> pCommaSeparated)
 pHole :: Parser STm
 pHole = do
   C.char '_'
-  x <- optional (C.string "_") <|> optional (takeWhile1P Nothing isAlphaNum)
+  u <- optional $ C.char '_'
+  x <- optional (takeWhile1P Nothing isAlphaNum)
   ws
-  return $ SHole x
+  case (u, x) of
+    (Just _, Just x) -> return $ SHole $ Just $ "_" ++ x
+    (Nothing, Just x) -> return $ SHole $ Just $ x
+    (Just _, Nothing) -> return $ SHole $ Just $ "_"
+    (Nothing, Nothing) -> return $ SHole Nothing
 
 pAtom :: Parser STm
 pAtom =

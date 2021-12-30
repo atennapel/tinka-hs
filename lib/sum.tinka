@@ -1,5 +1,6 @@
 import lib/bool;
 import lib/functor;
+import lib/eq;
 
 Sum <l> (A B : Type l) : Type l = (b : Bool) ** if b A B;
 
@@ -29,3 +30,6 @@ mapSum <l> {X A B : Type l} (fn : A -> B) (x : Sum X A) : Sum X B
   = sum <l> <l> Left (\x. Right (fn x)) x;
 
 instance functorSum : {X : Type} -> Functor (Sum X) = \{X}. MkFunctor (mapSum {X});
+
+instance eqSum : {A B : Type} {{_ : Eq A}} {{_ : Eq B}} -> Eq (Sum A B)
+  = \{A} {B}. MkEq {Sum A B} (\a b. sum {A} {B} (\x. sum (\y. eq x y) (\_. False) b) (\x. sum (\_. False) (\y. eq x y) b) a);

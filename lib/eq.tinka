@@ -1,0 +1,15 @@
+import lib/bool;
+
+Eq (A : Type) = (eq : A -> A -> Bool) ** ();
+
+MkEq {A : Type} (eq : A -> A -> Bool) = [eq];
+
+eq {A : Type} {{eq : Eq A}} : A -> A -> Bool = eq.eq;
+neq {A : Type} {{_ : Eq A}} : A -> A -> Bool = \a b. not (eq a b);
+
+(==) = eq;
+(!=) = neq;
+
+instance eqVoid : Eq Void = MkEq (\_ _. True);
+instance eqUnit : Eq () = MkEq (\_ _. True);
+instance eqBoolInst : Eq Bool = MkEq eqBool;

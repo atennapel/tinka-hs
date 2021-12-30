@@ -1,5 +1,6 @@
 import lib/desc;
 import lib/functor;
+import lib/eq;
 
 ListD (A : Type) = desc \ListA. ListA :|: A :->: ListA :=>: ListA;
 List (A : Type) : Type = Data (ListD A) [];
@@ -32,3 +33,8 @@ mapList {A B : Type} (fn : A -> B) (x : List A) : List B
 (<$L>) = mapList;
 
 instance functorList : Functor List = MkFunctor mapList;
+
+instance eqList : {A : Type} {{_ : Eq A}} -> Eq (List A)
+  = \{A}. MkEq {List A} (\x. cataList x
+      (\y. caseList {Bool} {A} y True (\_ _. False))
+      (\hd rest y. caseList {Bool} {A} y False (\hd' tl'. eq hd hd' && rest tl')));

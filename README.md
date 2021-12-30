@@ -67,10 +67,10 @@ TODO:
   - [x] basic instance search
   - [x] postpone and retry
   - [x] instance parameters
-  - [x] recursive instance search
   - [x] limit instance search
   - [x] instance definitions
   - [x] instance lets
+  - [ ] recursive instance search
 - [ ] erased parameters
 - [ ] lib updates
   - [ ] induction for SumD and SumDL

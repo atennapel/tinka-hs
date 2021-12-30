@@ -86,13 +86,18 @@ insertNoLevel' ctx act = go =<< act where
       go (App t m (Impl i), vinst b mv, u2)
     _ -> pure (t, va, lv)
 
-insertLvl :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
-insertLvl ctx act = go =<< act where
+insertLvl :: Ctx -> Impl -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
+insertLvl ctx i act = go =<< act where
   go (t, va, lv) = case force va of
     VPiLvl x b u -> do
       m <- freshLMeta ctx
       let mv = finLevel (env ctx) m
       go (AppLvl t m, vinstLevel b mv, vinstCL u mv)
+    VPi x (Impl j) a u1 b u2 | i /= j -> do
+      m <- freshMeta ctx
+      if i == ImplInst then addInstanceHole ctx m a u1 else return ()
+      let mv = eval (env ctx) m
+      go (App t m (Impl j), vinst b mv, u2)
     _ -> pure (t, va, lv)
 
 insert :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
@@ -302,7 +307,7 @@ infer ctx tm = do
           (t, tty, l1) <- insertUntilName ctx name j $ infer ctx f
           return (Impl j, t, tty, l1)
         Right (Impl j) -> do
-          (t, tty, l1) <- insertLvl ctx $ infer ctx f
+          (t, tty, l1) <- insertLvl ctx j $ infer ctx f
           return (Impl j, t, tty, l1)
         Right Expl -> do
           (t, tty, l1) <- insert' ctx $ infer ctx f
@@ -355,7 +360,7 @@ infer ctx tm = do
       let vt = VPiLvl x (closeLevel ctx rty) (closeCL ctx u)
       return (Let "f" False (quoteCtx ctx vt) (LamLvl x cb) (Var 0), vt, VOmega)
     c@(SProj t p) -> do
-      (tm, vt, l1) <- infer ctx t
+      (tm, vt, l1) <- insert' ctx $ infer ctx t
       case (force vt, p) of
         (VSigma x ty u1 c _, SFst) -> return (Proj tm Fst, ty, u1)
         (VSigma x ty _ c u2, SSnd) -> return (Proj tm Snd, vinst c (vfst (evalCtx ctx tm)), u2)
@@ -450,7 +455,7 @@ tryUnifyCtx ctx ty lv = do
   where
     go :: Ix -> [BinderEntry] -> IO (Maybe Tm)
     go i [] = return Nothing
-    go i (BinderEntry x inst _ _ (Just (ty', lv')) : rest) | inst = do
+    go i (BinderEntry x inst impl _ (Just (ty', lv')) : rest) | inst || impl == Impl ImplInst = do
       debug $ "try local " ++ x ++ " : " ++ showVZ ctx ty'
       res <- tryUnify' ctx (Var i) ty' lv' ty lv
       case res of
