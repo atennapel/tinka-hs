@@ -20,4 +20,4 @@ maybe {A R : Type} (j : A -> R) (n : R) (m : Maybe A) : R
 mapMaybe {A B : Type} (fn : A -> B) (s : Maybe A) : Maybe B
   = maybe (\x. Just (fn x)) Nothing s;
 
-functorMaybe : Functor Maybe = mapMaybe;
+functorMaybe : Functor Maybe = MkFunctor mapMaybe;

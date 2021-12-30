@@ -4,6 +4,7 @@ import System.IO.Unsafe
 import Data.IORef
 import qualified Data.IntMap as IM
 import qualified Data.Set as S
+import Data.Coerce (coerce)
 
 import Common
 import Core
@@ -29,10 +30,10 @@ isSolved :: MetaEntry -> Bool
 isSolved (Solved {}) = True
 isSolved _ = False
 
-allSolved :: IO Bool
-allSolved = do
+allUnsolved :: IO [MetaVar]
+allUnsolved = do
   ms <- getMetas
-  return $ all isSolved $ IM.elems ms
+  return $ map (coerce . fst) $ filter (\(k, v) -> not (isSolved v)) $ IM.assocs ms
 
 writeMeta :: MetaVar -> MetaEntry -> IO ()
 writeMeta (MetaVar m) e = modifyIORef mctx $ IM.insert m e
@@ -74,10 +75,10 @@ isLSolved :: LMetaEntry -> Bool
 isLSolved (LSolved {}) = True
 isLSolved _ = False
 
-allLSolved :: IO Bool
-allLSolved = do
+allLUnsolved :: IO [LMetaVar]
+allLUnsolved = do
   ms <- getLMetas
-  return $ all isLSolved $ IM.elems ms
+  return $ map (coerce . fst) $ filter (\(k, v) -> not (isLSolved v)) $ IM.assocs ms
 
 writeLMeta :: LMetaVar -> LMetaEntry -> IO ()
 writeLMeta (LMetaVar m) e = modifyIORef lmctx $ IM.insert m e

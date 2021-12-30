@@ -28,4 +28,4 @@ swapSum <l> {A B : Type l} (x : Sum A B) : Sum B A = sum <l> <l> Right Left x;
 mapSum <l> {X A B : Type l} (fn : A -> B) (x : Sum X A) : Sum X B
   = sum <l> <l> Left (\x. Right (fn x)) x;
 
-functorSum : {X : Type} -> Functor (Sum X) = mapSum;
+functorSum : {X : Type} -> Functor (Sum X) = \{X}. MkFunctor (mapSum {X});

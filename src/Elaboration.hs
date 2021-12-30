@@ -5,6 +5,7 @@ import qualified Data.Set as S
 import System.IO.Unsafe
 import Data.IORef
 import Data.Bifunctor (first)
+import Data.Coerce (coerce)
 
 import Common
 import Core
@@ -405,29 +406,41 @@ infer ctx tm = do
     tm -> throwIO $ ElaborateError $ "cannot infer: " ++ show tm
 
 tryUnify :: Ctx -> VLevel -> VLevel -> VTy -> VTy -> IO Bool
-tryUnify ctx u1 u2 a b = do
+tryUnify ctx u1 u2 a b = catch (True <$ unifyCtx ctx u1 u2 a b "" "") \(err :: Error) -> return False
+
+save :: IO (LMetaVar, LMetaMap, MetaVar, MetaMap, [HoleEntry])
+save = do
   nlm <- readIORef nextLMeta
   ls <- readIORef lmctx
   nm <- readIORef nextMeta
   ms <- readIORef mctx
   hs <- readIORef instanceHoles
-  catch (True <$ unifyCtx ctx u1 u2 a b "" "") \(err :: Error) -> do
-    writeIORef lmctx ls
-    writeIORef nextLMeta nlm
-    writeIORef mctx ms
-    writeIORef nextMeta nm
-    writeIORef instanceHoles hs
-    return False
+  return (coerce nlm, ls, coerce nm, ms, hs)
+
+restore :: (LMetaVar, LMetaMap, MetaVar, MetaMap, [HoleEntry]) -> IO ()
+restore (nlm, ls, nm, ms, hs) = do
+  writeIORef nextLMeta (coerce nlm)
+  writeIORef lmctx ls
+  writeIORef nextMeta (coerce nm)
+  writeIORef mctx ms
+  writeIORef instanceHoles hs
+  return ()
 
 tryUnify' :: Ctx -> Tm -> Val -> VLevel -> Val -> VLevel -> IO (Maybe Tm)
 tryUnify' ctx tm ty' lv' ty lv = do
+  state <- save
   succeeded <- tryUnify ctx lv' lv ty' ty
   if succeeded then
     return $ Just tm
   else do
-    (tm', ty', lv') <- insert ctx (return (tm, ty, lv))
+    restore state
+    (tm', ty', lv') <- insert ctx (return (tm, ty', lv'))
     succeeded <- tryUnify ctx lv' lv ty' ty
-    if succeeded then return $ Just tm' else return $ Nothing
+    if succeeded then
+      return $ Just tm'
+    else do
+      restore state
+      return $ Nothing
 
 tryUnifyCtx :: Ctx -> VTy -> VLevel -> IO (Maybe Tm)
 tryUnifyCtx ctx ty lv = do
@@ -437,7 +450,8 @@ tryUnifyCtx ctx ty lv = do
   where
     go :: Ix -> [BinderEntry] -> IO (Maybe Tm)
     go i [] = return Nothing
-    go i (BinderEntry _ _ _ (Just (ty', lv')) : rest) = do
+    go i (BinderEntry x _ _ (Just (ty', lv')) : rest) = do
+      debug $ "try local " ++ x ++ " : " ++ showVZ ctx ty'
       res <- tryUnify' ctx (Var i) ty' lv' ty lv
       case res of
         Nothing -> go (i + 1) rest
@@ -453,6 +467,7 @@ tryUnifyGlobals ctx ty lv = do
     go :: [GlobalEntry] -> IO (Maybe Tm)
     go [] = return Nothing
     go (e : rest) = do
+      debug $ "try global " ++ gName e ++ " : " ++ showVZ ctx (gTy e)
       res <- tryUnify' ctx (Global (gName e)) (gTy e) (gUniv e) ty lv
       case res of
         Nothing -> go rest
@@ -478,7 +493,6 @@ trySolveInstance (HoleEntry ctx tm ty lv) = do
 
 trySolveInstances :: IO Bool
 trySolveInstances = do
-  debug "try to solve instances"
   hs <- readIORef instanceHoles
   hs' <- go hs
   case hs' of
@@ -493,9 +507,11 @@ trySolveInstances = do
       restl <- go tl
       res <- trySolveInstance hd
       if res then
-        return $ Just (hd : tl)
+        case restl of
+          Just tl -> return $ Just (hd : tl)
+          Nothing -> return Nothing
       else
-        return restl
+        return $ Just tl
 
 showUnsolvedInstances :: [HoleEntry] -> IO ()
 showUnsolvedInstances [] = return ()
@@ -510,7 +526,8 @@ trySolveAllInstances :: IO ()
 trySolveAllInstances = do
   go 0
   hs <- readIORef instanceHoles
-  if null hs then
+  if null hs then do
+    debug $ "all instances are solved"
     return ()
   else
     showUnsolvedInstances hs
@@ -518,6 +535,7 @@ trySolveAllInstances = do
     go :: Int -> IO ()
     go i | i >= maxInstanceSearch = putStrLn "instance search limit reached"
     go i = do
+      debug $ "try to solve instances (round " ++ show i ++ ")"
       b <- trySolveInstances
       if b then
         go (i + 1)
@@ -552,10 +570,10 @@ elaborate ctx tm = do
   hs <- readIORef holes
   onlyIf (not $ null hs) $ showHoles hs
   throwUnless (null hs) $ ElaborateError $ "\nholes found:\n" ++ showCZ ctx tm ++ "\n" ++ showCZ ctx ty ++ "\nholes: " ++ show (map fst $ reverse hs)
-  solved <- allSolved
-  throwUnless solved $ ElaborateError $ "not all metas are solved:\n" ++ showC ctx tm ++ "\n" ++ showC ctx ty
-  solvedL <- allLSolved
-  throwUnless solvedL $ ElaborateError $ "not all level metas are solved" 
+  unsolved <- allUnsolved
+  throwUnless (null unsolved) $ ElaborateError $ "not all metas are solved:\n" ++ showC ctx tm ++ "\n" ++ showC ctx ty ++ "\nunsolved: " ++ show unsolved
+  unsolvedL <- allLUnsolved
+  throwUnless (null unsolvedL) $ ElaborateError $ "not all level metas are solved\nunsolved: " ++ show unsolvedL
   ty' <- verify ctx tm
   -- throwUnless (ty == ty') $ ElaborateError $ "elaborated type did not match verified type: " ++ show ty ++ " ~ " ++ show ty'
   return (tm, ty, lv)
