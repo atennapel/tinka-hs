@@ -1,24 +1,20 @@
-if : <l> {A : Type l} -> Bool -> A -> A -> A
-  = \{A} b t f. indBool (\_. A) t f b;
+if <l> {A : Type l} (b : Bool) (t f : A) : A = indBool (\_. A) t f b;
 
-(<?>) : <l> {A : Type l} -> A -> A -> Bool -> A = \t f b. if b t f;
+(<?>) <l> {A : Type l} (t f : A) (b : Bool) : A = if b t f;
 
-not : Bool -> Bool = \b. if b False True;
+not (b : Bool) : Bool = if b False True;
 
-and : Bool -> Bool -> Bool
-  = \a b. if a b False;
+and (a b : Bool) : Bool = if a b False;
 (&&) = and;
 
-or : Bool -> Bool -> Bool
-  = \a b. if a True b;
+or (a b : Bool) : Bool = if a True b;
 (||) = or;
 
-xor : Bool -> Bool -> Bool
-  = \a b. if a (not b) b;
+xor (a b : Bool) : Bool = if a (not b) b;
 (^^) = xor;
 
 neqBool = xor;
-eqBool : Bool -> Bool -> Bool = \a b. not (neqBool a b);
+eqBool (a b : Bool) : Bool = not (neqBool a b);
 
 (!=B) = neqBool;
 (==B) = eqBool;

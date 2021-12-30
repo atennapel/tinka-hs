@@ -43,6 +43,7 @@ data Val
 pattern VTypeFin l = VType (VFinLevel l)
 pattern VVar l = VNe (HVar l) []
 pattern VMeta m = VNe (HMeta m) []
+pattern VPrim x = VNe (HPrim x) []
 
 pattern VVoid = VNe (HPrim PVoid) []
 pattern VUnitType = VNe (HPrim PUnitType) []

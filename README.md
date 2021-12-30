@@ -65,6 +65,12 @@ TODO:
 - [ ] lib updates
   - [ ] induction for SumD and SumDL
   - [ ] induction deriviation
+- [ ] instance search
+  - [ ] basic instance search
+  - [ ] postpone and retry
+  - [ ] recursive instance search
+  - [ ] instance parameters
+- [ ] erased parameters
 - [ ] update unification
   - [ ] eta rule for Bool
   - [ ] more cumulativity in elaboration
@@ -79,6 +85,7 @@ TODO:
   - [x] `\.` for lambdas with no parameters (like Haskell's `$`)
   - [x] infix operators
   - [x] nat literals
+  - [x] defs and lets with parameters
   - [ ] list and vector literals
 - [ ] improve error message
   - [ ] use source position

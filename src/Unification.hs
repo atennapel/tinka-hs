@@ -2,6 +2,7 @@ module Unification (unify, unifyLevel, unifyFinLevel) where
 
 import qualified Data.IntMap as IM
 import qualified Data.Set as S
+import qualified Data.Map as M
 import Data.Coerce (coerce)
 import Control.Exception (throwIO, catch)
 import Control.Monad (zipWithM_)
@@ -19,36 +20,44 @@ import Prims
 data PR = PR {
   dom :: Lvl,
   cod :: Lvl,
-  ren :: IM.IntMap Lvl
+  ren :: IM.IntMap Lvl,
+  apx :: M.Map (Either PrimName Name) Lvl
 }
 
 lift :: PR -> PR
-lift (PR dom cod ren) = PR (dom + 1) (cod + 1) (IM.insert (coerce cod) dom ren)
+lift (PR dom cod ren approx) = PR (dom + 1) (cod + 1) (IM.insert (coerce cod) dom ren) approx
 
 invert :: Lvl -> Sp -> IO PR
 invert gamma sp = do
-  (dom, ren) <- go sp
-  return $ PR dom gamma ren
+  (dom, ren, approx) <- go sp
+  return $ PR dom gamma ren approx
   where
-    go :: Sp -> IO (Lvl, IM.IntMap Lvl)
-    go [] = return (0, mempty)
+    go :: Sp -> IO (Lvl, IM.IntMap Lvl, M.Map (Either PrimName Name) Lvl)
+    go [] = return (0, mempty, mempty)
     go (EApp t _ : sp) = do
-      (dom, ren) <- go sp
-      case force t of
-        VVar (Lvl x) | IM.notMember x ren -> return (dom + 1, IM.insert x dom ren)
+      (dom, ren, approx) <- go sp
+      case forceMetas t of
+        VVar (Lvl x) | IM.notMember x ren -> return (dom + 1, IM.insert x dom ren, approx)
         VVar x -> throwIO $ UnifyError $ "duplicate var in spine: " ++ show x
+
+        -- approx solutions
+        VGlobal x [] _ | M.notMember (Right x) approx -> return (dom + 1, ren, M.insert (Right x) dom approx)
+        VGlobal x [] _ -> throwIO $ UnifyError $ "duplicate global in spine: " ++ x
+        VPrim x | M.notMember (Left x) approx -> return (dom + 1, ren, M.insert (Left x) dom approx)
+        VPrim x -> throwIO $ UnifyError $ "duplicate primitive in spine: " ++ show x
+
         _ -> throwIO $ UnifyError $ "non-var application in spine"
     go (EAppLvl (VFL 0 xs ys) : sp) = do
-      (dom, ren) <- go sp
+      (dom, ren, approx) <- go sp
       let lvls = IM.keys xs
       if IM.null ys && length lvls == 1 then do
         let x = head lvls
         if IM.notMember x ren then
-          return (dom + 1, IM.insert x dom ren)
+          return (dom + 1, IM.insert x dom ren, approx)
         else
           throwIO $ UnifyError $ "duplicate var in spine: " ++ show x
       else
-        throwIO $ UnifyError $ "non-var application in spine"
+        throwIO $ UnifyError $ "complex level application in spine"
     go (_ : sp) = throwIO $ UnifyError $ "non-var in spine"
 
 rename :: MetaVar -> PR -> Val -> IO Tm
@@ -115,8 +124,14 @@ rename m pren v = go pren v
       VNe (HVar x) sp -> do
         t <- Var <$> goVar pren x
         goSp pren t sp
-      VNe (HPrim x) sp -> goSp pren (Prim (Left x)) sp
-      VGlobal x sp _ -> goSp pren (Global x) sp
+      VNe (HPrim x) sp ->
+        case M.lookup (Left x) (apx pren) of
+          Just x' -> goSp pren (Var $ lvlToIx (dom pren) x') sp
+          Nothing -> goSp pren (Prim (Left x)) sp
+      VGlobal x sp _ ->
+        case M.lookup (Right x) (apx pren) of
+          Just x' -> goSp pren (Var $ lvlToIx (dom pren) x') sp
+          Nothing -> goSp pren (Global x) sp
       VLam x i b -> Lam x i <$> goLift pren b
       VPi x i t u1 b u2 -> Pi x i <$> go pren t <*> goLevel pren u1 <*> goLift pren b <*> goLevel pren u2
       VLamLvl x b -> LamLvl x <$> goLiftLevel pren b
@@ -267,6 +282,10 @@ unifyFinLevel l a b = do
           solveFinLevel l m (subVFinLevel n a)
         (Nothing, Just (m, n), VFL n' xs ys, _) | n' >= n && all (>= n) (IM.elems xs) && all (>= n) (IM.elems ys) ->
           solveFinLevel l m (subVFinLevel n a)
+        (_, _, VFL 0 xs ys, VFL 0 xs' ys') | IM.null xs && IM.null ys && IM.null xs' && all (== 0) (IM.elems ys') ->
+          mapM_ (\m -> solveFinLevel l (LMetaVar m) mempty) (IM.keys ys')
+        (_, _, VFL 0 xs' ys', VFL 0 xs ys) | IM.null xs && IM.null ys && IM.null xs' && all (== 0) (IM.elems ys') ->
+          mapM_ (\m -> solveFinLevel l (LMetaVar m) mempty) (IM.keys ys')
         (_, _, VFL 0 xs ys, VFL 0 xs' ys') -> do
           let m = minimum (IM.elems xs ++ IM.elems ys ++ IM.elems xs' ++ IM.elems ys')
           if m > 0 then
