@@ -503,20 +503,24 @@ showUnsolvedInstances (HoleEntry ctx tm ty lv : tl) = do
   showUnsolvedInstances tl
   putStrLn $ "unsolved instance " ++ showVZ ctx ty
 
+maxInstanceSearch :: Int
+maxInstanceSearch = 1000
+
 trySolveAllInstances :: IO ()
 trySolveAllInstances = do
-  go
+  go 0
   hs <- readIORef instanceHoles
   if null hs then
     return ()
   else
     showUnsolvedInstances hs
   where
-    go :: IO ()
-    go = do
+    go :: Int -> IO ()
+    go i | i >= maxInstanceSearch = putStrLn "instance search limit reached"
+    go i = do
       b <- trySolveInstances
       if b then
-        go
+        go (i + 1)
       else
         return ()
 
