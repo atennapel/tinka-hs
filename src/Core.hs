@@ -32,7 +32,7 @@ data Tm
   | Sigma Name Tm Level Tm Level
   | Con Tm
   | Refl
-  | Let Name Ty Tm Tm
+  | Let Name Bool Ty Tm Tm
   | Type Level
   | Meta MetaVar
   | InsertedMeta MetaVar [Maybe Icit]
@@ -170,7 +170,7 @@ instance Show Tm where
   show t@Sigma {} = showTmSigma t
   show (Con t) = "Con " ++ showTmS t
   show Refl = "Refl"
-  show (Let x t v b) = "let " ++ showName x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
+  show (Let x i t v b) = "let " ++ (if i then "instance " else "") ++ showName x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (Type (FinLevel FLZ)) = "Type"
   show (Type l) = "Type " ++ showLevelS l
   show (Meta m) = "?" ++ show m

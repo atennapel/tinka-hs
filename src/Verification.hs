@@ -21,11 +21,11 @@ check ctx tm ty = do
     (Pair a b, VSigma x ty _ b' _) -> do
       check ctx a ty
       check ctx b (vinst b' $ evalCtx ctx a)
-    (Let x t v b, _) -> do
+    (Let x inst t v b, _) -> do
       l <- checkTy ctx t
       let vt = evalCtx ctx t
       check ctx v vt
-      check (define x vt l (evalCtx ctx v) ctx) b ty
+      check (define x inst vt l (evalCtx ctx v) ctx) b ty
     (Con t, VData l i d j) ->
       check ctx t (vel l i (vlam "i" $ VData l i d) j d)
     (Refl, VId l a b x y) -> do
@@ -82,11 +82,11 @@ infer ctx = \case
     l1 <- checkTy ctx t
     l2 <- checkTy (bind x Expl (evalCtx ctx t) l1 ctx) b
     return $ VType (l1 <> l2)
-  Let x t v b -> do
+  Let x inst t v b -> do
     l <- checkTy ctx t
     let vt = evalCtx ctx t
     check ctx v vt
-    infer (define x vt l (evalCtx ctx v) ctx) b
+    infer (define x inst vt l (evalCtx ctx v) ctx) b
   s@(App f a i) -> do
     ty <- infer ctx f
     case force ty of

@@ -214,7 +214,7 @@ eval e = \case
   Sigma x t u1 b u2 -> VSigma x (eval e t) (level e u1) (Clos e b) (level e u2)
   Con t -> VCon (eval e t)
   Refl -> VRefl
-  Let x _ v b -> eval (Right (eval e v) : e) b
+  Let x _ _ v b -> eval (Right (eval e v) : e) b
   Type l -> VType (level e l)
   Meta m -> vmeta m
   InsertedMeta m bds -> vinsertedmeta e m bds

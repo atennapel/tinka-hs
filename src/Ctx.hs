@@ -15,6 +15,7 @@ import Zonking
 
 data BinderEntry = BinderEntry {
   bName :: Name,
+  bInstance :: Bool,
   bIcit :: Icit,
   bInserted :: Bool,
   bTy :: Maybe (VTy, VLevel)
@@ -33,20 +34,20 @@ data Ctx = Ctx {
 empty :: Ctx
 empty = Ctx 0 [] [] [] Nothing
 
-define :: Name -> VTy -> VLevel -> Val -> Ctx -> Ctx
-define x t u v (Ctx l e b bds pos) = Ctx (l + 1) (Right v : e) (BinderEntry x Expl False (Just (t, u)) : b) (Nothing : bds) pos
+define :: Name -> Bool -> VTy -> VLevel -> Val -> Ctx -> Ctx
+define x inst t u v (Ctx l e b bds pos) = Ctx (l + 1) (Right v : e) (BinderEntry x inst Expl False (Just (t, u)) : b) (Nothing : bds) pos
 
 bind :: Name -> Icit -> VTy -> VLevel -> Ctx -> Ctx
-bind x i t u (Ctx l e b bds pos) = Ctx (l + 1) (Right (VVar l) : e) (BinderEntry x i False (Just (t, u)) : b) (Just i : bds) pos
+bind x i t u (Ctx l e b bds pos) = Ctx (l + 1) (Right (VVar l) : e) (BinderEntry x False i False (Just (t, u)) : b) (Just i : bds) pos
 
 bindInsert :: Name -> Icit -> VTy -> VLevel -> Ctx -> Ctx
-bindInsert x i t u (Ctx l e b bds pos) = Ctx (l + 1) (Right (VVar l) : e) (BinderEntry x i True (Just (t, u)) : b) (Just i : bds) pos
+bindInsert x i t u (Ctx l e b bds pos) = Ctx (l + 1) (Right (VVar l) : e) (BinderEntry x False i True (Just (t, u)) : b) (Just i : bds) pos
 
 bindLevel :: Name -> Ctx -> Ctx
-bindLevel x (Ctx l e b bds pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) (BinderEntry x (Impl ImplUnif) False Nothing : b) (Just Expl : bds) pos
+bindLevel x (Ctx l e b bds pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) (BinderEntry x False (Impl ImplUnif) False Nothing : b) (Just Expl : bds) pos
 
 bindLevelInsert :: Name -> Ctx -> Ctx
-bindLevelInsert x (Ctx l e b bds pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) (BinderEntry x (Impl ImplUnif) True Nothing : b) (Just Expl : bds) pos
+bindLevelInsert x (Ctx l e b bds pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) (BinderEntry x False (Impl ImplUnif) True Nothing : b) (Just Expl : bds) pos
 
 enter :: SourcePos -> Ctx -> Ctx
 enter p ctx = ctx { pos = Just p }
@@ -64,13 +65,13 @@ lookupCtx ctx x = go (binders ctx) 0
   where
     go :: Binders -> Int -> Maybe (Ix, Maybe (VTy, VLevel))
     go [] _ = Nothing
-    go (BinderEntry y _ False mty : _) i | x == y = Just (Ix i, mty)
+    go (BinderEntry y _ _ False mty : _) i | x == y = Just (Ix i, mty)
     go (_ : bs) i = go bs (i + 1)
 
 levelVars :: Ctx -> S.Set Lvl
 levelVars ctx = S.fromList $ levels 0 $ binders ctx
   where
-    levels i (BinderEntry _ _ _ Nothing : rest) = (lvl ctx - i - 1) : levels (i + 1) rest
+    levels i (BinderEntry _ _ _ _ Nothing : rest) = (lvl ctx - i - 1) : levels (i + 1) rest
     levels i (_ : rest) = levels (i + 1) rest
     levels i [] = []
 
@@ -137,7 +138,7 @@ prettyCore ns tm = show (go ns tm)
       Con t -> SCon (go ns t)
       Refl -> SRefl
       Pair a b -> SPair (go ns a) (go ns b)
-      Let x t v b -> let x' = chooseName x ns in SLet x' (Just $ go ns t) (go ns v) (go (x' : ns) b)
+      Let x i t v b -> let x' = chooseName x ns in SLet x' i (Just $ go ns t) (go ns v) (go (x' : ns) b)
       Proj s p -> SProj (go ns s) (goProj p)
         where
           goProj Fst = SFst
@@ -180,8 +181,8 @@ instance Show Ctx where
     intercalate "\n" (map showVar vs)
     where
       var :: BinderEntry -> Either VFinLevel Val -> (Name, Icit, Either VFinLevel (VTy, Val))
-      var (BinderEntry x i _ Nothing) (Left l) = (x, i, Left l)
-      var (BinderEntry x i _ (Just (ty, _))) (Right v) = (x, i, Right (ty, v))
+      var (BinderEntry x _ i _ Nothing) (Left l) = (x, i, Left l)
+      var (BinderEntry x _ i _ (Just (ty, _))) (Right v) = (x, i, Right (ty, v))
       var _ _ = undefined
 
       showVar :: (Name, Icit, Either VFinLevel (VTy, Val)) -> String

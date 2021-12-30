@@ -47,7 +47,7 @@ data STm
   | SSigma Name STm STm
   | SCon STm
   | SRefl
-  | SLet Name (Maybe STy) STm STm
+  | SLet Name Bool (Maybe STy) STm STm
   | SType SLevel
   | SHole (Maybe Name)
   | SNatLit Int
@@ -194,8 +194,8 @@ instance Show STm where
   show t@(SSigma _ _ _) = showSTmSigma t
   show (SCon t) = "Con " ++ showSTmS t
   show SRefl = "Refl"
-  show (SLet x (Just t) v b) = "let " ++ showName x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
-  show (SLet x Nothing v b) = "let " ++ showName x ++ " = " ++ show v ++ "; " ++ show b
+  show (SLet x i (Just t) v b) = "let " ++ (if i then "instance " else "") ++ showName x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
+  show (SLet x i Nothing v b) = "let " ++ (if i then "instance " else "") ++ showName x ++ " = " ++ show v ++ "; " ++ show b
   show (SType (SLNat 0)) = "Type"
   show (SType l) = "Type " ++ showSLevelS l
   show (SNatLit i) = show i

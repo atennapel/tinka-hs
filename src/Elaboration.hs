@@ -192,10 +192,10 @@ check ctx tm ty lv = do
       ta <- check ctx a ty u1
       tb <- check ctx b (vinst b' (evalCtx ctx ta)) u2
       return $ Pair ta tb
-    (SLet x mt v b, _) -> do
+    (SLet x inst mt v b, _) -> do
       (cv, ct, vt, u) <- checkOrInfer ctx v mt
-      cb <- check (define x vt u (evalCtx ctx cv) ctx) b ty lv
-      return $ Let x ct cv cb
+      cb <- check (define x inst vt u (evalCtx ctx cv) ctx) b ty lv
+      return $ Let x inst ct cv cb
 
     (SCon t, VData l i d j) -> do
       ct <- check ctx t (vel l i (vlam "i" $ VData l i d) j d) lv
@@ -287,15 +287,15 @@ infer ctx tm = do
     SPiLvl x b -> do
       (cb, l) <- checkTy (bindLevel x ctx) b
       return (PiLvl x cb (quoteLevel (lvl ctx + 1) l), VType VOmega, VOmega1)
-    SLet x mt v b -> do
+    SLet x inst mt v b -> do
       (cv, ct, vt, l) <- checkOrInfer ctx v mt
-      (cb, ty, u) <- infer (define x vt l (evalCtx ctx cv) ctx) b
-      return (Let x ct cv cb, ty, u)
+      (cb, ty, u) <- infer (define x inst vt l (evalCtx ctx cv) ctx) b
+      return (Let x inst ct cv cb, ty, u)
     SPair a b -> do
       (ta, va, u1) <- infer ctx a
       (tb, vb, u2) <- infer ctx b
       let vt = VSigma "_" va u1 (Fun $ const vb) u2
-      return (Let "p" (quoteCtx ctx vt) (Pair ta tb) (Var 0), vt, u1 <> u2)
+      return (Let "p" False (quoteCtx ctx vt) (Pair ta tb) (Var 0), vt, u1 <> u2)
     c@(SApp f a i) -> do
       (i, cf, tty, l1) <- case i of
         Left (name, j) -> do
@@ -349,11 +349,11 @@ infer ctx tm = do
           return (m, u1)
       (cb, rty, u2) <- insert ctx $ infer (bind x i a u1 ctx) b
       let vt = VPi x i a u1 (closeVal ctx rty) u2
-      return (Let "f" (quoteCtx ctx vt) (Lam x i cb) (Var 0), vt, u1 <> u2)
+      return (Let "f" False (quoteCtx ctx vt) (Lam x i cb) (Var 0), vt, u1 <> u2)
     SLamLvl x Nothing b -> do
       (cb, rty, u) <- infer (bindLevel x ctx) b
       let vt = VPiLvl x (closeLevel ctx rty) (closeCL ctx u)
-      return (Let "f" (quoteCtx ctx vt) (LamLvl x cb) (Var 0), vt, VOmega)
+      return (Let "f" False (quoteCtx ctx vt) (LamLvl x cb) (Var 0), vt, VOmega)
     c@(SProj t p) -> do
       (tm, vt, l1) <- infer ctx t
       case (force vt, p) of
@@ -450,7 +450,7 @@ tryUnifyCtx ctx ty lv = do
   where
     go :: Ix -> [BinderEntry] -> IO (Maybe Tm)
     go i [] = return Nothing
-    go i (BinderEntry x _ _ (Just (ty', lv')) : rest) = do
+    go i (BinderEntry x inst _ _ (Just (ty', lv')) : rest) | inst = do
       debug $ "try local " ++ x ++ " : " ++ showVZ ctx ty'
       res <- tryUnify' ctx (Var i) ty' lv' ty lv
       case res of
@@ -585,7 +585,7 @@ elaborateDef mod x inst ty tm =
     Just e | x /= "_" ->
       error $ "cannot redefine global " ++ maybe "" (++ ".") (gModule e) ++ x ++ " as " ++ maybe "" (++ ".") mod ++ x
     _ -> do
-      (etm, ety, elv) <- elaborate empty (SLet x ty tm (SVar x))
+      (etm, ety, elv) <- elaborate empty (SLet x False ty tm (SVar x))
       debug $ "finished elaboration of " ++ x
       return $ GlobalEntry x (eval [] ety) (level [] elv) (eval [] etm) ety elv etm inst mod
 

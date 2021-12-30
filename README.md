@@ -25,6 +25,7 @@ Currently supports:
 - heterogenous equality type with axiom K
 - predicative non-cumulative hierarchy of universes, with simple universe polymorphism
 - "Gentle art of Levitation"-style descriptions
+- simple instance arguments (`{{_ : Functor F}} -> ...`)
 
 TODO:
 - [x] core language
@@ -62,18 +63,18 @@ TODO:
 - [x] simplify equality type
   - [x] Refl as a core term
   - [x] rename HEq to Id
-- [ ] lib updates
-  - [ ] induction for SumD and SumDL
-  - [ ] induction deriviation
-- [ ] instance search
+- [x] instance search
   - [x] basic instance search
   - [x] postpone and retry
   - [x] instance parameters
   - [x] recursive instance search
   - [x] limit instance search
   - [x] instance definitions
-  - [ ] instance lets
+  - [x] instance lets
 - [ ] erased parameters
+- [ ] lib updates
+  - [ ] induction for SumD and SumDL
+  - [ ] induction deriviation
 - [ ] update unification
   - [ ] eta rule for Bool
   - [ ] more cumulativity in elaboration

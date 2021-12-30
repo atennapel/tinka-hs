@@ -441,6 +441,7 @@ funOrSpine = do
 pLet :: Parser STm
 pLet = do
   pKeyword "let"
+  inst <- maybe False (const True) <$> optional (symbol "instance")
   x <- pOpBinder
   ps <- many pLamBinder
   a <- optional (do
@@ -449,7 +450,7 @@ pLet = do
   symbol "="
   t <- pSurface
   symbol ";"
-  SLet x (setupPiForDef ps a) (foldLamBindersUnannotated t ps) <$> pSurface
+  SLet x inst (setupPiForDef ps a) (foldLamBindersUnannotated t ps) <$> pSurface
 
 setupPiForDef :: [([Name], Either (Maybe Name) (Either (Name, Impl) Icit, Maybe STm))] -> Maybe STm -> Maybe STm
 setupPiForDef [] Nothing = Nothing

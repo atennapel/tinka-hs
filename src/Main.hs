@@ -138,7 +138,7 @@ elabDecls getDecls = do
   return ()
 
 reduceGlobalLet :: Name -> Tm -> Tm
-reduceGlobalLet x (Let y _ v (Var 0)) | x == y = v
+reduceGlobalLet x (Let y _ _ v (Var 0)) | x == y = v
 reduceGlobalLet _ t = t
 
 showElabDef :: GlobalEntry -> String
