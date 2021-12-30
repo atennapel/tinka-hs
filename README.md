@@ -66,10 +66,10 @@ TODO:
   - [ ] induction for SumD and SumDL
   - [ ] induction deriviation
 - [ ] instance search
-  - [ ] basic instance search
-  - [ ] postpone and retry
-  - [ ] recursive instance search
+  - [x] basic instance search
+  - [x] postpone and retry
   - [ ] instance parameters
+  - [ ] recursive instance search
 - [ ] erased parameters
 - [ ] update unification
   - [ ] eta rule for Bool

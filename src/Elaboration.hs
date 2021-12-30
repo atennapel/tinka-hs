@@ -39,6 +39,17 @@ addHole x ctx tm ty lv = do
     Just _ -> error $ "duplicate hole _" ++ x
     Nothing -> writeIORef holes ((x, HoleEntry ctx tm ty lv) : hs)
 
+-- instances
+instanceHoles :: IORef [HoleEntry]
+instanceHoles = unsafeDupablePerformIO $ newIORef []
+{-# noinline instanceHoles #-}
+
+resetInstanceHoles :: IO ()
+resetInstanceHoles = writeIORef instanceHoles []
+
+addInstanceHole :: Ctx -> Tm -> Val -> VLevel -> IO ()
+addInstanceHole ctx tm ty lv = modifyIORef instanceHoles (HoleEntry ctx tm ty lv :)
+
 -- elaboration
 freshMeta :: Ctx -> IO Tm
 freshMeta ctx = do
@@ -151,7 +162,7 @@ check ctx tm ty lv = do
     (SPos p tm, _) -> check (enter p ctx) tm ty lv
     (SHole x, _) -> do
       tm <- freshMeta ctx
-      maybe (return ()) (\x -> addHole x ctx tm ty lv) x
+      maybe (return ()) (\x -> if x == "_" then addInstanceHole ctx tm ty lv else addHole x ctx tm ty lv) x
       return tm
     (SLam x i ma b, VPi x' i' ty u1 b' u2) | either (\x -> x == x' && i' == Impl) (== i') i -> do
       case ma of
@@ -381,7 +392,7 @@ infer ctx tm = do
       let u = VFinLevel $ finLevel (env ctx) l
       a <- eval (env ctx) <$> freshMeta ctx
       t <- freshMeta ctx
-      maybe (return ()) (\x -> addHole x ctx t a u) x
+      maybe (return ()) (\x -> if x == "_" then addInstanceHole ctx t a u else addHole x ctx t a u) x
       return (t, a, u)
     SNatLit n | n >= 0 -> infer ctx (go n)
       where
@@ -391,11 +402,15 @@ infer ctx tm = do
 
 tryUnify :: Ctx -> VLevel -> VLevel -> VTy -> VTy -> IO Bool
 tryUnify ctx u1 u2 a b = do
+  nlm <- readIORef nextLMeta
   ls <- readIORef lmctx
+  nm <- readIORef nextMeta
   ms <- readIORef mctx
   catch (True <$ unifyCtx ctx u1 u2 a b "" "") \(err :: Error) -> do
     writeIORef lmctx ls
+    writeIORef nextLMeta nlm
     writeIORef mctx ms
+    writeIORef nextMeta nm
     return False
 
 tryUnify' :: Ctx -> Tm -> Val -> VLevel -> Val -> VLevel -> IO (Maybe Tm)
@@ -437,35 +452,67 @@ tryUnifyGlobals ctx ty lv = do
         Nothing -> go rest
         _ -> return res
 
-trySolveInstances :: IO ()
-trySolveInstances = do
-  debug "try to solve instances"
-  hs <- readIORef holes
-  hs' <- go hs
-  writeIORef holes hs'
-  where
-    go :: HoleMap -> IO HoleMap
-    go [] = return []
-    go (hd@("_", HoleEntry ctx tm ty lv) : rest) = do
-      tl <- go rest
-      case force ty of
-        VNe (HMeta _) _ -> return (hd : tl) -- TODO: postpone
-        _ -> do
-          res <- tryUnifyCtx ctx ty lv
+trySolveInstance :: HoleEntry -> IO Bool
+trySolveInstance (HoleEntry ctx tm ty lv) = do
+  case force ty of
+    VNe (HMeta _) _ -> return True
+    _ -> do
+      res <- tryUnifyCtx ctx ty lv
+      case res of
+        Nothing -> do
+          res <- tryUnifyGlobals ctx ty lv
           case res of
-            Nothing -> do
-              res <- tryUnifyGlobals ctx ty lv
-              case res of
-                Nothing -> return (hd : tl)
-                Just tm' -> do
-                  unify (lvl ctx) (eval (env ctx) tm) (eval (env ctx) tm')
-                  return tl
+            Nothing -> throwIO $ ElaborateError $ "unable to solve instance for " ++ showVZ ctx ty
             Just tm' -> do
               unify (lvl ctx) (eval (env ctx) tm) (eval (env ctx) tm')
-              return tl
-    go (x : rest) = do
-      tl <- go rest
-      return (x : tl)
+              return False
+        Just tm' -> do
+          unify (lvl ctx) (eval (env ctx) tm) (eval (env ctx) tm')
+          return False
+
+trySolveInstances :: IO Bool
+trySolveInstances = do
+  debug "try to solve instances"
+  hs <- readIORef instanceHoles
+  hs' <- go hs
+  case hs' of
+    Just hs' -> do
+      writeIORef instanceHoles hs'
+      return True
+    Nothing -> return False
+  where
+    go :: [HoleEntry] -> IO (Maybe [HoleEntry])
+    go [] = return Nothing
+    go (hd : tl) = do
+      restl <- go tl
+      res <- trySolveInstance hd
+      if res then
+        return $ Just (hd : tl)
+      else
+        return restl
+
+showUnsolvedInstances :: [HoleEntry] -> IO ()
+showUnsolvedInstances [] = return ()
+showUnsolvedInstances (HoleEntry ctx tm ty lv : tl) = do
+  showUnsolvedInstances tl
+  putStrLn $ "unsolved instance " ++ showVZ ctx ty
+
+trySolveAllInstances :: IO ()
+trySolveAllInstances = do
+  go
+  hs <- readIORef instanceHoles
+  if null hs then
+    return ()
+  else
+    showUnsolvedInstances hs
+  where
+    go :: IO ()
+    go = do
+      b <- trySolveInstances
+      if b then
+        go
+      else
+        return ()
 
 showHoles :: HoleMap -> IO ()
 showHoles [] = return ()
@@ -479,8 +526,9 @@ elaborate :: Ctx -> STm -> IO (Tm, Ty, Level)
 elaborate ctx tm = do
   resetMetas
   resetHoles
+  resetInstanceHoles
   (tm', vty, vlv) <- infer ctx tm
-  trySolveInstances
+  trySolveAllInstances
   solveUnsolvedLMetas
   debug $ "elaborated tm: " ++ show tm'
   debug $ "elaborated ty: " ++ showV ctx vty
