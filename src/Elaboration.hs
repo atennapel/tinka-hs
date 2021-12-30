@@ -55,6 +55,7 @@ addInstanceHole ctx tm ty lv = modifyIORef instanceHoles (HoleEntry ctx tm ty lv
 freshMeta :: Ctx -> IO Tm
 freshMeta ctx = do
   m <- newMeta
+  debug $ "freshMeta ?" ++ show m
   return $ InsertedMeta m (bds ctx)
 
 freshLMeta :: Ctx -> IO FinLevel
@@ -501,9 +502,14 @@ trySolveInstances :: IO Bool
 trySolveInstances = do
   hs <- readIORef instanceHoles
   hs' <- go hs
+  hsnow <- readIORef instanceHoles
+  let hsnew = take (length hsnow - length hs) hsnow
   case hs' of
     Just hs' -> do
-      writeIORef instanceHoles hs'
+      writeIORef instanceHoles (hs' ++ hsnew)
+      return True
+    Nothing | length hsnew > 0 -> do
+      writeIORef instanceHoles hsnew
       return True
     Nothing -> return False
   where

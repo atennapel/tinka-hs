@@ -24,4 +24,4 @@ mapMaybe {A B : Type} (fn : A -> B) (s : Maybe A) : Maybe B
 instance functorMaybe : Functor Maybe = MkFunctor mapMaybe;
 
 instance eqMaybe : {A : Type} {{_ : Eq A}} -> Eq (Maybe A)
-  = \{A}. MkEq {Maybe A} eqSum.eq;
+  = \{A}. MkEq {Maybe A} eq;

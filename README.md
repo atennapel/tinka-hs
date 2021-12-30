@@ -70,7 +70,8 @@ TODO:
   - [x] limit instance search
   - [x] instance definitions
   - [x] instance lets
-  - [ ] recursive instance search
+  - [x] recursive instance search
+- [ ] give fresh names to _ names if used
 - [ ] erased parameters
 - [ ] lib updates
   - [ ] induction for SumD and SumDL
