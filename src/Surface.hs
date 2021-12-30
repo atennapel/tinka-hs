@@ -36,8 +36,8 @@ type STy = STm
 
 data STm
   = SVar Name
-  | SApp STm STm (Either Name Icit)
-  | SLam Name (Either Name Icit) (Maybe STy) STm
+  | SApp STm STm (Either (Name, Impl) Icit)
+  | SLam Name (Either (Name, Impl) Icit) (Maybe STy) STm
   | SPi Name Icit STm STm
   | SAppLvl STm SLevel (Maybe Name)
   | SLamLvl Name (Maybe Name) STm
@@ -68,16 +68,18 @@ showSTmApp t =
   let (f, as) = go t in
   showSTmS f ++ " " ++ unwords (map showAppArgument $ reverse as)
   where
-    go :: STm -> (STm, [Either (SLevel, Maybe Name) (STm, Either Name Icit)])
+    go :: STm -> (STm, [Either (SLevel, Maybe Name) (STm, Either (Name, Impl) Icit)])
     go (SApp f a i) = let (f', as) = go f in (f', Right (a, i) : as)
     go (SAppLvl f a i) = let (f', as) = go f in (f', Left (a, i) : as)
     go (SPos _ s) = go s
     go t = (t, [])
 
-    showAppArgument :: Either (SLevel, Maybe Name) (STm, Either Name Icit) -> String
+    showAppArgument :: Either (SLevel, Maybe Name) (STm, Either (Name, Impl) Icit) -> String
     showAppArgument (Right (a, Right Expl)) = showSTmS a
-    showAppArgument (Right (a, Right Impl)) = "{" ++ show a ++ "}"
-    showAppArgument (Right (a, Left x)) = "{" ++ showName x ++ " = " ++ show a ++ "}"
+    showAppArgument (Right (a, Right (Impl ImplUnif))) = "{" ++ show a ++ "}"
+    showAppArgument (Right (a, Right (Impl ImplInst))) = "{{" ++ show a ++ "}}"
+    showAppArgument (Right (a, Left (x, ImplUnif))) = "{" ++ showName x ++ " = " ++ show a ++ "}"
+    showAppArgument (Right (a, Left (x, ImplInst))) = "{{" ++ showName x ++ " = " ++ show a ++ "}}"
     showAppArgument (Left (a, Just x)) = "<" ++ x ++ " = " ++ show a ++ ">"
     showAppArgument (Left (a, Nothing)) = "<" ++ show a ++ ">"
 
@@ -86,19 +88,23 @@ showSTmLam t =
   let (xs, b) = go t in
   "\\" ++ unwords (map showAbsParameter xs) ++ ". " ++ show b
   where
-    go :: STm -> ([(Name, Either (Maybe Name) (Either Name Icit, Maybe STy))], STm)
+    go :: STm -> ([(Name, Either (Maybe Name) (Either (Name, Impl) Icit, Maybe STy))], STm)
     go (SLam x i t b) = let (as, b') = go b in ((x, Right (i, t)) : as, b')
     go (SLamLvl x i b) = let (as, b') = go b in ((x, Left i) : as, b')
     go (SPos _ s) = go s
     go t = ([], t)
 
-    showAbsParameter :: (Name, Either (Maybe Name) (Either Name Icit, Maybe STy)) -> String
+    showAbsParameter :: (Name, Either (Maybe Name) (Either (Name, Impl) Icit, Maybe STy)) -> String
     showAbsParameter (x, Right (Right Expl, Nothing)) = showName x
     showAbsParameter (x, Right (Right Expl, Just t)) = "(" ++ showName x ++ " : " ++ show t ++ ")"
-    showAbsParameter (x, Right (Right Impl, Nothing)) = "{" ++ showName x ++ "}"
-    showAbsParameter (x, Right (Right Impl, Just t)) = "{" ++ showName x ++ " : " ++ show t ++ "}"
-    showAbsParameter (x, Right (Left y, Nothing)) = "{" ++ showName x ++ " = " ++ y ++ "}"
-    showAbsParameter (x, Right (Left y, Just t)) = "{" ++ showName x ++ " : " ++ show t ++ " = " ++ y ++ "}"
+    showAbsParameter (x, Right (Right (Impl ImplUnif), Nothing)) = "{" ++ showName x ++ "}"
+    showAbsParameter (x, Right (Right (Impl ImplInst), Nothing)) = "{{" ++ showName x ++ "}}"
+    showAbsParameter (x, Right (Right (Impl ImplUnif), Just t)) = "{" ++ showName x ++ " : " ++ show t ++ "}"
+    showAbsParameter (x, Right (Right (Impl ImplInst), Just t)) = "{{" ++ showName x ++ " : " ++ show t ++ "}}"
+    showAbsParameter (x, Right (Left (y, ImplUnif), Nothing)) = "{" ++ showName x ++ " = " ++ y ++ "}"
+    showAbsParameter (x, Right (Left (y, ImplInst), Nothing)) = "{{" ++ showName x ++ " = " ++ y ++ "}}"
+    showAbsParameter (x, Right (Left (y, ImplUnif), Just t)) = "{" ++ showName x ++ " : " ++ show t ++ " = " ++ y ++ "}"
+    showAbsParameter (x, Right (Left (y, ImplInst), Just t)) = "{{" ++ showName x ++ " : " ++ show t ++ " = " ++ y ++ "}}"
     showAbsParameter (x, Left (Just y)) = "<" ++ x ++ " = " ++ y ++ ">"
     showAbsParameter (x, Left Nothing) = "<" ++ x ++ ">"
 
@@ -123,7 +129,8 @@ showSTmPi t =
     showParam :: (Name, Maybe (STm, Icit)) -> String
     showParam ("_", Just (t, Expl)) = showApp t
     showParam (x, Just (t, Expl)) = "(" ++ showName x ++ " : " ++ show t ++ ")"
-    showParam (x, Just (t, Impl)) = "{" ++ showName x ++ " : " ++ show t ++ "}"
+    showParam (x, Just (t, Impl ImplUnif)) = "{" ++ showName x ++ " : " ++ show t ++ "}"
+    showParam (x, Just (t, Impl ImplInst)) = "{{" ++ showName x ++ " : " ++ show t ++ "}}"
     showParam (x, Nothing) = "<" ++ x ++ ">"
 
 showSTmPair :: STm -> String

@@ -44,7 +44,7 @@ capps t (Left l : r) = capps (AppLvl t l) r
 capps t (Right (a, i) : r) = capps (App t a i) r
 
 cLiftTerm :: FinLevel -> FinLevel -> Ty -> Tm -> Tm
-cLiftTerm k l a x = capps (Prim (Left PLiftTerm)) [Left k, Left l, Right (a, Impl), Right (x, Expl)]
+cLiftTerm k l a x = capps (Prim (Left PLiftTerm)) [Left k, Left l, Right (a, Impl ImplUnif), Right (x, Expl)]
 
 showTmS :: Tm -> String
 showTmS t@(Var _) = show t
@@ -69,7 +69,8 @@ showTmApp t =
 
     showAppArgument :: Either FinLevel (Tm, Icit) -> String
     showAppArgument (Right (a, Expl)) = showTmS a
-    showAppArgument (Right (a, Impl)) = "{" ++ show a ++ "}"
+    showAppArgument (Right (a, Impl ImplUnif)) = "{" ++ show a ++ "}"
+    showAppArgument (Right (a, Impl ImplInst)) = "{{" ++ show a ++ "}}"
     showAppArgument (Left a) = "<" ++ show a ++ ">"
 
 showTmLam :: Tm -> String
@@ -84,7 +85,8 @@ showTmLam t =
 
     showAbsParameter :: (Name, Maybe Icit) -> String
     showAbsParameter (x, Just Expl) = showName x
-    showAbsParameter (x, Just Impl) = "{" ++ showName x ++ "}"
+    showAbsParameter (x, Just (Impl ImplUnif)) = "{" ++ showName x ++ "}"
+    showAbsParameter (x, Just (Impl ImplInst)) = "{{" ++ showName x ++ "}}"
     showAbsParameter (x, Nothing) = "<" ++ x ++ ">"
 
 showTmPi :: Tm -> String
@@ -106,7 +108,8 @@ showTmPi t =
     showParam :: (Name, Maybe (Icit, Tm)) -> String
     showParam ("_", Just (Expl, t)) = showApp t
     showParam (x, Just (Expl, t)) = "(" ++ showName x ++ " : " ++ show t ++ ")"
-    showParam (x, Just (Impl, t)) = "{" ++ showName x ++ " : " ++ show t ++ "}"
+    showParam (x, Just (Impl ImplInst, t)) = "{{" ++ showName x ++ " : " ++ show t ++ "}}"
+    showParam (x, Just (Impl ImplUnif, t)) = "{" ++ showName x ++ " : " ++ show t ++ "}"
     showParam (x, Nothing) = "<" ++ x ++ ">"
 
 showTmPair :: Tm -> String

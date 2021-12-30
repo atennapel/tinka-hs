@@ -52,16 +52,16 @@ pattern VBool = VNe (HPrim PBool) []
 pattern VTrue = VNe (HPrim PTrue) []
 pattern VFalse = VNe (HPrim PFalse) []
 pattern VLift k l x = VNe (HPrim PLift) [EApp x Expl, EAppLvl l, EAppLvl k]
-pattern VLiftTerm k l a x = VNe (HPrim PLiftTerm) [EApp x Expl, EApp a Impl, EAppLvl l, EAppLvl k]
-pattern VId l a b x y = VNe (HPrim PId) [EApp y Expl, EApp x Expl, EApp b Impl, EApp a Impl, EAppLvl l]
+pattern VLiftTerm k l a x = VNe (HPrim PLiftTerm) [EApp x Expl, EApp a (Impl ImplUnif), EAppLvl l, EAppLvl k]
+pattern VId l a b x y = VNe (HPrim PId) [EApp y Expl, EApp x Expl, EApp b (Impl ImplUnif), EApp a (Impl ImplUnif), EAppLvl l]
 
-pattern VData l i d j = VNe (HPrim PData) [EApp j Expl, EApp d Expl, EApp i Impl, EAppLvl l]
+pattern VData l i d j = VNe (HPrim PData) [EApp j Expl, EApp d Expl, EApp i (Impl ImplUnif), EAppLvl l]
 
 vpi :: Name -> Val -> VLevel -> VLevel -> (Val -> Val) -> Val
 vpi x a u1 u2 b = VPi x Expl a u1 (Fun b) u2
 
 vpimpl :: Name -> Val -> VLevel -> VLevel -> (Val -> Val) -> Val
-vpimpl x a u1 u2 b = VPi x Impl a u1 (Fun b) u2
+vpimpl x a u1 u2 b = VPi x (Impl ImplUnif) a u1 (Fun b) u2
 
 vpilvl :: Name -> (VFinLevel -> VLevel) -> (VFinLevel -> Val) -> Val
 vpilvl x u b = VPiLvl x (Fun b) (FunLvl u)
@@ -79,7 +79,7 @@ vlam :: Name -> (Val -> Val) -> Val
 vlam x b = VLam x Expl (Fun b)
 
 vlamimpl :: Name -> (Val -> Val) -> Val
-vlamimpl x b = VLam x Impl (Fun b)
+vlamimpl x b = VLam x (Impl ImplUnif) (Fun b)
 
 vlamlvl :: Name -> (VFinLevel -> Val) -> Val
 vlamlvl x b = VLamLvl x (Fun b)

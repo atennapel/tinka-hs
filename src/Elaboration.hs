@@ -64,10 +64,11 @@ freshLMeta ctx = do
 insert' :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insert' ctx act = go =<< act where
   go (t, va, lv) = case force va of
-    VPi x Impl a _ b u2 -> do
+    VPi x (Impl i) a u1 b u2 -> do
       m <- freshMeta ctx
+      if i == ImplInst then addInstanceHole ctx m a u1 else return ()
       let mv = eval (env ctx) m
-      go (App t m Impl, vinst b mv, u2)
+      go (App t m (Impl i), vinst b mv, u2)
     VPiLvl x b u -> do
       m <- freshLMeta ctx
       let mv = finLevel (env ctx) m
@@ -77,10 +78,11 @@ insert' ctx act = go =<< act where
 insertNoLevel' :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insertNoLevel' ctx act = go =<< act where
   go (t, va, lv) = case force va of
-    VPi x Impl a _ b u2 -> do
+    VPi x (Impl i) a u1 b u2 -> do
       m <- freshMeta ctx
+      if i == ImplInst then addInstanceHole ctx m a u1 else return ()
       let mv = eval (env ctx) m
-      go (App t m Impl, vinst b mv, u2)
+      go (App t m (Impl i), vinst b mv, u2)
     _ -> pure (t, va, lv)
 
 insertLvl :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
@@ -94,20 +96,21 @@ insertLvl ctx act = go =<< act where
 
 insert :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insert ctx act = act >>= \case
-  (t@(Lam _ Impl _), va, lv) -> return (t, va, lv)
+  (t@(Lam _ (Impl _) _), va, lv) -> return (t, va, lv)
   (t@(LamLvl _ _), va, lv) -> return (t, va, lv)
   (t, va, lv) -> insert' ctx (return (t, va, lv))
 
-insertUntilName :: Ctx -> Name -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
-insertUntilName ctx name act = go =<< act where
+insertUntilName :: Ctx -> Name -> Impl -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
+insertUntilName ctx name i act = go =<< act where
   go (t, va, lv) = case force va of
-    VPi x Impl a _ b u2 -> do
-      if x == name then
+    VPi x (Impl j) a u1 b u2 -> do
+      if x == name && i == j then
         return (t, va, lv)
       else do
         m <- freshMeta ctx
+        if j == ImplInst then addInstanceHole ctx m a u1 else return ()
         let mv = eval (env ctx) m
-        go (App t m Impl, vinst b mv, u2)
+        go (App t m (Impl j), vinst b mv, u2)
     VPiLvl x b u -> do
       m <- freshLMeta ctx
       let mv = finLevel (env ctx) m
@@ -117,10 +120,11 @@ insertUntilName ctx name act = go =<< act where
 insertUntilLevelName :: Ctx -> Name -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)
 insertUntilLevelName ctx name act = go =<< act where
   go (t, va, lv) = case force va of
-    VPi x Impl a _ b u2 -> do
+    VPi x (Impl i) a u1 b u2 -> do
       m <- freshMeta ctx
+      if i == ImplInst then addInstanceHole ctx m a u1 else return ()
       let mv = eval (env ctx) m
-      go (App t m Impl, vinst b mv, u2)
+      go (App t m (Impl i), vinst b mv, u2)
     VPiLvl x b u -> do
       if x == name then
         return (t, va, lv)
@@ -164,7 +168,7 @@ check ctx tm ty lv = do
       tm <- freshMeta ctx
       maybe (return ()) (\x -> if x == "_" then addInstanceHole ctx tm ty lv else addHole x ctx tm ty lv) x
       return tm
-    (SLam x i ma b, VPi x' i' ty u1 b' u2) | either (\x -> x == x' && i' == Impl) (== i') i -> do
+    (SLam x i ma b, VPi x' i' ty u1 b' u2) | either (\(x, j) -> x == x' && i' == Impl j) (== i') i -> do
       case ma of
         Nothing -> return ()
         Just a -> do
@@ -175,8 +179,8 @@ check ctx tm ty lv = do
             ("check failed " ++ show tm ++ " : " ++ showVZ ctx ty ++ " got " ++ showVZ ctx ty')
       cb <- check (bind x i' ty u1 ctx) b (vinst b' (VVar (lvl ctx))) u2
       return $ Lam x i' cb
-    (t, VPi x Impl a u1 b u2) -> do
-      Lam x Impl <$> check (bindInsert x Impl a u1 ctx) t (vinst b (VVar (lvl ctx))) u2
+    (t, VPi x (Impl i) a u1 b u2) -> do
+      Lam x (Impl i) <$> check (bindInsert x (Impl i) a u1 ctx) t (vinst b (VVar (lvl ctx))) u2
     (SLamLvl x i b, VPiLvl y c u) | maybe True (== y) i -> do
       let v = vFinLevelVar (lvl ctx)
       LamLvl x <$> check (bindLevel x ctx) b (vinstLevel c v) (vinstCL u v)
@@ -293,12 +297,12 @@ infer ctx tm = do
       return (Let "p" (quoteCtx ctx vt) (Pair ta tb) (Var 0), vt, u1 <> u2)
     c@(SApp f a i) -> do
       (i, cf, tty, l1) <- case i of
-        Left name -> do
-          (t, tty, l1) <- insertUntilName ctx name $ infer ctx f
-          return (Impl, t, tty, l1)
-        Right Impl -> do
+        Left (name, j) -> do
+          (t, tty, l1) <- insertUntilName ctx name j $ infer ctx f
+          return (Impl j, t, tty, l1)
+        Right (Impl j) -> do
           (t, tty, l1) <- insertLvl ctx $ infer ctx f
-          return (Impl, t, tty, l1)
+          return (Impl j, t, tty, l1)
         Right Expl -> do
           (t, tty, l1) <- insert' ctx $ infer ctx f
           return (Expl, t, tty, l1)
@@ -406,11 +410,13 @@ tryUnify ctx u1 u2 a b = do
   ls <- readIORef lmctx
   nm <- readIORef nextMeta
   ms <- readIORef mctx
+  hs <- readIORef instanceHoles
   catch (True <$ unifyCtx ctx u1 u2 a b "" "") \(err :: Error) -> do
     writeIORef lmctx ls
     writeIORef nextLMeta nlm
     writeIORef mctx ms
     writeIORef nextMeta nm
+    writeIORef instanceHoles hs
     return False
 
 tryUnify' :: Ctx -> Tm -> Val -> VLevel -> Val -> VLevel -> IO (Maybe Tm)

@@ -15,10 +15,11 @@ lvlToIx l x = coerce (l - x - 1)
 
 type Name = String
 
-data Icit = Impl | Expl deriving (Show, Eq)
+data Impl = ImplUnif | ImplInst deriving (Show, Eq)
+data Icit = Impl Impl | Expl deriving (Show, Eq)
 
-icit :: Icit -> a -> a -> a
-icit Impl a _ = a
+icit :: Icit -> (Impl -> a) -> a -> a
+icit (Impl x) a _ = a x
 icit Expl _ b = b
 
 onlyIf :: Bool -> IO () -> IO ()

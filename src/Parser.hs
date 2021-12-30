@@ -190,15 +190,18 @@ pProj = do
 data Sp
   = SpProj SProjType
   | SpLevel SLevel (Maybe Name)
-  | SpArg STm (Either Name Icit)
+  | SpArg STm (Either (Name, Impl) Icit)
   | SpOp Name
   deriving (Show)
 
 pSp :: Parser Sp
-pSp = proj <|> abs <|> try levelByName <|> try level <|> try implByName <|> impl <|> try parensOp <|> try op <|> arg
+pSp = proj <|> abs <|> try levelByName <|> try level <|> try implinstByName <|> try implByName <|> try implinst <|> impl <|> try parensOp <|> try op <|> arg
   where
     -- {t}
-    impl = flip SpArg (Right Impl) <$> braces pSurface
+    impl = flip SpArg (Right $ Impl ImplUnif) <$> braces pSurface
+
+    -- {{t}}
+    implinst = flip SpArg (Right $ Impl ImplInst) <$> braces (braces pSurface)
 
     -- <t>
     level = flip SpLevel Nothing <$> angled pLevel
@@ -217,7 +220,14 @@ pSp = proj <|> abs <|> try levelByName <|> try level <|> try implByName <|> impl
       x <- parens pOperator <|> pIdent
       char '='
       t <- pSurface
-      return $ SpArg t (Left x)
+      return $ SpArg t (Left (x, ImplUnif))
+    
+    -- {{x = t}}
+    implinstByName = braces $ braces $ do
+      x <- parens pOperator <|> pIdent
+      char '='
+      t <- pSurface
+      return $ SpArg t (Left (x, ImplInst))
     
     -- <x = l>
     levelByName = angled $ do
@@ -322,8 +332,8 @@ pSpine = do
             Just hd' -> Just (Just $ apps hd' tl)
             Nothing -> Nothing
 
-pLamBinder :: Parser ([Name], Either (Maybe Name) (Either Name Icit, Maybe STm))
-pLamBinder = levels <|> implBinder <|> try binderWithType <|> justBinder
+pLamBinder :: Parser ([Name], Either (Maybe Name) (Either (Name, Impl) Icit, Maybe STm))
+pLamBinder = levels <|> try implinstBinder <|> implBinder <|> try binderWithType <|> justBinder
   where
     -- \x
     justBinder = (\x -> ([x], Right (Right Expl, Nothing))) <$> pOpBinder
@@ -346,7 +356,14 @@ pLamBinder = levels <|> implBinder <|> try binderWithType <|> justBinder
       xs <- some pOpBinder
       ty <- optional (symbol ":" >> pSurface)
       b <- optional (symbol "=" >> pBinder)
-      return $ maybe (xs, Right (Right Impl, ty)) (\b -> (xs, Right (Left b, ty))) b
+      return $ maybe (xs, Right (Right (Impl ImplUnif), ty)) (\b -> (xs, Right (Left (b, ImplUnif), ty))) b
+    
+    -- \{{x y z}} | \{{x y z : A}} | \{{x y z = b}} | \{{x y z : A = b}}
+    implinstBinder = braces $ braces $ do
+      xs <- some pOpBinder
+      ty <- optional (symbol ":" >> pSurface)
+      b <- optional (symbol "=" >> pBinder)
+      return $ maybe (xs, Right (Right (Impl ImplInst), ty)) (\b -> (xs, Right (Left (b, ImplInst), ty))) b
 
 pLam :: Parser STm
 pLam = do
@@ -357,17 +374,17 @@ pLam = do
   return $ foldLamBinders t xs
   where
 
-foldLamBinders :: STm -> [([Name], Either (Maybe Name) (Either Name Icit, Maybe STm))] -> STm
+foldLamBinders :: STm -> [([Name], Either (Maybe Name) (Either (Name, Impl) Icit, Maybe STm))] -> STm
 foldLamBinders t xs = foldr go t xs
   where
-    go :: ([Name], Either (Maybe Name) (Either Name Icit, Maybe STm)) -> STm -> STm
+    go :: ([Name], Either (Maybe Name) (Either (Name, Impl) Icit, Maybe STm)) -> STm -> STm
     go (xs, Left i) t = foldr (\x -> SLamLvl x i) t xs
     go (xs, Right (i, a)) t = foldr (\x t -> SLam x i a t) t xs
 
-foldLamBindersUnannotated :: STm -> [([Name], Either (Maybe Name) (Either Name Icit, Maybe STm))] -> STm
+foldLamBindersUnannotated :: STm -> [([Name], Either (Maybe Name) (Either (Name, Impl) Icit, Maybe STm))] -> STm
 foldLamBindersUnannotated t xs = foldr go t xs
   where
-    go :: ([Name], Either (Maybe Name) (Either Name Icit, Maybe STm)) -> STm -> STm
+    go :: ([Name], Either (Maybe Name) (Either (Name, Impl) Icit, Maybe STm)) -> STm -> STm
     go (xs, Left i) t = foldr (\x -> SLamLvl x i) t xs
     go (xs, Right (i, a)) t = foldr (\x t -> SLam x i Nothing t) t xs
 
@@ -375,7 +392,7 @@ pArrowOrCross :: Parser Bool
 pArrowOrCross = (True <$ pArrow) <|> (False <$ pCross)
 
 pPiSigmaBinder :: Parser ([Name], Either () (Icit, STm))
-pPiSigmaBinder = levels <|> implBinder <|> binderWithType
+pPiSigmaBinder = levels <|> try implinstBinder <|> implBinder <|> binderWithType
   where
     -- (x y z : A)
     binderWithType = parens $ do
@@ -393,7 +410,13 @@ pPiSigmaBinder = levels <|> implBinder <|> binderWithType
     implBinder = braces $ do
       xs <- some pOpBinder
       ty <- optional (symbol ":" >> pSurface)
-      return (xs, Right (Impl, fromMaybe (SHole Nothing) ty))
+      return (xs, Right (Impl ImplUnif, fromMaybe (SHole Nothing) ty))
+    
+    -- {{x y z}} | {{x y z : A}}
+    implinstBinder = braces $ braces $ do
+      xs <- some pOpBinder
+      ty <- optional (symbol ":" >> pSurface)
+      return (xs, Right (Impl ImplInst, fromMaybe (SHole Nothing) ty))
 
 pPiOrSigma :: Parser STm
 pPiOrSigma = do
@@ -428,16 +451,16 @@ pLet = do
   symbol ";"
   SLet x (setupPiForDef ps a) (foldLamBindersUnannotated t ps) <$> pSurface
 
-setupPiForDef :: [([Name], Either (Maybe Name) (Either Name Icit, Maybe STm))] -> Maybe STm -> Maybe STm
+setupPiForDef :: [([Name], Either (Maybe Name) (Either (Name, Impl) Icit, Maybe STm))] -> Maybe STm -> Maybe STm
 setupPiForDef [] Nothing = Nothing
 setupPiForDef xs a = Just $ createPiForDef xs (fromMaybe (SHole Nothing) a)
 
-createPiForDef :: [([Name], Either (Maybe Name) (Either Name Icit, Maybe STm))] -> STm -> STm
+createPiForDef :: [([Name], Either (Maybe Name) (Either (Name, Impl) Icit, Maybe STm))] -> STm -> STm
 createPiForDef xs t = foldr go t xs
   where
-    go :: ([Name], Either (Maybe Name) (Either Name Icit, Maybe STm)) -> STm -> STm
+    go :: ([Name], Either (Maybe Name) (Either (Name, Impl) Icit, Maybe STm)) -> STm -> STm
     go (xs, Left i) t = foldr SPiLvl t xs
-    go (xs, Right (i, a)) t = foldr (\x t -> SPi x (either (const Impl) id i) (fromMaybe (SHole Nothing) a) t) t xs
+    go (xs, Right (i, a)) t = foldr (\x t -> SPi x (either (Impl . snd) id i) (fromMaybe (SHole Nothing) a) t) t xs
 
 pSurface :: Parser STm
 pSurface = withPos (pLam <|> pLet <|> try pPiOrSigma <|> funOrSpine)

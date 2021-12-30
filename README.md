@@ -68,8 +68,10 @@ TODO:
 - [ ] instance search
   - [x] basic instance search
   - [x] postpone and retry
-  - [ ] instance parameters
-  - [ ] recursive instance search
+  - [x] instance parameters
+  - [x] recursive instance search
+  - [ ] instance definitions (limit search)
+  - [ ] limit instance search
 - [ ] erased parameters
 - [ ] update unification
   - [ ] eta rule for Bool

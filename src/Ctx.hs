@@ -43,10 +43,10 @@ bindInsert :: Name -> Icit -> VTy -> VLevel -> Ctx -> Ctx
 bindInsert x i t u (Ctx l e b bds pos) = Ctx (l + 1) (Right (VVar l) : e) (BinderEntry x i True (Just (t, u)) : b) (Just i : bds) pos
 
 bindLevel :: Name -> Ctx -> Ctx
-bindLevel x (Ctx l e b bds pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) (BinderEntry x Impl False Nothing : b) (Just Expl : bds) pos
+bindLevel x (Ctx l e b bds pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) (BinderEntry x (Impl ImplUnif) False Nothing : b) (Just Expl : bds) pos
 
 bindLevelInsert :: Name -> Ctx -> Ctx
-bindLevelInsert x (Ctx l e b bds pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) (BinderEntry x Impl True Nothing : b) (Just Expl : bds) pos
+bindLevelInsert x (Ctx l e b bds pos) = Ctx (l + 1) (Left (vFinLevelVar l) : e) (BinderEntry x (Impl ImplUnif) True Nothing : b) (Just Expl : bds) pos
 
 enter :: SourcePos -> Ctx -> Ctx
 enter p ctx = ctx { pos = Just p }
@@ -187,7 +187,8 @@ instance Show Ctx where
       showVar :: (Name, Icit, Either VFinLevel (VTy, Val)) -> String
       showVar (x, _, Left l') = "<" ++ x ++ ">" ++ showValue x (prettyFinLevelCtx ctx (quoteFinLevel l l'))
       showVar (x, Expl, Right (ty, v)) = x ++ " : " ++ showVZ ctx ty ++ showValue x (showVZ ctx v)
-      showVar (x, Impl, Right (ty, v)) = "{" ++ x ++ "} : " ++ showVZ ctx ty ++ showValue x (showVZ ctx v)
+      showVar (x, Impl ImplUnif, Right (ty, v)) = "{" ++ x ++ "} : " ++ showVZ ctx ty ++ showValue x (showVZ ctx v)
+      showVar (x, Impl ImplInst, Right (ty, v)) = "{{" ++ x ++ "}} : " ++ showVZ ctx ty ++ showValue x (showVZ ctx v)
 
       showValue :: Name -> String -> String
       showValue x v | x == v = ""
