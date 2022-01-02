@@ -105,6 +105,9 @@ TODO:
 - [ ] Prop universe
 - [ ] Setoid type theory/observational type theory
 
+Bugs:
+- elimination of Data fails for indexed datatypes
+
 Level solver issues:
 - max '4 ?l7 ~ S '4
 - max (S ?l0) ?l1 ~ max (S '3) '2

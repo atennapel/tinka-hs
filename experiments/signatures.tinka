@@ -1,0 +1,59 @@
+import lib/desc;
+import lib/list;
+
+ConTy = ();
+Ctx = List ConTy;
+
+-- Tag = TZ : {C : Ctx} {A : ConTy} -> Tag (A :: C) A | TS : {C : Ctx} {A B : ConTy} -> Tag C A -> Tag (B :: C) A
+TagD : Desc (Ctx ** ConTy) = idesc \Tag.
+  (Arg Ctx \C. Arg ConTy \A. Tag (A :: C, A))
+  :|: (Arg Ctx \C. Arg ConTy \A. Arg ConTy \B. Tag (C, A) :=>: Tag (B :: C, A));
+Tag (C : Ctx) (A : ConTy) = Data TagD (C, A);
+
+TZ {C : Ctx} {A : ConTy} : Tag (A :: C) A = [True, C, A];
+TS {C : Ctx} {A B : ConTy} (t : Tag C A) : Tag (B :: C) A = [False, C, A, B, t];
+
+indTag
+  <k> (P : {C : Ctx} {A : ConTy} -> Tag C A -> Type k)
+  (tz : {C : Ctx} {A : ConTy} -> P {A :: C} {A} TZ)
+  (ts : {C : Ctx} {A B : ConTy} (x : Tag C A) -> P x -> P {B :: C} {A} (TS x))
+  {C : Ctx} {A : ConTy} (x : Tag C A) : P x
+  = elimSumD P
+      (\_ _ {i} d.
+        let c = d.0;
+        let a = d.1;
+        let p = d._2._2;
+        elimId {Ctx ** ConTy} {(a :: c, a)} (\{y} p. P {y._1} {y._2} (True, c, a, p)) tz p)
+      (\case ind d.
+        let c = d.0;
+        let a = d.1;
+        let b = d.2;
+        let t' = d.3;
+        let t = case {(c, a)} t';
+        let p = d._2._2._2._2;
+        elimId {Ctx ** ConTy} {(b :: c, a)} (\{y} p. P {y._1} {y._2} (False, c, a, b, t, p)) (ts t (ind {(c, a)} t')) p)
+      {(C, A)} x;
+
+Tm : Ctx -> ConTy -> Type = Tag;
+Data' (C : Ctx) : Type = Tm C [];
+
+BoolCtx = [] :: [] :: Nil;
+Bool' = Data' BoolCtx;
+True' : Bool' = TZ;
+False' : Bool' = TS TZ;
+
+Elim' {C' : Ctx} (P : Data' C' -> Type) : (C : Ctx) -> (Tag C [] -> Tag C' []) -> Type =
+  indList (\C. (Tag C [] -> Tag C' []) -> Type)
+    (\_. ())
+    (\ty rest ind k. P (k TZ) ** ind (\x. k (TS x)));
+Elim {C : Ctx} (P : Data' C -> Type) : Type = Elim' {C} P C (\x. x);
+
+elimTag {C' : Ctx} (P : Data' C' -> Type) {C : Ctx} : (x : Tag C []) (conv : Tag C [] -> Tag C' []) -> Elim' {C'} P C conv -> P (conv x) =
+  indTag (\{c} {a} x. (conv : Tag c [] -> Tag C' []) -> Elim' {C'} P c conv -> P (conv x))
+    (\_ ps. ps._1)
+    (\x ind k ps. ind (\x. k (TS x)) ps._2)
+    {C} {[]};
+
+elim (C : Ctx) (P : Data' C -> Type) (x : Data' C) (ps : Elim P) : P x = elimTag P x (\x. x) ps;
+
+main = \b. elim BoolCtx (\_. Bool') b [False', True'];

@@ -26,3 +26,6 @@ indVec
         let p = d._2._2._2;
         elimId (\p. P (False, m, hd, tl, p)) (vcons {m} hd tl (ind tl')) p)
       x;
+
+lengthV {A : Type} {n : Nat} : Vec n A -> Nat
+  = indVec {A} (\_. Nat) 0 (\_ _ rest. 1 +N rest) {n};
