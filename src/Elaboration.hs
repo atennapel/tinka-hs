@@ -49,7 +49,9 @@ resetInstanceHoles :: IO ()
 resetInstanceHoles = writeIORef instanceHoles []
 
 addInstanceHole :: Ctx -> Tm -> Val -> VLevel -> IO ()
-addInstanceHole ctx tm ty lv = modifyIORef instanceHoles (HoleEntry ctx tm ty lv :)
+addInstanceHole ctx tm ty lv = do
+  modifyIORef instanceHoles (HoleEntry ctx tm ty lv :)
+  -- trySolveAllInstances
 
 -- elaboration
 freshMeta :: Ctx -> IO Tm
@@ -537,12 +539,6 @@ maxInstanceSearch = 1000
 trySolveAllInstances :: IO ()
 trySolveAllInstances = do
   go 0
-  hs <- readIORef instanceHoles
-  if null hs then do
-    debug $ "all instances are solved"
-    return ()
-  else
-    showUnsolvedInstances hs
   where
     go :: Int -> IO ()
     go i | i >= maxInstanceSearch = putStrLn "instance search limit reached"
@@ -553,6 +549,16 @@ trySolveAllInstances = do
         go (i + 1)
       else
         return ()
+
+trySolveAllInstancesOrFail :: IO ()
+trySolveAllInstancesOrFail = do
+  trySolveAllInstances
+  hs <- readIORef instanceHoles
+  if null hs then do
+    debug $ "all instances are solved"
+    return ()
+  else
+    showUnsolvedInstances hs
 
 showHoles :: HoleMap -> IO ()
 showHoles [] = return ()
@@ -568,7 +574,7 @@ elaborate ctx tm = do
   resetHoles
   resetInstanceHoles
   (tm', vty, vlv) <- infer ctx tm
-  trySolveAllInstances
+  trySolveAllInstancesOrFail
   solveUnsolvedLMetas
   debug $ "elaborated tm: " ++ show tm'
   debug $ "elaborated ty: " ++ showV ctx vty
