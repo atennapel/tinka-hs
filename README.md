@@ -71,7 +71,9 @@ TODO:
   - [x] instance definitions
   - [x] instance lets
   - [x] recursive instance search
-- [ ] give fresh names to _ names if used
+- [ ] naming fixes
+  - [ ] give fresh names to _ names if used
+  - [ ] generate nicer fresh names
 - [ ] erased parameters
 - [ ] lib updates
   - [ ] induction for SumD and SumDL
@@ -104,9 +106,6 @@ TODO:
   - [ ] curried indexes and parameters
 - [ ] Prop universe
 - [ ] Setoid type theory/observational type theory
-
-Bugs:
-- elimination of Data fails for indexed datatypes
 
 Level solver issues:
 - max '4 ?l7 ~ S '4

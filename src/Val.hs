@@ -14,18 +14,27 @@ data Clos v
   = Clos Env Tm
   | Fun (v -> Val)
 
+instance Show (Clos v) where
+  show (Clos _ tm) = "(Clos " ++ show tm ++ ")"
+  show _ = "Fun"
+
 data ClosLvl
   = ClosLvl Env Level
   | FunLvl (VFinLevel -> VLevel)
 
+instance Show ClosLvl where
+  show (ClosLvl _ tm) = "(ClosLvl " ++ show tm ++ ")"
+  show _ = "FunLvl"
+
 data Head = HVar Lvl | HPrim PrimName | HMeta MetaVar
-  deriving (Eq)
+  deriving (Eq, Show)
 
 data Elim
   = EApp Val Icit
   | EAppLvl VFinLevel
   | EProj ProjType
   | EPrimElim PrimElimName [Either VFinLevel (Val, Icit)]
+  deriving (Show)
 
 data Val
   = VNe Head Sp
@@ -39,6 +48,7 @@ data Val
   | VCon Val
   | VRefl
   | VType VLevel
+  deriving (Show)
 
 pattern VTypeFin l = VType (VFinLevel l)
 pattern VVar l = VNe (HVar l) []

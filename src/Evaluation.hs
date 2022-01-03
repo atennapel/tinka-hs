@@ -149,7 +149,7 @@ vprimelim PEMapD [Left l, Right (i, _), Right (a, _), Right (b, _), Right (fn, _
 
 vprimelim x as (VNe h sp) = VNe h (EPrimElim x as : sp)
 vprimelim p as (VGlobal x sp v) = VGlobal x (EPrimElim p as : sp) (vprimelim p as v)
-vprimelim x as _ = undefined
+vprimelim x as v = error $ "impossible vprimelim " ++ show x ++ " " ++ show v
 
 vliftterm :: VFinLevel -> VFinLevel -> Val -> Val -> Val
 vliftterm k l a (VNe h (EPrimElim PELower _ : sp)) = VNe h sp
@@ -254,7 +254,7 @@ evalprimelim PEElimId =
   vlam "refl" $ \refl ->
   vlamimpl "y" $ \y ->
   vlam "p" $ \pp ->
-  vprimelim PEElimId [Left k, Left l, Right (a, Impl ImplUnif), Right (x, Impl ImplUnif), Right (p, Expl), Right (refl, Expl), Right (y, Impl ImplUnif)] p
+  vprimelim PEElimId [Left k, Left l, Right (a, Impl ImplUnif), Right (x, Impl ImplUnif), Right (p, Expl), Right (refl, Expl), Right (y, Impl ImplUnif)] pp
 evalprimelim PEEx =
   vlamlvl "l" $ \l ->
   vlamimpl "I" $ \i ->

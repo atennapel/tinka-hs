@@ -1,10 +1,11 @@
+{- signatures for closed finite types -}
+
 import lib/desc;
 import lib/list;
 
 ConTy = ();
 Ctx = List ConTy;
 
--- Tag = TZ : {C : Ctx} {A : ConTy} -> Tag (A :: C) A | TS : {C : Ctx} {A B : ConTy} -> Tag C A -> Tag (B :: C) A
 TagD : Desc (Ctx ** ConTy) = idesc \Tag.
   (Arg Ctx \C. Arg ConTy \A. Tag (A :: C, A))
   :|: (Arg Ctx \C. Arg ConTy \A. Arg ConTy \B. Tag (C, A) :=>: Tag (B :: C, A));
@@ -56,4 +57,4 @@ elimTag {C' : Ctx} (P : Data' C' -> Type) {C : Ctx} : (x : Tag C []) (conv : Tag
 
 elim (C : Ctx) (P : Data' C -> Type) (x : Data' C) (ps : Elim P) : P x = elimTag P x (\x. x) ps;
 
-main = \b. elim BoolCtx (\_. Bool') b [False', True'];
+main = elim BoolCtx (\_. Bool') False' [False', True'];
