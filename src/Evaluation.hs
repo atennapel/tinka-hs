@@ -44,7 +44,7 @@ vapp :: Val -> Val -> Icit -> Val
 vapp (VLam _ _ b) v _ = vinst b v
 vapp (VNe h sp) v i = VNe h (EApp v i : sp)
 vapp (VGlobal x sp w) v i = VGlobal x (EApp v i : sp) (vapp w v i)
-vapp _ _ _ = undefined
+vapp a b _ = error $ "vapp failed " ++ show a ++ " @ " ++ show b
 
 vappLevel :: Val -> VFinLevel -> Val
 vappLevel (VLamLvl _ b) v = vinstLevel b v
@@ -81,7 +81,7 @@ forceFinLevel (VFL n xs ys) = foldr (<>) (VFL n xs mempty) $ map go $ M.assocs y
     go :: (Int, Int) -> VFinLevel
     go (m, n) = case lookupLMeta (coerce m) of
       LUnsolved {} -> addToVFinLevel n (vFinMeta $ coerce m)
-      LSolved v _ -> forceFinLevel (addToVFinLevel n v)
+      LSolved v -> forceFinLevel (addToVFinLevel n v)
 
 vproj :: Val -> ProjType -> Val
 vproj (VPair a b) Fst = a
@@ -145,7 +145,7 @@ vprimelim PEMapD [Left l, Right (i, _), Right (a, _), Right (b, _), Right (fn, _
   VPair (vfst x) (vmapd l i (vapp k (VLiftTerm (vFLS l) l a (vfst x)) Expl) a b fn ii (vsnd x))
 -- mapD (Par A B) f (x, y) = (mapDEx A f x, mapD B y)
 vprimelim PEMapD [Left l, Right (i, _), Right (a, _), Right (b, _), Right (fn, _), Right (ii, _), Right (x, _)] (VInd ta tb) =
-  VPair (vmapd l i ta a b fn ii (vfst x)) (vmapd l i tb a b fn ii (vsnd x))
+  VPair (vmapdex l i ta a b fn (vfst x)) (vmapd l i tb a b fn ii (vsnd x))
 
 vprimelim x as (VNe h sp) = VNe h (EPrimElim x as : sp)
 vprimelim p as (VGlobal x sp v) = VGlobal x (EPrimElim p as : sp) (vprimelim p as v)

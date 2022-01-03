@@ -2,21 +2,21 @@ import lib/desc;
 import lib/functor;
 import lib/eq;
 
-ListD (A : Type) = desc \ListA. ListA :|: A :->: ListA :=>: ListA;
-List (A : Type) : Type = Data (ListD A) [];
+ListD <l> (A : Type l) : Desc (Lift <l> ()) = descL <l> \ListA. SumDL <l> ListA (Arg <l> A \_. Ind <l> ListA ListA);
+List <l> (A : Type l) : Type l = Data (ListD A) [];
 
-Nil {A : Type} : List A = [True];
-Cons {A : Type} (hd : A) (tl : List A) : List A = [False, hd, tl];
+Nil <l> {A : Type l} : List A = [True];
+Cons <l> {A : Type l} (hd : A) (tl : List A) : List A = [False, hd, tl];
 
 (::) = Cons;
 
 indList
-  <k> {A : Type}
+  <k> <l> {A : Type l}
   (P : List A -> Type k)
   (nil : P Nil)
   (cons : (hd : A) (tl : List A) -> P tl -> P (hd :: tl))
   (x : List A) : P x
-  = elimSumD P (\_ _ _. nil) (\case ind d. cons d.0 (case d.1) (ind d.1)) x;
+  = elimSumDL P (\_ _ _. nil) (\case ind d. cons d.0 (case {lift []} d.1) (ind {lift []} d.1)) {lift []} x;
 
 paraList <k> {R : Type k} {A : Type} (x : List A) (nil : R) (cons : A -> List A -> R -> R) : R
   = indList (\_. R) nil cons x;

@@ -43,5 +43,20 @@ elimSumD
         (right {R} case ind)
         y._1 y._2) x;
 
+elimSumDL
+  <k> <l> {I : Type l}
+  {A B : Desc I}
+  (P : {i : I} -> Data (SumDL A B) i -> Type k)
+  (left : {R : I -> Type l} -> (case : {i : I} -> R i -> Data (SumDL A B) i) -> ({i : I} -> (x : R i) -> P (case x)) -> {i : I} -> (x : El R i A) -> P (True, mapD A case x))
+  (right : {R : I -> Type l} -> (case : {i : I} -> R i -> Data (SumDL A B) i) -> ({i : I} -> (x : R i) -> P (case x)) -> {i : I} -> (x : El R i B) -> P (False, mapD B case x))
+  {i : I}
+  (x : Data (SumDL A B) i) : P x
+  = elimData P (\{R} case ind {j} y.
+      indBool (\b. (xs : El R j (if b A B)) -> P (lift b, mapD (if b A B) case xs))
+        (left {R} case ind)
+        (right {R} case ind)
+        (lower y._1) y._2) x;
+
 desc (K : Desc () -> Desc ()) : Desc () = K (Var []);
+descL <l> (K : Desc (Lift <l> ()) -> Desc (Lift <l> ())) : Desc (Lift <l> ()) = K (Var (lift []));
 idesc <l> {I : Type l} (K : (I -> Desc I) -> Desc I) : Desc I = K Var;

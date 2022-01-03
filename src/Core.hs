@@ -165,6 +165,7 @@ instance Show Tm where
   show t@(AppLvl _ _) = showTmApp t
   show t@(LamLvl _ _) = showTmLam t
   show t@PiLvl {} = showTmPi t
+  -- show (PiLvl x b l) = "<" ++ x ++ "> ->(" ++ show l ++ ") " ++ show b
   show t@(Proj _ _) = showTmProj t
   show t@(Pair _ _) = showTmPair t
   show t@Sigma {} = showTmSigma t

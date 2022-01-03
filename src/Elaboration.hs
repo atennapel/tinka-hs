@@ -63,6 +63,7 @@ freshMeta ctx = do
 freshLMeta :: Ctx -> IO FinLevel
 freshLMeta ctx = do
   m <- newLMeta (lvl ctx) (levelVars ctx)
+  debug $ "freshLMeta ?l" ++ show m
   return $ FLMeta m
 
 insert' :: Ctx -> IO (Tm, Val, VLevel) -> IO (Tm, Val, VLevel)

@@ -15,7 +15,7 @@ zonkFinLevel l vs (FLMax a b) = flmax (zonkFinLevel l vs a) (zonkFinLevel l vs b
 zonkFinLevel l vs f@(FLMeta m) =
   case lookupLMeta m of
     LUnsolved {} -> f
-    LSolved _ f -> zonkFinLevel l vs f
+    LSolved v -> zonkFinLevel l vs (quoteFinLevel l v)
 
 zonkLevel :: Lvl -> Env -> Level -> Level
 zonkLevel l vs (FinLevel f) = FinLevel (zonkFinLevel l vs f)

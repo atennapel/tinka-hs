@@ -253,19 +253,19 @@ unify l a b = do
 -- level unification
 solveFinLevel :: Lvl -> LMetaVar -> VFinLevel -> IO ()
 solveFinLevel l m b@(VFL n xs ys) = do
-  debug $ "solveLevel ?l" ++ show m ++ " := " ++ show (quoteFinLevel l b)
+  debug $ "solveLevel (" ++ show l ++ ") ?l" ++ show m ++ " := " ++ show (quoteFinLevel l b)
   case lookupLMeta m of
-    LSolved a _ -> unifyFinLevel l a b
+    LSolved a -> unifyFinLevel l a b
     LUnsolved gamma scope -> do
+      debug $ "?l" ++ show m ++ " " ++ show gamma ++ " " ++ show scope ++ " " ++ show (IM.keys xs)
       throwUnless (IM.notMember (coerce m) ys) $ UnifyError $ "occurs check failed in level: ?l" ++ show m ++ " := " ++ show (quoteFinLevel l b)
       throwUnless (all (\x -> S.member (coerce x) scope) (IM.keys xs)) $ UnifyError $ "scope check failed in level: ?l" ++ show m ++ " := " ++ show (quoteFinLevel l b)
-      let q = quoteFinLevel gamma b
-      debug $ "solution: " ++ show q
-      solveLMeta m b q
+      debug $ "solution: " ++ show (quoteFinLevel gamma b)
+      solveLMeta m b
 
 unifyFinLevel :: Lvl -> VFinLevel -> VFinLevel -> IO ()
 unifyFinLevel l a b = do
-  debug $ "unifyFinLevel " ++ show (quoteFinLevel l a) ++ " ~ " ++ show (quoteFinLevel l b)
+  debug $ "unifyFinLevel (" ++ show l ++ ") " ++ show (quoteFinLevel l a) ++ " ~ " ++ show (quoteFinLevel l b)
   case (forceFinLevel a, forceFinLevel b) of
     (a, b) | a == b -> return ()
     (a, b) ->
@@ -311,7 +311,7 @@ unifyFinLevel l a b = do
 
 unifyLevel :: Lvl -> VLevel -> VLevel -> IO ()
 unifyLevel l a b = do
-  debug $ "unifyLevel " ++ show (quoteLevel l a) ++ " ~ " ++ show (quoteLevel l b)
+  debug $ "unifyLevel (" ++ show l ++ ") " ++ show (quoteLevel l a) ++ " ~ " ++ show (quoteLevel l b)
   case (forceLevel a, forceLevel b) of
     (VOmega1, VOmega1) -> return ()
     (VOmega, VOmega) -> return ()

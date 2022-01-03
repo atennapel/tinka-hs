@@ -1,4 +1,4 @@
-{- signatures for closed finite types -}
+{- signatures for finite types -}
 
 import lib/desc;
 import lib/list;
@@ -20,7 +20,7 @@ indTag
   (ts : {C : Ctx} {A B : ConTy} (x : Tag C A) -> P x -> P {B :: C} {A} (TS x))
   {C : Ctx} {A : ConTy} (x : Tag C A) : P x
   = elimSumD P
-      (\_ _ {i} d.
+      (\_ _ d.
         let c = d.0;
         let a = d.1;
         let p = d._2._2;
@@ -38,7 +38,7 @@ indTag
 Tm : Ctx -> ConTy -> Type = Tag;
 Data' (C : Ctx) : Type = Tm C [];
 
-BoolCtx = [] :: [] :: Nil;
+BoolCtx : Ctx = [] :: [] :: Nil;
 Bool' = Data' BoolCtx;
 True' : Bool' = TZ;
 False' : Bool' = TS TZ;
