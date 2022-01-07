@@ -314,6 +314,125 @@ primType PLiftTerm =
   vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (l <> k)) $ \a ->
   vfun a (VFinLevel l) (VFinLevel (l <> k)) $
   VLift k l a, VOmega)
+-- Ty : <l> -> Type l -> Type (S l)
+primType PTy =
+  (vpilvl "l" (\l -> VFinLevel (vFLS (vFLS l))) $ \l ->
+  vfun (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS (vFLS l))) $
+  VTypeFin (vFLS l), VOmega)
+-- End : <l> {I : Type l} -> I -> Ty <l> I
+primType PEnd =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vfun i (VFinLevel l) (VFinLevel (vFLS l)) $
+  VTyPrim l i, VOmega)
+-- Arg : <l> {I : Type l} (A : Type l) -> (A -> Ty <l> I) -> Ty <l> I
+primType PArg =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vpi "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \a ->
+  vfun (vfun a (VFinLevel l) (VFinLevel (vFLS l)) (VTyPrim l i)) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
+  VTyPrim l i, VOmega)
+-- Ind : <l> {I : Type l} -> I -> Ty <l> I -> Ty <l> I
+primType PInd =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vfun i (VFinLevel l) (VFinLevel (vFLS l)) $
+  vfun (VTyPrim l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
+  VTyPrim l i, VOmega)
+-- HInd : <l> {I : Type l} (A : Type l) -> (A -> I) -> Ty <l> I -> Ty <l> I
+primType PHInd =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vpi "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \a ->
+  vfun (vfun a (VFinLevel l) (VFinLevel l) i) (VFinLevel l) (VFinLevel (vFLS l)) $
+  vfun (VTyPrim l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
+  VTyPrim l i, VOmega)
+-- Ctx : <l> -> Type l -> Type (S l)
+primType PCtx =
+  (vpilvl "l" (\l -> VFinLevel (vFLS (vFLS l))) $ \l ->
+  vfun (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS (vFLS l))) $
+  VTypeFin (vFLS l), VOmega)
+-- Empty : <l> {I : Type l} -> Ctx <l> I
+primType PEmpty =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  VCtx l i, VOmega)
+-- Ext : <l> {I : Type l} -> Ty <l> I -> Ctx <l> I -> Ctx <l> I
+primType PExt =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vfun (VTyPrim l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
+  vfun (VCtx l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
+  VCtx l i, VOmega)
+-- Var : <l> {I : Type l} -> Ctx <l> I -> Ty <l> I -> Type l
+primType PVar =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vfun (VCtx l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
+  vfun (VTyPrim l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
+  VTypeFin l, VOmega)
+-- VZ : <l> {I : Type l} {C : Ctx <l> I} {A : Ty <l> I} -> Var <l> {I} (Ext <l> {I} A C) A
+primType PVZ =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vpimpl "C" (VCtx l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \c ->
+  vpimpl "A" (VTyPrim l i) (VFinLevel (vFLS l)) (VFinLevel l) $ \a ->
+  VVarPrim l i (VExt l i a c) a, VOmega)
+-- VS : <l> {I : Type l} {C : Ctx <l> I} {A B : Ty <l> I} -> Var <l> {I} C A -> Var <l> {I} (Ext <l> {I} B C) A
+primType PVS =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+    vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+    vpimpl "C" (VCtx l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \c ->
+    vpimpl "A" (VTyPrim l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \a ->
+    vpimpl "B" (VTyPrim l i) (VFinLevel (vFLS l)) (VFinLevel l) $ \b ->
+    vfun (VVarPrim l i c a) (VFinLevel l) (VFinLevel l) $
+    VVarPrim l i (VExt l i b c) a, VOmega)
+-- Tm : <l> {I : Type l} -> Ctx <l> I -> Ty <l> I -> Type l
+primType PTm =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vfun (VCtx l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
+  vfun (VTyPrim l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
+  VTypeFin l, VOmega)
+-- El : <l> {I : Type l} {C : Ctx <l> I} {A : Ty <l> I} -> Var <l> {I} C A -> Tm <l> {I} C A
+primType PEl =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vpimpl "C" (VCtx l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \c ->
+  vpimpl "A" (VTyPrim l i) (VFinLevel (vFLS l)) (VFinLevel l) $ \a ->
+  vfun (VVarPrim l i c a) (VFinLevel l) (VFinLevel l) $
+  VTm l i c a, VOmega)
+-- App : <l> {I : Type l} {C : Ctx <l> I} {A : Type l} {B : A -> Ty <l> I} -> Tm <l> {I} C (Arg <l> {I} A B) -> (a : A) -> Tm <l> {I} C (B a)
+primType PApp =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vpimpl "C" (VCtx l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \c ->
+  vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \a ->
+  vpimpl "B" (vfun a (VFinLevel l) (VFinLevel (vFLS l)) (VTyPrim l i)) (VFinLevel (vFLS l)) (VFinLevel l) $ \b ->
+  vfun (VTm l i c (VArg l i a b)) (VFinLevel l) (VFinLevel l) $
+  vpi "a" a (VFinLevel l) (VFinLevel l) $ \arg ->
+  VTm l i c (vapp b arg Expl), VOmega)
+-- AppInd : <l> {I : Type l} {C : Ctx <l> I} {i : I} {B : Ty <l> I} -> Tm <l> {I} C (Ind <l> {I} i B) -> Tm <l> {I} C (End i) -> Tm <l> {I} C B
+primType PAppInd =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vpimpl "C" (VCtx l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \c ->
+  vpimpl "i" i (VFinLevel l) (VFinLevel (vFLS l)) $ \ii ->
+  vpimpl "B" (VTyPrim l i) (VFinLevel (vFLS l)) (VFinLevel l) $ \b ->
+  vfun (VTm l i c (VInd l i ii b)) (VFinLevel l) (VFinLevel l) $
+  vfun (VTm l i c (VEnd l i ii)) (VFinLevel l) (VFinLevel l) $
+  VTm l i c b, VOmega)
+-- AppHInd : <l> {I : Type l} {C : Ctx <l> I} {A : Type l} {i : A -> I} {B : Ty <l> I} -> Tm <l> {I} C (HInd <l> {I} A i B) -> ((a : A) -> Tm <l> {I} C (End (i a))) -> Tm <l> {I} C B
+primType PAppHInd =
+  (vpilvl "l" (\l -> VFinLevel (vFLS l)) $ \l ->
+  vpimpl "I" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \i ->
+  vpimpl "C" (VCtx l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \c ->
+  vpimpl "A" (VTypeFin l) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $ \a ->
+  vpimpl "i" (vfun a (VFinLevel l) (VFinLevel l) i) (VFinLevel l) (VFinLevel (vFLS l)) $ \ii ->
+  vpimpl "B" (VTyPrim l i) (VFinLevel (vFLS l)) (VFinLevel l) $ \b ->
+  vfun (VTm l i c (VHInd l i a ii b)) (VFinLevel l) (VFinLevel l) $
+  vfun (vpi "a" a (VFinLevel l) (VFinLevel l) $ \arg -> VTm l i c (VEnd l i (vapp ii a Expl))) (VFinLevel l) (VFinLevel l) $
+  VTm l i c b, VOmega)
 
 primElimType :: PrimElimName -> (Val, VLevel)
 -- <k> <l> {A : Type l} -> Lift <k> <l> A -> A
