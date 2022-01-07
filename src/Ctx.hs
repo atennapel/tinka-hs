@@ -135,8 +135,6 @@ prettyCore ns tm = show (go ns tm)
       LamLvl x b -> SLamLvl x Nothing (go (x : ns) b)
       PiLvl x b _ -> let x' = chooseName x ns in SPiLvl x' (go (x' : ns) b)
       Sigma x t _ b _ -> let x' = chooseName x ns in SSigma x' (go ns t) (go (x' : ns) b)
-      Con t -> SCon (go ns t)
-      Refl -> SRefl
       Pair a b -> SPair (go ns a) (go ns b)
       Let x i t v b -> let x' = chooseName x ns in SLet x' i (Just $ go ns t) (go ns v) (go (x' : ns) b)
       Proj s p -> SProj (go ns s) (goProj p)

@@ -206,18 +206,6 @@ check ctx tm ty lv = do
       cb <- check (define x inst vt u (evalCtx ctx cv) ctx) b ty lv
       return $ Let x inst ct cv cb
 
-    (SCon t, VData l i d j) -> do
-      ct <- check ctx t (vel l i (vlam "i" $ VData l i d) j d) lv
-      return $ Con ct
-    (SPair _ _, VData l i d j) -> check ctx (SCon tm) ty lv
-
-    (SRefl, VId l a b x y) -> do
-      catch (unify (lvl ctx) a b >> unify (lvl ctx) x y) $ \(err :: Error) -> 
-        catch (unify (lvl ctx) x y >> unify (lvl ctx) a b) $ \(err :: Error) ->
-          throwIO $ ElaborateError $ "check failed " ++ show tm ++ " : " ++ showVZ ctx ty ++ ": " ++ show err
-      return Refl
-    (SVar "[]", VId {}) -> check ctx SRefl ty lv
-
     (SVar x, VLift k l t) | x == "[]" || x == "True" || x == "False" -> do
       ct <- check ctx tm t (VFinLevel l)
       return $ cLiftTerm (quoteFinLevelCtx ctx k) (quoteFinLevelCtx ctx l) (quoteCtx ctx t) ct

@@ -30,8 +30,6 @@ data Tm
   | Proj Tm ProjType
   | Pair Tm Tm
   | Sigma Name Tm Level Tm Level
-  | Con Tm
-  | Refl
   | Let Name Bool Ty Tm Tm
   | Type Level
   | Meta MetaVar
@@ -52,7 +50,6 @@ showTmS t@(Pair _ _) = show t
 showTmS t@(Global _) = show t
 showTmS t@(Prim _) = show t
 showTmS t@(Meta _) = show t
-showTmS t@Refl = show t
 showTmS t@(InsertedMeta _ _) = show t
 showTmS t@(Type (FinLevel FLZ)) = show t
 showTmS t = "(" ++ show t ++ ")"
@@ -117,7 +114,6 @@ showTmPair s =
   let ps = flattenPair s in
     case last ps of
       Prim (Left PUnit) -> "[" ++ intercalate ", " (map show $ init ps) ++ "]"
-      Refl -> "[" ++ intercalate ", " (map show $ init ps) ++ "]"
       _ -> "(" ++ intercalate ", " (map show ps) ++ ")"
   where
     flattenPair :: Tm -> [Tm]
@@ -169,8 +165,6 @@ instance Show Tm where
   show t@(Proj _ _) = showTmProj t
   show t@(Pair _ _) = showTmPair t
   show t@Sigma {} = showTmSigma t
-  show (Con t) = "Con " ++ showTmS t
-  show Refl = "Refl"
   show (Let x i t v b) = "let " ++ (if i then "instance " else "") ++ showName x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (Type (FinLevel FLZ)) = "Type"
   show (Type l) = "Type " ++ showLevelS l

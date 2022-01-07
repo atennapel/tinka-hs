@@ -45,8 +45,6 @@ data Val
   | VPiLvl Name (Clos VFinLevel) ClosLvl
   | VPair Val Val
   | VSigma Name Val VLevel (Clos Val) VLevel
-  | VCon Val
-  | VRefl
   | VType VLevel
   deriving (Show)
 
@@ -55,17 +53,10 @@ pattern VVar l = VNe (HVar l) []
 pattern VMeta m = VNe (HMeta m) []
 pattern VPrim x = VNe (HPrim x) []
 
-pattern VVoid = VNe (HPrim PVoid) []
 pattern VUnitType = VNe (HPrim PUnitType) []
 pattern VUnit = VNe (HPrim PUnit) []
-pattern VBool = VNe (HPrim PBool) []
-pattern VTrue = VNe (HPrim PTrue) []
-pattern VFalse = VNe (HPrim PFalse) []
 pattern VLift k l x = VNe (HPrim PLift) [EApp x Expl, EAppLvl l, EAppLvl k]
 pattern VLiftTerm k l a x = VNe (HPrim PLiftTerm) [EApp x Expl, EApp a (Impl ImplUnif), EAppLvl l, EAppLvl k]
-pattern VId l a b x y = VNe (HPrim PId) [EApp y Expl, EApp x Expl, EApp b (Impl ImplUnif), EApp a (Impl ImplUnif), EAppLvl l]
-
-pattern VData l i d j = VNe (HPrim PData) [EApp j Expl, EApp d Expl, EApp i (Impl ImplUnif), EAppLvl l]
 
 vpi :: Name -> Val -> VLevel -> VLevel -> (Val -> Val) -> Val
 vpi x a u1 u2 b = VPi x Expl a u1 (Fun b) u2

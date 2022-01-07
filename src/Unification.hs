@@ -138,8 +138,6 @@ rename m pren v = go pren v
       VPiLvl x b u -> PiLvl x <$> goLiftLevel pren b <*> goLevel (lift pren) (vinstCL u (vFinLevelVar (cod pren)))
       VPair a b -> Pair <$> go pren a <*> go pren b
       VSigma x t u1 b u2 -> Sigma x <$> go pren t <*> goLevel pren u1 <*> goLift pren b <*> goLevel pren u2
-      VCon t -> Con <$> go pren t
-      VRefl -> return Refl
       VType i -> Type <$> goLevel pren i
 
 lams :: Sp -> Tm -> Tm
@@ -164,17 +162,6 @@ unifyElim :: Lvl -> Elim -> Elim -> IO ()
 unifyElim k (EApp v _) (EApp v' _) = unify k v v'
 unifyElim k (EAppLvl l) (EAppLvl l') = unifyFinLevel k l l'
 unifyElim k (EProj p) (EProj p') | eqvProj p p' = return ()
--- indBool <S l> (\_. Desc <l> I) t f ~ ifDesc <l> {I} t f
-unifyElim k (EPrimElim PEIndBool [Left l, Right (p, _), Right (t, _), Right (f, _)]) (EPrimElim PEIfDesc [Left l', Right (i, _), Right (t', _), Right (f', _)]) = do
-  unifyFinLevel k l (vFLS l')
-  unify k p (vlam "_" $ \_ -> vDesc l i)
-  unify k t t'
-  unify k f f'
-unifyElim k (EPrimElim PEIfDesc [Left l', Right (i, _), Right (t', _), Right (f', _)]) (EPrimElim PEIndBool [Left l, Right (p, _), Right (t, _), Right (f, _)]) = do
-  unifyFinLevel k (vFLS l') l
-  unify k (vlam "_" $ \_ -> vDesc l i) p
-  unify k t' t
-  unify k f' f
 unifyElim k (EPrimElim x1 as1) (EPrimElim x2 as2) | x1 == x2 =
   zipWithM_ (go k) as1 as2
   where
@@ -207,8 +194,6 @@ unify l a b = do
   case (forceMetas a, forceMetas b) of
     (VType i, VType i') -> unifyLevel l i i'
 
-    (VCon t, VCon t') -> unify l t t'
-
     (VPi _ i t u1 b u2, VPi _ i' t' u1' b' u2') | i == i' ->
       unifyLevel l u1 u1' >> unify l t t' >> unifyLevel l u2 u2' >> unifyClos l b b'
     (VPiLvl _ b u, VPiLvl _ b' u') ->
@@ -236,9 +221,6 @@ unify l a b = do
 
     (VUnit, v) -> return ()
     (v, VUnit) -> return ()
-
-    (VRefl, v) -> return ()
-    (v, VRefl) -> return ()
 
     (VNe h sp, VNe h' sp') | h == h' -> unifySp l sp sp'
 
