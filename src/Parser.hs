@@ -91,7 +91,7 @@ pOperator' = try $ do
 pLabel :: Parser Name
 pLabel = try $ do
   x <- takeWhile1P Nothing (\c -> isValidOperator c || isAlphaNum c)
-  guard (head x == '\'' && last x /= ',' && x /= "'")
+  guard (head x == '\'' && last x /= ',' && last x /= ';' && x /= "'")
   ws
   return $ tail x
 

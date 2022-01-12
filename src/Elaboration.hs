@@ -222,12 +222,10 @@ check ctx tm ty lv = do
       ct <- check ctx tm t (VFinLevel l)
       return $ cLiftTerm (quoteFinLevelCtx ctx k) (quoteFinLevelCtx ctx l) (quoteCtx ctx t) ct
     
-    (SVar "ENil", VTy) -- TODO
-    
     (SLabelLit x, VTag (VECons (VLabelLit y) e)) | x == y -> check ctx (SVar "TZ") ty lv
-    (SLabelLit x, VTag (VECons (VLabelLit y) e)) -> do
-      ct <- check ctx (SLabelLit x) (VTag e)
-      
+    (SLabelLit x, VTag (VECons l e)) -> do
+      ct <- check ctx (SLabelLit x) (VTag e) lv
+      return $ App (App (App (Prim (Left PTS)) (quoteCtx ctx l) (Impl ImplUnif)) (quoteCtx ctx e) (Impl ImplUnif)) ct Expl -- TS {l} {e} ct
     
     (tm, _) -> do
       (ctm, ty', lv') <- insert ctx $ infer ctx tm
