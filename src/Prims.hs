@@ -12,6 +12,10 @@ data PrimName
   | PLiftTerm
 
   | PData
+
+  | PLabel
+  | PEnum | PENil | PECons
+  | PTag | PTZ | PTS
   deriving (Eq, Ord)
 
 data PrimElimName
@@ -34,6 +38,13 @@ instance Show PrimName where
   show PLift = "Lift"
   show PLiftTerm = "lift"
   show PData = "Data"
+  show PLabel = "Label"
+  show PEnum = "Enum"
+  show PENil = "ENil"
+  show PECons = "ECons"
+  show PTag = "Tag"
+  show PTZ = "TZ"
+  show PTS = "TS"
 
 instance Show PrimElimName where
   show PEAbsurd = "absurd"
@@ -58,6 +69,13 @@ toPrimName "Id" = Just PId
 toPrimName "Lift" = Just PLift
 toPrimName "lift" = Just PLiftTerm
 toPrimName "Data" = Just PData
+toPrimName "Label" = Just PLabel
+toPrimName "Enum" = Just PEnum
+toPrimName "ENil" = Just PENil
+toPrimName "ECons" = Just PECons
+toPrimName "Tag" = Just PTag
+toPrimName "TZ" = Just PTZ
+toPrimName "TS" = Just PTS
 toPrimName _ = Nothing
 
 toPrimElimName :: String -> Maybe PrimElimName

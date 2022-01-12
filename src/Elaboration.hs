@@ -222,6 +222,13 @@ check ctx tm ty lv = do
       ct <- check ctx tm t (VFinLevel l)
       return $ cLiftTerm (quoteFinLevelCtx ctx k) (quoteFinLevelCtx ctx l) (quoteCtx ctx t) ct
     
+    (SVar "ENil", VTy) -- TODO
+    
+    (SLabelLit x, VTag (VECons (VLabelLit y) e)) | x == y -> check ctx (SVar "TZ") ty lv
+    (SLabelLit x, VTag (VECons (VLabelLit y) e)) -> do
+      ct <- check ctx (SLabelLit x) (VTag e)
+      
+    
     (tm, _) -> do
       (ctm, ty', lv') <- insert ctx $ infer ctx tm
       debug $ "check: try to unify " ++ showVZ ctx ty' ++ " ~ " ++ showVZ ctx ty
@@ -285,6 +292,7 @@ infer ctx tm = do
       l' <- checkFinLevel ctx l
       let vl = finLevelCtx ctx l'
       return (Type (FinLevel l'), VType (VFinLevel (vFLS vl)), VFinLevel (vFLS (vFLS vl)))
+    SLabelLit x -> return (LabelLit x, VLabel, VFinLevel mempty)
     SPi x i t b -> do
       (ct, l1) <- checkTy ctx t
       (cb, l2) <- checkTy (bind x i (evalCtx ctx ct) l1 ctx) b

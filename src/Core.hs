@@ -32,6 +32,7 @@ data Tm
   | Sigma Name Tm Level Tm Level
   | Con Tm
   | Refl
+  | LabelLit Name
   | Let Name Bool Ty Tm Tm
   | Type Level
   | Meta MetaVar
@@ -52,6 +53,7 @@ showTmS t@(Pair _ _) = show t
 showTmS t@(Global _) = show t
 showTmS t@(Prim _) = show t
 showTmS t@(Meta _) = show t
+showTmS t@(LabelLit _) = show t
 showTmS t@Refl = show t
 showTmS t@(InsertedMeta _ _) = show t
 showTmS t@(Type (FinLevel FLZ)) = show t
@@ -171,6 +173,7 @@ instance Show Tm where
   show t@Sigma {} = showTmSigma t
   show (Con t) = "Con " ++ showTmS t
   show Refl = "Refl"
+  show (LabelLit x) = "'" ++ x
   show (Let x i t v b) = "let " ++ (if i then "instance " else "") ++ showName x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (Type (FinLevel FLZ)) = "Type"
   show (Type l) = "Type " ++ showLevelS l

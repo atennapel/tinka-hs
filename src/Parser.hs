@@ -85,8 +85,15 @@ pName = try $ do
 pOperator' :: Parser Name
 pOperator' = try $ do
   x <- takeWhile1P Nothing (\c -> isValidOperator c || isAlphaNum c)
-  guard (not (invalidOperator x) && not (isAlphaNum (head x)) && not (isHole x) && head x /= '_')
+  guard (not (invalidOperator x) && not (isAlphaNum (head x)) && not (isHole x) && head x /= '_' && head x /= '\'' && x /= "'")
   return x
+
+pLabel :: Parser Name
+pLabel = try $ do
+  x <- takeWhile1P Nothing (\c -> isValidOperator c || isAlphaNum c)
+  guard (head x == '\'' && last x /= ',' && x /= "'")
+  ws
+  return $ tail x
 
 pIdent :: Parser Name
 pIdent = try $ do
@@ -147,6 +154,11 @@ pPair = parens (foldr1 SPair <$> pCommaSeparated)
 pUnitPair :: Parser STm
 pUnitPair = brackets (foldr SPair (SVar "[]") <$> pCommaSeparated)
 
+pEnum :: Parser STm
+pEnum = do
+  char '\''
+  brackets (foldr (\x y -> SApp (SApp (SVar "ECons") (SLabelLit x) (Right Expl)) y (Right Expl)) (SVar "ENil") <$> many pIdent)
+
 pHole :: Parser STm
 pHole = do
   C.char '_'
@@ -167,11 +179,13 @@ pAtom =
     (SNatLit <$> (L.decimal <* ws)) <|>
     (SType (SLNat 0) <$ symbol "Type") <|>
     (SRefl <$ symbol "Refl") <|>
+    (SLabelLit <$> pLabel) <|>
     (SVar <$> pIdent))
   <|> pCon
   <|> try (SVar "()" <$ parens ws)
   <|> try (SVar "[]" <$ brackets ws)
   <|> try pPair
+  <|> try pEnum
   <|> try pUnitPair
   <|> parens pSurface
 

@@ -139,6 +139,7 @@ rename m pren v = go pren v
       VPair a b -> Pair <$> go pren a <*> go pren b
       VSigma x t u1 b u2 -> Sigma x <$> go pren t <*> goLevel pren u1 <*> goLift pren b <*> goLevel pren u2
       VCon t -> Con <$> go pren t
+      VLabelLit x -> return $ LabelLit x
       VRefl -> return Refl
       VType i -> Type <$> goLevel pren i
 
@@ -208,6 +209,8 @@ unify l a b = do
     (VType i, VType i') -> unifyLevel l i i'
 
     (VCon t, VCon t') -> unify l t t'
+
+    (VLabelLit x, VLabelLit y) | x == y -> return ()
 
     (VPi _ i t u1 b u2, VPi _ i' t' u1' b' u2') | i == i' ->
       unifyLevel l u1 u1' >> unify l t t' >> unifyLevel l u2 u2' >> unifyClos l b b'

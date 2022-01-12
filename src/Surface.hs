@@ -51,6 +51,7 @@ data STm
   | SType SLevel
   | SHole (Maybe Name)
   | SNatLit Int
+  | SLabelLit Name
   | SPos SourcePos STm
 
 showSTmS :: STm -> String
@@ -60,6 +61,7 @@ showSTmS t@(SType (SLNat 0)) = show t
 showSTmS t@(SPair _ _) = show t
 showSTmS t@(SHole _) = show t
 showSTmS t@(SNatLit _) = show t
+showSTmS t@(SLabelLit _) = show t
 showSTmS (SPos _ t) = showSTmS t
 showSTmS t = "(" ++ show t ++ ")"
 
@@ -199,6 +201,7 @@ instance Show STm where
   show (SType (SLNat 0)) = "Type"
   show (SType l) = "Type " ++ showSLevelS l
   show (SNatLit i) = show i
+  show (SLabelLit x) = "'" ++ x
 
 data Decl
   = Def Name Bool (Maybe STy) STm

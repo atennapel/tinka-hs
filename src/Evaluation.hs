@@ -214,6 +214,7 @@ eval e = \case
   Sigma x t u1 b u2 -> VSigma x (eval e t) (level e u1) (Clos e b) (level e u2)
   Con t -> VCon (eval e t)
   Refl -> VRefl
+  LabelLit x -> VLabelLit x
   Let x _ _ v b -> eval (Right (eval e v) : e) b
   Type l -> VType (level e l)
   Meta m -> vmeta m
@@ -355,6 +356,7 @@ quoteWith ql l = go l
       VSigma x t u1 b u2 -> Sigma x (go l t) (quoteLevel l u1) (go (l + 1) (vinst b (VVar l))) (quoteLevel l u2)
       VCon t -> Con (go l t)
       VRefl -> Refl
+      VLabelLit x -> LabelLit x
       VType i -> Type (quoteLevel l i)
 
 quote :: Lvl -> Val -> Tm
@@ -408,6 +410,7 @@ conv :: Lvl -> Val -> Val -> Bool
 conv l a b = case (a, b) of
   (VType i, VType i') -> i == i'
   (VCon t, VCon t') -> conv l t t'
+  (VLabelLit x, VLabelLit y) -> x == y
 
   (VPi _ i t u1 b u2, VPi _ i' t' u1' b' u2') | i == i' && u1 == u1' && u2 == u2' ->
     conv l t t' && convClos l b b'
@@ -480,6 +483,26 @@ primType PData =
   vfun (vDesc l i) (VFinLevel (vFLS l)) (VFinLevel (vFLS l)) $
   vfun i (VFinLevel l) (VFinLevel (vFLS l)) $
   VTypeFin l, VOmega)
+
+primType PLabel = (VType vFLZ, VFinLevel (vFLS mempty))
+
+primType PEnum = (VType vFLZ, VFinLevel (vFLS mempty))
+primType PENil = (VEnum, VFinLevel mempty)
+primType PECons = (vfun VLabel (VFinLevel mempty) (VFinLevel mempty) $ vfun VEnum (VFinLevel mempty) (VFinLevel mempty) VEnum, (VFinLevel mempty))
+
+-- Tag : Enum -> Type
+primType PTag = (vfun VEnum (VFinLevel mempty) (VFinLevel (vFLS mempty)) (VType vFLZ), VFinLevel (vFLS mempty))
+-- TZ : {l : Label} {e : Enum} -> Tag (ECons l e)
+primType PTZ =
+  (vpimpl "l" VLabel (VFinLevel mempty) (VFinLevel mempty) $ \l ->
+  vpimpl "e" VEnum (VFinLevel mempty) (VFinLevel mempty) $ \e ->
+  VTag (VECons l e), VFinLevel mempty)
+-- TS : {l : Label} {e : Enum} -> Tag e -> Tag (ECons l e)
+primType PTS =
+  (vpimpl "l" VLabel (VFinLevel mempty) (VFinLevel mempty) $ \l ->
+  vpimpl "e" VEnum (VFinLevel mempty) (VFinLevel mempty) $ \e ->
+  vfun (VTag e) (VFinLevel mempty) (VFinLevel mempty) $
+  VTag (VECons l e), VFinLevel mempty)
 
 primElimType :: PrimElimName -> (Val, VLevel)
 -- <l> {A : Type l} -> Void -> A
