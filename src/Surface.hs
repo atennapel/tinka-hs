@@ -50,7 +50,7 @@ data STm
   | SLet Name Bool (Maybe STy) STm STm
   | SType SLevel
   | SHole (Maybe Name)
-  | SNatLit Int
+  | SNatLit Integer
   | SLabelLit Name
   | SPos SourcePos STm
 

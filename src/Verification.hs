@@ -79,6 +79,7 @@ infer ctx tm = do
       checkFinLevel ctx l
       return $ VType (VFinLevel (vFLS (finLevelCtx ctx l)))
     LabelLit _ -> return VLabel
+    NatLit _ -> return VNat
     Pi x i t _ b _ -> do
       l1 <- checkTy ctx t
       let vt = evalCtx ctx t

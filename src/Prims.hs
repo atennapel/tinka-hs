@@ -7,6 +7,7 @@ data PrimName
   | PUnitType | PUnit
   | PBool | PTrue | PFalse
   | PId
+  | PNat
 
   | PLift
   | PLiftTerm
@@ -45,6 +46,7 @@ instance Show PrimName where
   show PTag = "Tag"
   show PTZ = "TZ"
   show PTS = "TS"
+  show PNat = "Nat"
 
 instance Show PrimElimName where
   show PEAbsurd = "absurd"
@@ -76,6 +78,7 @@ toPrimName "ECons" = Just PECons
 toPrimName "Tag" = Just PTag
 toPrimName "TZ" = Just PTZ
 toPrimName "TS" = Just PTS
+toPrimName "Nat" = Just PNat
 toPrimName _ = Nothing
 
 toPrimElimName :: String -> Maybe PrimElimName

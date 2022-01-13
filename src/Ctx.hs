@@ -138,6 +138,7 @@ prettyCore ns tm = show (go ns tm)
       Con t -> SCon (go ns t)
       Refl -> SRefl
       LabelLit x -> SLabelLit x
+      NatLit n -> SNatLit n
       Pair a b -> SPair (go ns a) (go ns b)
       Let x i t v b -> let x' = chooseName x ns in SLet x' i (Just $ go ns t) (go ns v) (go (x' : ns) b)
       Proj s p -> SProj (go ns s) (goProj p)

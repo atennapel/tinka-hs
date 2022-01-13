@@ -76,6 +76,7 @@ zonk = go
       Con t -> Con (go k vs t)
       Refl -> Refl
       LabelLit x -> LabelLit x
+      NatLit n -> NatLit n
       Let x i t v b -> Let x i (go k vs t) (go k vs v) (goUnder k vs b)
       LamLvl x b -> LamLvl x (goUnderLevel k vs b)
       PiLvl x b u -> PiLvl x (goUnderLevel k vs b) (zonkLevel (k + 1) (Left (vFinLevelVar k) : vs) u)

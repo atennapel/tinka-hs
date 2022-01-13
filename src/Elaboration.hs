@@ -414,10 +414,7 @@ infer ctx tm = do
       t <- freshMeta ctx
       maybe (return ()) (\x -> if x == "_" then addInstanceHole ctx t a u else addHole x ctx t a u) x
       return (t, a, u)
-    SNatLit n | n >= 0 -> infer ctx (go n)
-      where
-        go 0 = SVar "Z"
-        go n = SApp (SVar "S") (go (n - 1)) (Right Expl)
+    SNatLit n | n >= 0 -> return (NatLit n, VNat, VFinLevel mempty)
     tm -> throwIO $ ElaborateError $ "cannot infer: " ++ show tm
 
 tryUnify :: Ctx -> VLevel -> VLevel -> VTy -> VTy -> IO Bool

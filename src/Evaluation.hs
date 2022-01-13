@@ -214,6 +214,7 @@ eval e = \case
   Sigma x t u1 b u2 -> VSigma x (eval e t) (level e u1) (Clos e b) (level e u2)
   Con t -> VCon (eval e t)
   Refl -> VRefl
+  NatLit n -> VNatLit n
   LabelLit x -> VLabelLit x
   Let x _ _ v b -> eval (Right (eval e v) : e) b
   Type l -> VType (level e l)
@@ -356,6 +357,7 @@ quoteWith ql l = go l
       VSigma x t u1 b u2 -> Sigma x (go l t) (quoteLevel l u1) (go (l + 1) (vinst b (VVar l))) (quoteLevel l u2)
       VCon t -> Con (go l t)
       VRefl -> Refl
+      VNatLit n -> NatLit n
       VLabelLit x -> LabelLit x
       VType i -> Type (quoteLevel l i)
 
@@ -411,6 +413,7 @@ conv l a b = case (a, b) of
   (VType i, VType i') -> i == i'
   (VCon t, VCon t') -> conv l t t'
   (VLabelLit x, VLabelLit y) -> x == y
+  (VNatLit x, VNatLit y) -> x == y
 
   (VPi _ i t u1 b u2, VPi _ i' t' u1' b' u2') | i == i' && u1 == u1' && u2 == u2' ->
     conv l t t' && convClos l b b'
@@ -449,6 +452,7 @@ conv l a b = case (a, b) of
 
 -- prim types
 primType :: PrimName -> (Val, VLevel)
+primType PNat = (VType vFLZ, VFinLevel (vFLS mempty))
 primType PVoid = (VType vFLZ, VFinLevel (vFLS mempty))
 primType PUnitType = (VType vFLZ, VFinLevel (vFLS mempty))
 primType PUnit = (VUnitType, VFinLevel mempty)

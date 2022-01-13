@@ -47,6 +47,7 @@ data Val
   | VSigma Name Val VLevel (Clos Val) VLevel
   | VCon Val
   | VRefl
+  | VNatLit Integer
   | VLabelLit Name
   | VType VLevel
   deriving (Show)
@@ -75,6 +76,8 @@ pattern VECons hd tl = VNe (HPrim PECons) [EApp tl Expl, EApp hd Expl]
 pattern VTag e = VNe (HPrim PTag) [EApp e Expl]
 pattern VTZ l e = VNe (HPrim PTZ) [EApp e (Impl ImplUnif), EApp l (Impl ImplUnif)]
 pattern VTS l e t = VNe (HPrim PTS) [EApp t Expl, EApp e (Impl ImplUnif), EApp l (Impl ImplUnif)]
+
+pattern VNat = VNe (HPrim PNat) []
 
 vpi :: Name -> Val -> VLevel -> VLevel -> (Val -> Val) -> Val
 vpi x a u1 u2 b = VPi x Expl a u1 (Fun b) u2
