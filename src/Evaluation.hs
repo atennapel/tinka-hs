@@ -104,8 +104,15 @@ vprimelim PEElimId [_, _, _, _, _, Right (refl, _), _] VRefl = refl
 -- elimEnum <k> P enil econs ENil = enil
 vprimelim PEElimEnum [_, _, Right (enil, _), _] VENil = enil
 -- elimEnum <k> P enil econs (ECons hd tl) = econs hd tl (elimEnum <k> P enil econs tl) 
-vprimelim PEElimEnum as@[Left k, Right (p, _), Right (enil, _), Right (econs, _)] (VECons hd tl) =
+vprimelim PEElimEnum as@[_, _, _, Right (econs, _)] (VECons hd tl) =
   vapp (vapp (vapp econs hd Expl) tl Expl) (vprimelim PEElimEnum as tl) Expl
+
+-- elimTag <k> P tz ts {_} (TZ {l} {e}) = tz {l} {e}
+vprimelim PEElimTag [_, _, Right (tz, _), _, _] (VTZ l e) =
+  vapp (vapp tz l (Impl ImplUnif)) e (Impl ImplUnif)
+-- elimTag <k> P tz ts {_} (TS {l} {e} t) = ts {l} {e} t (elimTag <k> P tz ts {e} t)
+vprimelim PEElimTag as@[_, _, _, Right (ts, _), _] (VTS l e t) =
+  vapp (vapp (vapp (vapp ts l (Impl ImplUnif)) e (Impl ImplUnif)) t Expl) (vprimelim PEElimTag (init as ++ [Right (e, Impl ImplUnif)]) t) Expl
 
 vprimelim x as (VNe h sp) = VNe h (EPrimElim x as : sp)
 vprimelim p as (VGlobal x sp v) = VGlobal x (EPrimElim p as : sp) (vprimelim p as v)
@@ -188,6 +195,14 @@ evalprimelim PEElimEnum =
   vlam "econs" $ \econs ->
   vlam "e" $ \e ->
   vprimelim PEElimEnum [Left k, Right (p, Expl), Right (enil, Expl), Right (econs, Expl)] e
+evalprimelim PEElimTag =
+  vlamlvl "k" $ \k ->
+  vlam "P" $ \p ->
+  vlam "tz" $ \tz ->
+  vlam "ts" $ \ts ->
+  vlamimpl "e" $ \e ->
+  vlam "t" $ \t ->
+  vprimelim PEElimTag [Left k, Right (p, Expl), Right (tz, Expl), Right (ts, Expl), Right (e, Impl ImplUnif)] t
 
 -- quote
 data QuoteLevel = Full | KeepGlobals
@@ -424,3 +439,20 @@ primElimType PEElimEnum =
   vfun (vpi "hd" VLabel (VFinLevel mempty) (VFinLevel k) $ \hd -> vpi "tl" VEnum (VFinLevel mempty) (VFinLevel k) $ \tl -> vfun (vapp p tl Expl) (VFinLevel k) (VFinLevel k) $ vapp p (VECons hd tl) Expl) (VFinLevel k) (VFinLevel k) $
   vpi "e" VEnum (VFinLevel mempty) (VFinLevel k) $ \e ->
   vapp p e Expl, VOmega)
+{-
+<k>
+(P : {e : Enum} -> Tag e -> Type k)
+(tz : {l : Label} {e : Enum} -> P {ECons l e} (TZ {l} {e}))
+(ts : {l : Label} {e : Enum} (t : Tag e) -> P {e} t -> P {ECons l e} (TS {l} {e} t))
+{e : Enum}
+(t : Tag e)
+-> P {e} t
+-}
+primElimType PEElimTag =
+  (vpilvl "k" (\k -> VFinLevel (vFLS k)) $ \k ->
+  vpi "P" (vpimpl "e" VEnum (VFinLevel mempty) (VFinLevel (vFLS k)) $ \e -> vfun (VTag e) (VFinLevel mempty) (VFinLevel (vFLS k)) $ VTypeFin k) (VFinLevel (vFLS k)) (VFinLevel k) $ \p ->
+  vfun (vpimpl "l" VLabel (VFinLevel mempty) (VFinLevel k) $ \l -> vpimpl "e" VEnum (VFinLevel mempty) (VFinLevel k) $ \e -> vapp (vapp p (VECons l e) (Impl ImplUnif)) (VTZ l e) Expl) (VFinLevel k) (VFinLevel k) $
+  vfun (vpimpl "l" VLabel (VFinLevel mempty) (VFinLevel k) $ \l -> vpimpl "e" VEnum (VFinLevel mempty) (VFinLevel k) $ \e -> vpi "t" (VTag e) (VFinLevel mempty) (VFinLevel k) $ \t -> vfun (vapp (vapp p e (Impl ImplUnif)) t Expl) (VFinLevel k) (VFinLevel k) $ vapp (vapp p (VECons l e) (Impl ImplUnif)) (VTS l e t) Expl) (VFinLevel k) (VFinLevel k) $
+  vpimpl "e" VEnum (VFinLevel mempty) (VFinLevel k) $ \e ->
+  vpi "t" (VTag e) (VFinLevel mempty) (VFinLevel k) $ \t ->
+  vapp (vapp p e (Impl ImplUnif)) t Expl, VOmega)

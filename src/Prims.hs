@@ -18,6 +18,7 @@ data PrimElimName
   = PELower
   | PEElimId
   | PEElimEnum
+  | PEElimTag
   deriving (Eq)
 
 instance Show PrimName where
@@ -38,6 +39,7 @@ instance Show PrimElimName where
   show PELower = "lower"
   show PEElimId = "elimId"
   show PEElimEnum = "elimEnum"
+  show PEElimTag = "elimTag"
 
 toPrimName :: String -> Maybe PrimName
 toPrimName "()" = Just PUnitType
@@ -58,6 +60,7 @@ toPrimElimName :: String -> Maybe PrimElimName
 toPrimElimName "lower" = Just PELower
 toPrimElimName "elimId" = Just PEElimId
 toPrimElimName "elimEnum" = Just PEElimEnum
+toPrimElimName "elimTag" = Just PEElimTag
 toPrimElimName _ = Nothing
 
 data PrimElimPosition = PEPFirst | PEPLast | PEPThird
