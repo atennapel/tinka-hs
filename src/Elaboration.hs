@@ -227,6 +227,17 @@ check ctx tm ty lv = do
       ct <- check ctx (SLabelLit x) (VTag e) lv
       return $ App (App (App (Prim (Left PTS)) (quoteCtx ctx l) (Impl ImplUnif)) (quoteCtx ctx e) (Impl ImplUnif)) ct Expl -- TS {l} {e} ct
     
+    (SNatLit n, VFin (VNatLit m)) | n < m -> return $ NatLit n
+    (SNatLit 0, VFin w) -> do
+      n <- evalCtx ctx <$> freshMeta ctx
+      unify (lvl ctx) w (VS n)
+      return $ NatLit 0
+    (SNatLit m, VFin w) -> do
+      n <- evalCtx ctx <$> freshMeta ctx
+      unify (lvl ctx) w (VS n)
+      check ctx (SNatLit (m - 1)) (VFin n) lv
+      return $ NatLit m
+
     (tm, _) -> do
       (ctm, ty', lv') <- insert ctx $ infer ctx tm
       debug $ "check: try to unify " ++ showVZ ctx ty' ++ " ~ " ++ showVZ ctx ty

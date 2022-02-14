@@ -32,6 +32,11 @@ check ctx tm ty = do
     (Refl, VId l a b x y) -> do
       throwUnless (conv (lvl ctx) a b) $ VerifyError $ "type equality failed " ++ show tm ++ " : " ++ showV ctx ty
       throwUnless (conv (lvl ctx) x y) $ VerifyError $ "value equality failed " ++ show tm ++ " : " ++ showV ctx ty
+
+    (NatLit 0, VFin (VS _)) -> return ()
+    (NatLit n, VFin (VNatLit m)) | n < m -> return ()
+    (NatLit n, VFin (VNatLit m)) -> throwIO $ VerifyError $ "check " ++ show tm ++ " : " ++ showV ctx ty ++ " failed"
+
     (tm, ty) -> do
       ty' <- infer ctx tm
       debug $ "verify: unify " ++ showV ctx ty' ++ " ~ " ++ showV ctx ty

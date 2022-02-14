@@ -78,6 +78,9 @@ pattern VTZ l e = VNe (HPrim PTZ) [EApp e (Impl ImplUnif), EApp l (Impl ImplUnif
 pattern VTS l e t = VNe (HPrim PTS) [EApp t Expl, EApp e (Impl ImplUnif), EApp l (Impl ImplUnif)]
 
 pattern VNat = VNe (HPrim PNat) []
+pattern VS n = VNe (HPrim PS) [EApp n Expl]
+pattern VFin n = VNe (HPrim PFin) [EApp n Expl]
+pattern VFS n x = VNe (HPrim PFS) [EApp x Expl, EApp n (Impl ImplUnif)]
 
 vpi :: Name -> Val -> VLevel -> VLevel -> (Val -> Val) -> Val
 vpi x a u1 u2 b = VPi x Expl a u1 (Fun b) u2

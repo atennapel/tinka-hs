@@ -7,7 +7,7 @@ data PrimName
   | PUnitType | PUnit
   | PBool | PTrue | PFalse
   | PId
-  | PNat
+  | PNat | PS | PFin | PFS
 
   | PLift
   | PLiftTerm
@@ -26,6 +26,8 @@ data PrimElimName
   | PEElimId
   | PEEx | PEEl | PEMapD | PEMapDEx
   | PEElimData
+  | PEElimNat
+  | PEElimFin
   deriving (Eq)
 
 instance Show PrimName where
@@ -47,6 +49,9 @@ instance Show PrimName where
   show PTZ = "TZ"
   show PTS = "TS"
   show PNat = "Nat"
+  show PS = "S"
+  show PFin = "Fin"
+  show PFS = "FS"
 
 instance Show PrimElimName where
   show PEAbsurd = "absurd"
@@ -59,6 +64,8 @@ instance Show PrimElimName where
   show PEMapD = "mapD"
   show PEMapDEx = "mapDEx"
   show PEElimData = "elimData"
+  show PEElimNat = "elimNat"
+  show PEElimFin = "elimFin"
 
 toPrimName :: String -> Maybe PrimName
 toPrimName "Void" = Just PVoid
@@ -79,6 +86,9 @@ toPrimName "Tag" = Just PTag
 toPrimName "TZ" = Just PTZ
 toPrimName "TS" = Just PTS
 toPrimName "Nat" = Just PNat
+toPrimName "S" = Just PS
+toPrimName "Fin" = Just PFin
+toPrimName "FS" = Just PFS
 toPrimName _ = Nothing
 
 toPrimElimName :: String -> Maybe PrimElimName
@@ -92,6 +102,8 @@ toPrimElimName "El" = Just PEEl
 toPrimElimName "mapD" = Just PEMapD
 toPrimElimName "mapDEx" = Just PEMapDEx
 toPrimElimName "elimData" = Just PEElimData
+toPrimElimName "elimNat" = Just PEElimNat
+toPrimElimName "elimFin" = Just PEElimFin
 toPrimElimName _ = Nothing
 
 data PrimElimPosition = PEPFirst | PEPLast | PEPThird

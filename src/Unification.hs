@@ -213,6 +213,10 @@ unify l a b = do
 
     (VLabelLit x, VLabelLit y) | x == y -> return ()
     (VNatLit x, VNatLit y) | x == y -> return ()
+    (VNatLit x, VS y) | x > 0 -> unify l (VNatLit (x - 1)) y
+    (VS y, VNatLit x) | x > 0 -> unify l y (VNatLit (x - 1))
+    (VNatLit x, VFS _ y) | x > 0 -> unify l (VNatLit (x - 1)) y
+    (VFS _ y, VNatLit x) | x > 0 -> unify l y (VNatLit (x - 1))
 
     (VPi _ i t u1 b u2, VPi _ i' t' u1' b' u2') | i == i' ->
       unifyLevel l u1 u1' >> unify l t t' >> unifyLevel l u2 u2' >> unifyClos l b b'
