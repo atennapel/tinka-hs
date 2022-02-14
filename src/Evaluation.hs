@@ -101,6 +101,12 @@ vprimelim PELower _ (VLiftTerm _ _ _ v) = v
 
 vprimelim PEElimId [_, _, _, _, _, Right (refl, _), _] VRefl = refl
 
+-- elimEnum <k> P enil econs ENil = enil
+vprimelim PEElimEnum [_, _, Right (enil, _), _] VENil = enil
+-- elimEnum <k> P enil econs (ECons hd tl) = econs hd tl (elimEnum <k> P enil econs tl) 
+vprimelim PEElimEnum as@[Left k, Right (p, _), Right (enil, _), Right (econs, _)] (VECons hd tl) =
+  vapp (vapp (vapp econs hd Expl) tl Expl) (vprimelim PEElimEnum as tl) Expl
+
 vprimelim x as (VNe h sp) = VNe h (EPrimElim x as : sp)
 vprimelim p as (VGlobal x sp v) = VGlobal x (EPrimElim p as : sp) (vprimelim p as v)
 vprimelim x as v = error $ "impossible vprimelim " ++ show x ++ " " ++ show v
@@ -175,6 +181,13 @@ evalprimelim PEElimId =
   vlamimpl "y" $ \y ->
   vlam "p" $ \pp ->
   vprimelim PEElimId [Left k, Left l, Right (a, Impl ImplUnif), Right (x, Impl ImplUnif), Right (p, Expl), Right (refl, Expl), Right (y, Impl ImplUnif)] pp
+evalprimelim PEElimEnum =
+  vlamlvl "k" $ \k ->
+  vlam "P" $ \p ->
+  vlam "enil" $ \enil ->
+  vlam "econs" $ \econs ->
+  vlam "e" $ \e ->
+  vprimelim PEElimEnum [Left k, Right (p, Expl), Right (enil, Expl), Right (econs, Expl)] e
 
 -- quote
 data QuoteLevel = Full | KeepGlobals
@@ -384,7 +397,7 @@ primElimType PELower =
 (refl : P {x} Refl)
 {y : A}
 (p : Id <l> <l> {A} {A} x y)
-P {y} p
+-> P {y} p
 -}
 primElimType PEElimId =
   (vpilvl "k" (const VOmega) $ \k ->
@@ -396,3 +409,18 @@ primElimType PEElimId =
   vpimpl "y" a (VFinLevel l) (VFinLevel k) $ \y ->
   vpi "p" (VId l l a a x y) (VFinLevel mempty) (VFinLevel k) $ \pp ->
   vapp (vapp p y (Impl ImplUnif)) pp Expl, VOmega)
+{-
+<k>
+(P : Enum -> Type k)
+(nil : P ENil)
+(cons : (hd : Label) (tl : Enum) -> P tl -> P (ECons hd tl))
+(e : Enum)
+-> P e
+-}
+primElimType PEElimEnum =
+  (vpilvl "k" (\k -> VFinLevel (vFLS k)) $ \k ->
+  vpi "P" (vfun VEnum (VFinLevel mempty) (VFinLevel (vFLS k)) (VTypeFin k)) (VFinLevel (vFLS k)) (VFinLevel k) $ \p ->
+  vfun (vapp p VENil Expl) (VFinLevel k) (VFinLevel k) $
+  vfun (vpi "hd" VLabel (VFinLevel mempty) (VFinLevel k) $ \hd -> vpi "tl" VEnum (VFinLevel mempty) (VFinLevel k) $ \tl -> vfun (vapp p tl Expl) (VFinLevel k) (VFinLevel k) $ vapp p (VECons hd tl) Expl) (VFinLevel k) (VFinLevel k) $
+  vpi "e" VEnum (VFinLevel mempty) (VFinLevel k) $ \e ->
+  vapp p e Expl, VOmega)
