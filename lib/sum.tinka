@@ -1,21 +1,23 @@
-import lib/bool;
+import lib/enum;
 import lib/functor;
 import lib/eq;
 
-Sum <l> (A B : Type l) : Type l = (b : Bool) ** if b A B;
-
-(+:) = Sum;
-
-Left <l> {A B : Type l} (x : A) : Sum A B = (True, x);
-Right <l> {A B : Type l} (x : B) : Sum A B = (False, x);
+Sum <l> (A B : Type l) : Type l = (tag : Tag '[Left Right]) ** switch {Type l} tag [A, B];
+Left <l> {A B : Type l} (x : A) : Sum A B = ('Left , x);
+Right <l> {A B : Type l} (x : B) : Sum A B = ('Right , x);
 
 indSum
   <l k> {A B : Type l}
   (P : Sum A B -> Type k)
   (left : (x : A) -> P (Left x))
   (right : (x : B) -> P (Right x))
-  (sum : Sum A B) : P sum
-  = indBool (\b. (x : if b A B) -> P (b, x)) left right sum._1 sum._2;
+  (sum : Sum A B) : P sum =
+  switchD {'[Left Right]} (\tag. (data : switch {Type l} tag [A, B]) -> P (tag, data))
+    sum._1
+    [left, right]
+    sum._2;
+
+(+:) = Sum;
 
 sum
   <l k> {A B : Type l} {R : Type k}

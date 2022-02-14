@@ -1,3 +1,12 @@
+import lib/enum;
+
+Bool = Tag '[True False];
+True : Bool = 'True ;
+False : Bool = 'False ;
+
+indBool <k> (P : Bool -> Type k) (t : P True) (f : P False) (b : Bool) : P b =
+  switchD P b [t, f];
+
 if <l> {A : Type l} (b : Bool) (t f : A) : A = indBool (\_. A) t f b;
 
 (<?>) <l> {A : Type l} (t f : A) (b : Bool) : A = if b t f;

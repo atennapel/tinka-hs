@@ -1,1 +1,7 @@
 (~) : {A : Type} -> A -> A -> Type = \{A} x y. Id {A} {A} x y;
+
+idJ <k> {A : Type} (P : {a b : A} -> a ~ b -> Type k) (h : {a : A} -> P Refl) {a b : A} (p : Id a b) : P p =
+  elimId {A} {a} (\{c} q. P {a} {c} q) (h {a}) {b} p;
+
+rewrite <k> {A : Type} (P : A -> Type k) {a b : A} (p : a ~ b) (h : P a) : P b =
+  idJ (\{x} {y} _. P x -> P y) (\q. q) p h;

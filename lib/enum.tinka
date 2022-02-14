@@ -1,0 +1,13 @@
+CasesD' <k> {E : Enum} (P : Tag E -> Type k) (D : Enum) (ren : Tag D -> Tag E) : Type k =
+  elimEnum (\D. (Tag D -> Tag E) -> Type k) (\_. Lift <k> ()) (\hd tl rest ren. P (ren TZ) ** rest (\x. ren (TS x))) D ren;
+
+CasesD <k> {E : Enum} (P : Tag E -> Type k) : Type k = CasesD' <k> P E (\x. x);
+
+switchD <k> {E : Enum} (P : Tag E -> Type k) (t : Tag E) (cases : CasesD P) : P t =
+  elimTag (\{D} t. (ren : Tag D -> Tag E) -> CasesD' P D ren -> P (ren t))
+    (\ren cs. cs._1)
+    (\t' ind ren cs. ind (\x. ren (TS x)) cs._2)
+    t (\x. x) cases;
+
+switch <k> {A : Type k} {E : Enum} (t : Tag E) (cases : CasesD {E} (\_. A)) : A =
+  switchD (\_. A) t cases;

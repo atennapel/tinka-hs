@@ -1,3 +1,4 @@
+import lib/void;
 import lib/bool;
 
 Eq (A : Type) = (eq : A -> A -> Bool) ** ();

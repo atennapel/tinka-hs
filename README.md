@@ -28,6 +28,11 @@ Currently supports:
 - simple instance arguments (`{{_ : Functor F}} -> ...`)
 
 TODO:
+- [ ] Fix parser bug with labels ending with ; or ,
+- [ ] Remove primitive unit
+- [ ] Descriptions
+
+OLD TODO:
 - [x] core language
   - [x] syntax
   - [x] levels

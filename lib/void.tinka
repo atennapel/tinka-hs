@@ -1,0 +1,5 @@
+import lib/enum;
+
+Void = Tag '[];
+
+absurd <k> {A : Type k} (v : Void) : A = switch v [];
