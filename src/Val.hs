@@ -45,9 +45,7 @@ data Val
   | VPiLvl Name (Clos VFinLevel) ClosLvl
   | VPair Val Val
   | VSigma Name Val VLevel (Clos Val) VLevel
-  | VCon Val
   | VRefl
-  | VNatLit Integer
   | VLabelLit Name
   | VType VLevel
   deriving (Show)
@@ -57,17 +55,11 @@ pattern VVar l = VNe (HVar l) []
 pattern VMeta m = VNe (HMeta m) []
 pattern VPrim x = VNe (HPrim x) []
 
-pattern VVoid = VNe (HPrim PVoid) []
 pattern VUnitType = VNe (HPrim PUnitType) []
 pattern VUnit = VNe (HPrim PUnit) []
-pattern VBool = VNe (HPrim PBool) []
-pattern VTrue = VNe (HPrim PTrue) []
-pattern VFalse = VNe (HPrim PFalse) []
 pattern VLift k l x = VNe (HPrim PLift) [EApp x Expl, EAppLvl l, EAppLvl k]
 pattern VLiftTerm k l a x = VNe (HPrim PLiftTerm) [EApp x Expl, EApp a (Impl ImplUnif), EAppLvl l, EAppLvl k]
-pattern VId l a b x y = VNe (HPrim PId) [EApp y Expl, EApp x Expl, EApp b (Impl ImplUnif), EApp a (Impl ImplUnif), EAppLvl l]
-
-pattern VData l i d j = VNe (HPrim PData) [EApp j Expl, EApp d Expl, EApp i (Impl ImplUnif), EAppLvl l]
+pattern VId l k a b x y = VNe (HPrim PId) [EApp y Expl, EApp x Expl, EApp b (Impl ImplUnif), EApp a (Impl ImplUnif), EAppLvl k, EAppLvl l]
 
 pattern VLabel = VNe (HPrim PLabel) []
 pattern VEnum = VNe (HPrim PEnum) []
@@ -76,11 +68,6 @@ pattern VECons hd tl = VNe (HPrim PECons) [EApp tl Expl, EApp hd Expl]
 pattern VTag e = VNe (HPrim PTag) [EApp e Expl]
 pattern VTZ l e = VNe (HPrim PTZ) [EApp e (Impl ImplUnif), EApp l (Impl ImplUnif)]
 pattern VTS l e t = VNe (HPrim PTS) [EApp t Expl, EApp e (Impl ImplUnif), EApp l (Impl ImplUnif)]
-
-pattern VNat = VNe (HPrim PNat) []
-pattern VS n = VNe (HPrim PS) [EApp n Expl]
-pattern VFin n = VNe (HPrim PFin) [EApp n Expl]
-pattern VFS n x = VNe (HPrim PFS) [EApp x Expl, EApp n (Impl ImplUnif)]
 
 vpi :: Name -> Val -> VLevel -> VLevel -> (Val -> Val) -> Val
 vpi x a u1 u2 b = VPi x Expl a u1 (Fun b) u2

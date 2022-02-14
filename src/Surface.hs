@@ -45,12 +45,10 @@ data STm
   | SProj STm SProjType
   | SPair STm STm
   | SSigma Name STm STm
-  | SCon STm
   | SRefl
   | SLet Name Bool (Maybe STy) STm STm
   | SType SLevel
   | SHole (Maybe Name)
-  | SNatLit Integer
   | SLabelLit Name
   | SPos SourcePos STm
 
@@ -60,7 +58,6 @@ showSTmS t@SRefl = show t
 showSTmS t@(SType (SLNat 0)) = show t
 showSTmS t@(SPair _ _) = show t
 showSTmS t@(SHole _) = show t
-showSTmS t@(SNatLit _) = show t
 showSTmS t@(SLabelLit _) = show t
 showSTmS (SPos _ t) = showSTmS t
 showSTmS t = "(" ++ show t ++ ")"
@@ -194,13 +191,11 @@ instance Show STm where
   show t@(SProj _ _) = showSTmProj t
   show t@(SPair _ _) = showSTmPair t
   show t@(SSigma _ _ _) = showSTmSigma t
-  show (SCon t) = "Con " ++ showSTmS t
   show SRefl = "Refl"
   show (SLet x i (Just t) v b) = "let " ++ (if i then "instance " else "") ++ showName x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (SLet x i Nothing v b) = "let " ++ (if i then "instance " else "") ++ showName x ++ " = " ++ show v ++ "; " ++ show b
   show (SType (SLNat 0)) = "Type"
   show (SType l) = "Type " ++ showSLevelS l
-  show (SNatLit i) = show i
   show (SLabelLit x) = "'" ++ x
 
 data Decl

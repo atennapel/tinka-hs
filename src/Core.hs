@@ -30,9 +30,7 @@ data Tm
   | Proj Tm ProjType
   | Pair Tm Tm
   | Sigma Name Tm Level Tm Level
-  | Con Tm
   | Refl
-  | NatLit Integer
   | LabelLit Name
   | Let Name Bool Ty Tm Tm
   | Type Level
@@ -56,7 +54,6 @@ showTmS t@(Prim _) = show t
 showTmS t@(Meta _) = show t
 showTmS t@(LabelLit _) = show t
 showTmS t@Refl = show t
-showTmS t@(NatLit _) = show t
 showTmS t@(InsertedMeta _ _) = show t
 showTmS t@(Type (FinLevel FLZ)) = show t
 showTmS t = "(" ++ show t ++ ")"
@@ -173,9 +170,7 @@ instance Show Tm where
   show t@(Proj _ _) = showTmProj t
   show t@(Pair _ _) = showTmPair t
   show t@Sigma {} = showTmSigma t
-  show (Con t) = "Con " ++ showTmS t
   show Refl = "Refl"
-  show (NatLit n) = show n
   show (LabelLit x) = "'" ++ x
   show (Let x i t v b) = "let " ++ (if i then "instance " else "") ++ showName x ++ " : " ++ show t ++ " = " ++ show v ++ "; " ++ show b
   show (Type (FinLevel FLZ)) = "Type"

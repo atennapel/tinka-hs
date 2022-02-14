@@ -206,14 +206,9 @@ check ctx tm ty lv = do
       cb <- check (define x inst vt u (evalCtx ctx cv) ctx) b ty lv
       return $ Let x inst ct cv cb
 
-    (SCon t, VData l i d j) -> do
-      ct <- check ctx t (vel l i (vlam "i" $ VData l i d) j d) lv
-      return $ Con ct
-    (SPair _ _, VData l i d j) -> check ctx (SCon tm) ty lv
-
-    (SRefl, VId l a b x y) -> do
-      catch (unify (lvl ctx) a b >> unify (lvl ctx) x y) $ \(err :: Error) -> 
-        catch (unify (lvl ctx) x y >> unify (lvl ctx) a b) $ \(err :: Error) ->
+    (SRefl, VId l k a b x y) -> do
+      catch (unifyFinLevel (lvl ctx) l k >> unify (lvl ctx) a b >> unify (lvl ctx) x y) $ \(err :: Error) -> 
+        catch (unifyFinLevel (lvl ctx) l k >> unify (lvl ctx) x y >> unify (lvl ctx) a b) $ \(err :: Error) ->
           throwIO $ ElaborateError $ "check failed " ++ show tm ++ " : " ++ showVZ ctx ty ++ ": " ++ show err
       return Refl
     (SVar "[]", VId {}) -> check ctx SRefl ty lv
@@ -226,17 +221,6 @@ check ctx tm ty lv = do
     (SLabelLit x, VTag (VECons l e)) -> do
       ct <- check ctx (SLabelLit x) (VTag e) lv
       return $ App (App (App (Prim (Left PTS)) (quoteCtx ctx l) (Impl ImplUnif)) (quoteCtx ctx e) (Impl ImplUnif)) ct Expl -- TS {l} {e} ct
-    
-    (SNatLit n, VFin (VNatLit m)) | n < m -> return $ NatLit n
-    (SNatLit 0, VFin w) -> do
-      n <- evalCtx ctx <$> freshMeta ctx
-      unify (lvl ctx) w (VS n)
-      return $ NatLit 0
-    (SNatLit m, VFin w) -> do
-      n <- evalCtx ctx <$> freshMeta ctx
-      unify (lvl ctx) w (VS n)
-      check ctx (SNatLit (m - 1)) (VFin n) lv
-      return $ NatLit m
 
     (tm, _) -> do
       (ctm, ty', lv') <- insert ctx $ infer ctx tm
@@ -425,7 +409,6 @@ infer ctx tm = do
       t <- freshMeta ctx
       maybe (return ()) (\x -> if x == "_" then addInstanceHole ctx t a u else addHole x ctx t a u) x
       return (t, a, u)
-    SNatLit n | n >= 0 -> return (NatLit n, VNat, VFinLevel mempty)
     tm -> throwIO $ ElaborateError $ "cannot infer: " ++ show tm
 
 tryUnify :: Ctx -> VLevel -> VLevel -> VTy -> VTy -> IO Bool

@@ -27,15 +27,10 @@ check ctx tm ty = do
       let vt = evalCtx ctx t
       check ctx v vt
       check (define x inst vt l (evalCtx ctx v) ctx) b ty
-    (Con t, VData l i d j) ->
-      check ctx t (vel l i (vlam "i" $ VData l i d) j d)
-    (Refl, VId l a b x y) -> do
+    (Refl, VId l k a b x y) -> do
+      throwUnless (l == k) $ VerifyError $ "level equality failed " ++ show tm ++ " : " ++ showV ctx ty
       throwUnless (conv (lvl ctx) a b) $ VerifyError $ "type equality failed " ++ show tm ++ " : " ++ showV ctx ty
       throwUnless (conv (lvl ctx) x y) $ VerifyError $ "value equality failed " ++ show tm ++ " : " ++ showV ctx ty
-
-    (NatLit 0, VFin (VS _)) -> return ()
-    (NatLit n, VFin (VNatLit m)) | n < m -> return ()
-    (NatLit n, VFin (VNatLit m)) -> throwIO $ VerifyError $ "check " ++ show tm ++ " : " ++ showV ctx ty ++ " failed"
 
     (tm, ty) -> do
       ty' <- infer ctx tm
@@ -84,7 +79,6 @@ infer ctx tm = do
       checkFinLevel ctx l
       return $ VType (VFinLevel (vFLS (finLevelCtx ctx l)))
     LabelLit _ -> return VLabel
-    NatLit _ -> return VNat
     Pi x i t _ b _ -> do
       l1 <- checkTy ctx t
       let vt = evalCtx ctx t

@@ -135,11 +135,6 @@ pType = do
   ws
   return $ maybe (SType (SLNat 0)) SType l
 
-pCon :: Parser STm
-pCon = do
-  symbol "Con"
-  SCon <$> pAtom
-
 pCommaSeparated :: Parser [STm]
 pCommaSeparated = do
   first <- pSurface
@@ -176,12 +171,10 @@ pAtom =
   withPos (
     pHole <|>
     try pType <|>
-    (SNatLit <$> (L.decimal <* ws)) <|>
     (SType (SLNat 0) <$ symbol "Type") <|>
     (SRefl <$ symbol "Refl") <|>
     (SLabelLit <$> pLabel) <|>
     (SVar <$> pIdent))
-  <|> pCon
   <|> try (SVar "()" <$ parens ws)
   <|> try (SVar "[]" <$ brackets ws)
   <|> try pPair
