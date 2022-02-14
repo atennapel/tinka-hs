@@ -211,11 +211,11 @@ check ctx tm ty lv = do
         catch (unifyFinLevel (lvl ctx) l k >> unify (lvl ctx) x y >> unify (lvl ctx) a b) $ \(err :: Error) ->
           throwIO $ ElaborateError $ "check failed " ++ show tm ++ " : " ++ showVZ ctx ty ++ ": " ++ show err
       return Refl
-    (SVar "[]", VId {}) -> check ctx SRefl ty lv
+    (SLabelLit "[]", VId {}) -> check ctx SRefl ty lv
 
-    (SVar x, VLift k l t) | x == "[]" || x == "True" || x == "False" -> do
+    (SLabelLit _, VLift k l t) -> do
       ct <- check ctx tm t (VFinLevel l)
-      return $ cLiftTerm (quoteFinLevelCtx ctx k) (quoteFinLevelCtx ctx l) (quoteCtx ctx t) ct
+      return $ cLiftTerm (quoteFinLevelCtx ctx k) (quoteFinLevelCtx ctx l) (quoteCtx ctx t) ct 
     
     (SLabelLit x, VTag (VECons (VLabelLit y) e)) | x == y -> check ctx (SVar "TZ") ty lv
     (SLabelLit x, VTag (VECons l e)) -> do

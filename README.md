@@ -28,8 +28,8 @@ Currently supports:
 - simple instance arguments (`{{_ : Functor F}} -> ...`)
 
 TODO:
+- [x] Remove primitive unit
 - [ ] Fix parser bug with labels ending with ; or ,
-- [ ] Remove primitive unit
 - [ ] Descriptions
 
 OLD TODO:

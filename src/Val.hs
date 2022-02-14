@@ -55,8 +55,6 @@ pattern VVar l = VNe (HVar l) []
 pattern VMeta m = VNe (HMeta m) []
 pattern VPrim x = VNe (HPrim x) []
 
-pattern VUnitType = VNe (HPrim PUnitType) []
-pattern VUnit = VNe (HPrim PUnit) []
 pattern VLift k l x = VNe (HPrim PLift) [EApp x Expl, EAppLvl l, EAppLvl k]
 pattern VLiftTerm k l a x = VNe (HPrim PLiftTerm) [EApp x Expl, EApp a (Impl ImplUnif), EAppLvl l, EAppLvl k]
 pattern VId l k a b x y = VNe (HPrim PId) [EApp y Expl, EApp x Expl, EApp b (Impl ImplUnif), EApp a (Impl ImplUnif), EAppLvl k, EAppLvl l]

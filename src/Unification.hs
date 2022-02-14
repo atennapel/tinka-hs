@@ -223,9 +223,6 @@ unify l a b = do
     (VNe (HMeta m) sp, t) -> solve l m sp t
     (t, VNe (HMeta m) sp) -> solve l m sp t
 
-    (VUnit, v) -> return ()
-    (v, VUnit) -> return ()
-
     (VRefl, v) -> return ()
     (v, VRefl) -> return ()
 

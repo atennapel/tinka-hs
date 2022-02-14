@@ -147,7 +147,7 @@ pPair :: Parser STm
 pPair = parens (foldr1 SPair <$> pCommaSeparated)
 
 pUnitPair :: Parser STm
-pUnitPair = brackets (foldr SPair (SVar "[]") <$> pCommaSeparated)
+pUnitPair = brackets (foldr SPair (SLabelLit "[]") <$> pCommaSeparated)
 
 pEnum :: Parser STm
 pEnum = do
@@ -176,7 +176,7 @@ pAtom =
     (SLabelLit <$> pLabel) <|>
     (SVar <$> pIdent))
   <|> try (SVar "()" <$ parens ws)
-  <|> try (SVar "[]" <$ brackets ws)
+  <|> try (SLabelLit "[]" <$ brackets ws)
   <|> try pPair
   <|> try pEnum
   <|> try pUnitPair
@@ -186,7 +186,7 @@ pBinder :: Parser Name
 pBinder = pIdent <|> symbol "_"
 
 pOpBinder :: Parser Name
-pOpBinder = parens pOperator <|> pBinder
+pOpBinder = try ("()" <$ parens ws) <|> parens pOperator <|> pBinder
 
 pProj :: Parser SProjType
 pProj = do

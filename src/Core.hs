@@ -117,7 +117,7 @@ showTmPair :: Tm -> String
 showTmPair s =
   let ps = flattenPair s in
     case last ps of
-      Prim (Left PUnit) -> "[" ++ intercalate ", " (map show $ init ps) ++ "]"
+      LabelLit "tt" -> "[" ++ intercalate ", " (map show $ init ps) ++ "]"
       Refl -> "[" ++ intercalate ", " (map show $ init ps) ++ "]"
       _ -> "(" ++ intercalate ", " (map show ps) ++ ")"
   where

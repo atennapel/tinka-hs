@@ -1,3 +1,5 @@
+import lib/unit;
+
 CasesD' <k> {E : Enum} (P : Tag E -> Type k) (D : Enum) (ren : Tag D -> Tag E) : Type k =
   elimEnum (\D. (Tag D -> Tag E) -> Type k) (\_. Lift <k> ()) (\hd tl rest ren. P (ren TZ) ** rest (\x. ren (TS x))) D ren;
 

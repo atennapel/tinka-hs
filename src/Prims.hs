@@ -3,8 +3,7 @@ module Prims where
 import Common
 
 data PrimName
-  = PUnitType | PUnit
-  | PId
+  = PId
 
   | PLift
   | PLiftTerm
@@ -22,8 +21,6 @@ data PrimElimName
   deriving (Eq)
 
 instance Show PrimName where
-  show PUnitType = "()"
-  show PUnit = "[]"
   show PId = "Id"
   show PLift = "Lift"
   show PLiftTerm = "lift"
@@ -42,8 +39,6 @@ instance Show PrimElimName where
   show PEElimTag = "elimTag"
 
 toPrimName :: String -> Maybe PrimName
-toPrimName "()" = Just PUnitType
-toPrimName "[]" = Just PUnit
 toPrimName "Id" = Just PId
 toPrimName "Lift" = Just PLift
 toPrimName "lift" = Just PLiftTerm

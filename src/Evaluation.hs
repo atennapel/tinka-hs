@@ -330,9 +330,6 @@ conv l a b = case (a, b) of
   (VPair a b, x) -> conv l a (vfst x) && conv l b (vsnd x)
   (x, VPair a b) -> conv l (vfst x) a && conv l (vsnd x) b
 
-  (VUnit, v) -> True
-  (v, VUnit) -> True
-
   (VRefl, v) -> True
   (v, VRefl) -> True
 
@@ -351,8 +348,6 @@ conv l a b = case (a, b) of
 
 -- prim types
 primType :: PrimName -> (Val, VLevel)
-primType PUnitType = (VType vFLZ, VFinLevel (vFLS mempty))
-primType PUnit = (VUnitType, VFinLevel mempty)
 -- <k l> -> Type l -> Type (max l k)
 primType PLift =
   (vpilvl "k" (const VOmega) $ \k ->
